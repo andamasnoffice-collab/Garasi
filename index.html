@@ -1,0 +1,2009 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GarasiKu - Sistem Gerbang & Logbook Armada</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Free CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        dark: {
+                            base: '#090D16',
+                            surface: '#0F172A',
+                            card: '#131D31',
+                            cardHover: '#1A2640',
+                            border: '#1E293B',
+                            borderLight: '#334155'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #090D16;
+            color: #E2E8F0;
+        }
+        ::-webkit-scrollbar {
+            width: 7px;
+            height: 7px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #090D16;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1E293B;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #334155;
+        }
+        .tab-btn.active {
+            color: #38BDF8;
+            background: rgba(14, 165, 233, 0.12);
+            border-color: #0284C7;
+            font-weight: 600;
+        }
+        @media print {
+            body * { visibility: hidden !important; }
+            #printable-ticket, #printable-ticket * {
+                visibility: visible !important;
+                color: #000000 !important;
+                background: #ffffff !important;
+            }
+            #printable-ticket {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 24px;
+                border: none !important;
+                box-shadow: none !important;
+            }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body class="bg-dark-base text-slate-200 min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-black">
+
+    <!-- TOP NAVIGATION BAR -->
+    <header class="bg-dark-surface/90 backdrop-blur-md border-b border-dark-border sticky top-0 z-30 shadow-lg shadow-black/30">
+        <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16 gap-2">
+                <!-- Brand Title -->
+                <div class="flex items-center space-x-2.5 sm:space-x-3 shrink-0">
+                    <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-cyan-500/20 ring-1 ring-cyan-400/30">
+                        <i class="fa-solid fa-warehouse text-base sm:text-lg"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="font-extrabold text-base sm:text-lg text-white tracking-tight">GarasiKu</span>
+                            <span class="px-2 py-0.5 text-[9px] sm:text-[10px] font-bold rounded-full bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 uppercase tracking-wider">GATE PRO</span>
+                        </div>
+                        <p class="text-[10px] sm:text-[11px] text-slate-400 hidden md:block">Sistem Gerbang Armada & Kendali Pengemudi</p>
+                    </div>
+                </div>
+
+                <!-- Clock, Admin Controls & Actions -->
+                <div class="flex items-center space-x-1.5 sm:space-x-2.5">
+                    <!-- Live Clock -->
+                    <div class="hidden lg:flex flex-col text-right pr-3 border-r border-dark-border">
+                        <span id="live-time" class="font-mono text-xs font-bold text-cyan-400">--:--:-- WIB</span>
+                        <span id="live-date" class="text-[10px] text-slate-400">Memuat...</span>
+                    </div>
+
+                    <!-- Admin Auth Toggle Button -->
+                    <button id="btn-admin-auth" onclick="toggleAdminState()" class="px-2.5 sm:px-3 py-1.5 rounded-xl border border-dark-border bg-dark-card hover:bg-dark-cardHover text-slate-300 text-xs font-semibold flex items-center space-x-1.5 transition">
+                        <i id="admin-badge-icon" class="fa-solid fa-user-shield text-slate-400 text-xs"></i>
+                        <span id="admin-badge-text" class="hidden sm:inline">Mode Tamu</span>
+                    </button>
+
+                    <!-- Ganti PIN Button (Hanya tampil saat Admin Aktif) -->
+                    <button id="btn-change-pin" onclick="openChangePinModal()" class="hidden px-2.5 sm:px-3 py-1.5 rounded-xl border border-indigo-900/60 bg-indigo-950/40 hover:bg-indigo-900/50 text-indigo-300 text-xs font-semibold items-center space-x-1.5 transition">
+                        <i class="fa-solid fa-key text-xs"></i>
+                        <span class="hidden sm:inline">Ganti PIN</span>
+                    </button>
+
+                    <!-- Cloud DB Status / Config (Hanya tampil saat Admin Aktif) -->
+                    <button id="btn-cloud-config" onclick="openModal('modal-firebase-config')" class="hidden px-2 sm:px-3 py-1.5 rounded-xl border border-emerald-900/60 bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-400 text-xs font-semibold items-center space-x-1.5 transition">
+                        <i class="fa-solid fa-cloud text-xs"></i>
+                        <span id="cloud-status-text" class="hidden sm:inline">Cloud DB</span>
+                        <span id="cloud-status-dot" class="w-2 h-2 rounded-full bg-slate-600"></span>
+                    </button>
+
+                    <!-- Telegram Bot (Hanya tampil saat Admin Aktif) -->
+                    <button id="btn-telegram-config" onclick="openModal('modal-telegram')" class="hidden px-2 sm:px-3 py-1.5 rounded-xl border border-sky-900/60 bg-sky-950/40 hover:bg-sky-900/50 text-sky-400 text-xs font-semibold items-center space-x-1.5 transition">
+                        <i class="fa-brands fa-telegram text-sky-400 text-sm"></i>
+                        <span class="hidden sm:inline">Bot Telegram</span>
+                        <span id="telegram-status-dot" class="w-2 h-2 rounded-full bg-slate-600"></span>
+                    </button>
+
+                    <!-- Quick Gate Actions -->
+                    <button onclick="openModal('modal-checkout')" class="px-2.5 sm:px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs sm:text-sm font-bold flex items-center space-x-1.5 shadow-md shadow-amber-500/20 transition active:scale-95">
+                        <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                        <span class="whitespace-nowrap">Catat Keluar</span>
+                    </button>
+                    <button onclick="openModal('modal-checkin')" class="px-2.5 sm:px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 text-xs sm:text-sm font-bold flex items-center space-x-1.5 shadow-md shadow-emerald-500/20 transition active:scale-95">
+                        <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                        <span class="whitespace-nowrap">Catat Masuk</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 w-full flex-1 space-y-6">
+
+        <!-- 5 STATISTIC SUMMARY CARDS -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3.5">
+            <div onclick="openStatDetail('total')" class="bg-dark-surface/90 p-3.5 sm:p-4 rounded-2xl border border-dark-border hover:border-cyan-500/60 shadow-lg shadow-black/20 hover:-translate-y-0.5 transition cursor-pointer group backdrop-blur-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-medium text-slate-400 group-hover:text-cyan-400 transition">Total Armada</span>
+                    <div class="w-8 h-8 rounded-lg bg-cyan-950/70 border border-cyan-800/50 text-cyan-400 flex items-center justify-center text-sm group-hover:bg-cyan-500 group-hover:text-black transition">
+                        <i class="fa-solid fa-car"></i>
+                    </div>
+                </div>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <h3 id="stat-total-vehicles" class="text-xl sm:text-2xl font-extrabold text-white font-mono">0</h3>
+                    <span class="text-[11px] text-cyan-400 font-semibold opacity-80 group-hover:opacity-100 transition">Lihat &rarr;</span>
+                </div>
+                <p id="stat-total-sub" class="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">Semua unit terdaftar</p>
+            </div>
+
+            <div onclick="openStatDetail('garage')" class="bg-dark-surface/90 p-3.5 sm:p-4 rounded-2xl border border-dark-border hover:border-emerald-500/60 shadow-lg shadow-black/20 hover:-translate-y-0.5 transition cursor-pointer group backdrop-blur-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-medium text-slate-400 group-hover:text-emerald-400 transition">Di Garasi (Ready)</span>
+                    <div class="w-8 h-8 rounded-lg bg-emerald-950/70 border border-emerald-800/50 text-emerald-400 flex items-center justify-center text-sm group-hover:bg-emerald-500 group-hover:text-black transition">
+                        <i class="fa-solid fa-square-parking"></i>
+                    </div>
+                </div>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <h3 id="stat-in-garage" class="text-xl sm:text-2xl font-extrabold text-emerald-400 font-mono">0</h3>
+                    <span class="text-[11px] text-emerald-400 font-semibold opacity-80 group-hover:opacity-100 transition">Lihat &rarr;</span>
+                </div>
+                <p class="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">Siap ditugaskan</p>
+            </div>
+
+            <div onclick="openStatDetail('out')" class="bg-dark-surface/90 p-3.5 sm:p-4 rounded-2xl border border-dark-border hover:border-amber-500/60 shadow-lg shadow-black/20 hover:-translate-y-0.5 transition cursor-pointer group backdrop-blur-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-medium text-slate-400 group-hover:text-amber-400 transition">Sedang Keluar</span>
+                    <div class="w-8 h-8 rounded-lg bg-amber-950/70 border border-amber-800/50 text-amber-400 flex items-center justify-center text-sm group-hover:bg-amber-500 group-hover:text-black transition">
+                        <i class="fa-solid fa-route"></i>
+                    </div>
+                </div>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <h3 id="stat-on-trip" class="text-xl sm:text-2xl font-extrabold text-amber-400 font-mono">0</h3>
+                    <span class="text-[11px] text-amber-400 font-semibold opacity-80 group-hover:opacity-100 transition">Lihat &rarr;</span>
+                </div>
+                <p class="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">Di luar garasi</p>
+            </div>
+
+            <div onclick="openStatDetail('drivers')" class="bg-dark-surface/90 p-3.5 sm:p-4 rounded-2xl border border-dark-border hover:border-indigo-500/60 shadow-lg shadow-black/20 hover:-translate-y-0.5 transition cursor-pointer group backdrop-blur-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-medium text-slate-400 group-hover:text-indigo-400 transition">Driver Bertugas</span>
+                    <div class="w-8 h-8 rounded-lg bg-indigo-950/70 border border-indigo-800/50 text-indigo-400 flex items-center justify-center text-sm group-hover:bg-indigo-500 group-hover:text-black transition">
+                        <i class="fa-solid fa-id-badge"></i>
+                    </div>
+                </div>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <h3 id="stat-active-drivers" class="text-xl sm:text-2xl font-extrabold text-indigo-400 font-mono">0</h3>
+                    <span class="text-[11px] text-indigo-400 font-semibold opacity-80 group-hover:opacity-100 transition">Lihat &rarr;</span>
+                </div>
+                <p id="stat-drivers-sub" class="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">Dari 0 driver</p>
+            </div>
+
+            <div onclick="openStatDetail('etoll')" class="col-span-2 sm:col-span-1 bg-dark-surface/90 p-3.5 sm:p-4 rounded-2xl border border-dark-border hover:border-teal-500/60 shadow-lg shadow-black/20 hover:-translate-y-0.5 transition cursor-pointer group backdrop-blur-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-medium text-slate-400 group-hover:text-teal-400 transition">Kartu E-Toll</span>
+                    <div class="w-8 h-8 rounded-lg bg-teal-950/70 border border-teal-800/50 text-teal-400 flex items-center justify-center text-sm group-hover:bg-teal-500 group-hover:text-black transition">
+                        <i class="fa-solid fa-credit-card"></i>
+                    </div>
+                </div>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <h3 id="stat-etoll-ratio" class="text-xl sm:text-2xl font-extrabold text-teal-400 font-mono">0 / 0</h3>
+                    <span class="text-[11px] text-teal-400 font-semibold opacity-80 group-hover:opacity-100 transition">Kelola &rarr;</span>
+                </div>
+                <p id="stat-etoll-sub" class="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">Total: Rp 0</p>
+            </div>
+        </div>
+
+        <!-- NAVIGATION TABS -->
+        <div class="bg-dark-surface/90 backdrop-blur-sm rounded-2xl p-1.5 shadow-lg border border-dark-border flex items-center space-x-1.5 overflow-x-auto text-xs sm:text-sm">
+            <button onclick="switchTab('tab-monitoring')" id="tab-btn-monitoring" class="tab-btn active px-3.5 py-2.5 rounded-xl font-medium border border-transparent text-slate-300 hover:text-white transition flex items-center space-x-2 whitespace-nowrap">
+                <i class="fa-solid fa-border-all"></i>
+                <span>Monitoring Garasi</span>
+            </button>
+            <button onclick="switchTab('tab-logbook')" id="tab-btn-logbook" class="tab-btn px-3.5 py-2.5 rounded-xl font-medium border border-transparent text-slate-300 hover:text-white transition flex items-center space-x-2 whitespace-nowrap">
+                <i class="fa-solid fa-book-open"></i>
+                <span>Logbook Gerbang</span>
+            </button>
+            <button onclick="switchTab('tab-vehicles')" id="tab-btn-vehicles" class="tab-btn px-3.5 py-2.5 rounded-xl font-medium border border-transparent text-slate-300 hover:text-white transition flex items-center space-x-2 whitespace-nowrap">
+                <i class="fa-solid fa-car-side"></i>
+                <span>Daftar Armada</span>
+            </button>
+            <button onclick="switchTab('tab-drivers')" id="tab-btn-drivers" class="tab-btn px-3.5 py-2.5 rounded-xl font-medium border border-transparent text-slate-300 hover:text-white transition flex items-center space-x-2 whitespace-nowrap">
+                <i class="fa-solid fa-users"></i>
+                <span>Daftar Driver</span>
+            </button>
+        </div>
+
+        <!-- TAB 1: MONITORING GARASI -->
+        <div id="tab-monitoring" class="tab-content space-y-6">
+            <!-- Active Trips Section -->
+            <div id="active-trips-section" class="bg-gradient-to-r from-amber-950/40 via-amber-900/20 to-transparent border border-amber-500/40 rounded-3xl p-4 sm:p-5 space-y-3 shadow-lg shadow-amber-950/20 hidden">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2 text-amber-300 font-bold text-xs sm:text-sm">
+                        <i class="fa-solid fa-circle-radiation text-amber-400 animate-pulse"></i>
+                        <span>Armada Sedang Bertugas di Luar</span>
+                        <span id="active-trips-badge" class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-mono">0 Unit</span>
+                    </div>
+                </div>
+                <div id="active-trips-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+            </div>
+
+            <!-- Fleet Status Grid -->
+            <div class="bg-dark-surface/90 rounded-3xl p-4 sm:p-5 border border-dark-border shadow-xl space-y-4">
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-dark-border pb-4">
+                    <div>
+                        <h2 class="text-base font-bold text-white flex items-center space-x-2">
+                            <i class="fa-solid fa-cubes-stacked text-cyan-400"></i>
+                            <span>Status Seluruh Armada</span>
+                        </h2>
+                        <p class="text-xs text-slate-400">Sentuh unit untuk mencatat keluar atau memeriksa status operasional</p>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div id="category-filter-pills" class="flex flex-wrap items-center gap-1.5 overflow-x-auto py-1"></div>
+                        <select id="vehicle-sort-select" onchange="handleSortVehicles(this.value)" class="text-xs px-3 py-1.5 rounded-xl border border-dark-border bg-dark-card font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+                            <option value="frequent" selected>Sort: Sering Dipakai</option>
+                            <option value="unit-asc">Sort: No. Unit (1-52)</option>
+                            <option value="category">Sort: Kategori</option>
+                            <option value="plate-asc">Sort: Plat (A-Z)</option>
+                            <option value="garage-first">Sort: Siap di Garasi</option>
+                            <option value="km-asc">Sort: KM Terendah</option>
+                            <option value="km-desc">Sort: KM Tertinggi</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="monitoring-vehicles-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-3.5"></div>
+            </div>
+        </div>
+
+        <!-- TAB 2: LOGBOOK GERBANG -->
+        <div id="tab-logbook" class="tab-content hidden space-y-4">
+            <div class="bg-dark-surface/90 rounded-3xl p-4 sm:p-5 border border-dark-border shadow-xl space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-base font-bold text-white flex items-center space-x-2">
+                            <i class="fa-solid fa-book-open text-cyan-400"></i>
+                            <span>Riwayat Catatan Gerbang Keluar & Masuk</span>
+                        </h2>
+                        <p class="text-xs text-slate-400">Filter berdasarkan rentang waktu dan status perjalanan</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="exportLogsToCSV()" class="px-3 py-2 rounded-xl border border-emerald-900/60 bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-400 text-xs font-semibold flex items-center space-x-1.5 transition">
+                            <i class="fa-solid fa-file-excel text-emerald-400"></i>
+                            <span>Ekspor CSV</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Rentang Waktu & Filter Bar -->
+                <div class="p-3 bg-dark-card rounded-2xl border border-dark-border space-y-2.5">
+                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                        <div class="relative">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                            <input type="text" id="log-search" oninput="renderLogsTable()" placeholder="Cari plat, driver, tujuan..." class="w-full pl-8 pr-3 py-1.5 rounded-xl border border-dark-border bg-dark-surface text-xs text-slate-100 placeholder-slate-400 focus:ring-2 focus:ring-cyan-500/40">
+                        </div>
+                        <select id="log-filter-status" onchange="renderLogsTable()" class="px-3 py-1.5 rounded-xl border border-dark-border bg-dark-surface text-xs text-slate-200 focus:ring-2 focus:ring-cyan-500/40">
+                            <option value="ALL">Semua Status</option>
+                            <option value="ACTIVE">Sedang di Luar</option>
+                            <option value="COMPLETED">Selesai (Kembali)</option>
+                        </select>
+                        <div class="flex items-center space-x-1">
+                            <span class="text-[10px] text-slate-400 shrink-0">Dari:</span>
+                            <input type="date" id="log-filter-start-date" onchange="renderLogsTable()" class="w-full px-2 py-1.5 rounded-xl border border-dark-border bg-dark-surface text-xs text-slate-200">
+                        </div>
+                        <div class="flex items-center space-x-1">
+                            <span class="text-[10px] text-slate-400 shrink-0">Sampai:</span>
+                            <input type="date" id="log-filter-end-date" onchange="renderLogsTable()" class="w-full px-2 py-1.5 rounded-xl border border-dark-border bg-dark-surface text-xs text-slate-200">
+                        </div>
+                    </div>
+                    <!-- Preset Date Buttons -->
+                    <div class="flex items-center justify-between text-xs pt-1 border-t border-dark-borderLight">
+                        <div class="flex items-center space-x-1.5">
+                            <span class="text-[10px] text-slate-400">Rentang Cepat:</span>
+                            <button type="button" onclick="setLogDatePreset('today')" class="px-2 py-0.5 rounded-lg bg-dark-surface hover:bg-slate-800 text-[11px] text-slate-300">Hari Ini</button>
+                            <button type="button" onclick="setLogDatePreset('week')" class="px-2 py-0.5 rounded-lg bg-dark-surface hover:bg-slate-800 text-[11px] text-slate-300">7 Hari</button>
+                            <button type="button" onclick="setLogDatePreset('month')" class="px-2 py-0.5 rounded-lg bg-dark-surface hover:bg-slate-800 text-[11px] text-slate-300">Bulan Ini</button>
+                            <button type="button" onclick="setLogDatePreset('all')" class="px-2 py-0.5 rounded-lg bg-dark-surface hover:bg-slate-800 text-[11px] text-slate-300">Semua</button>
+                        </div>
+                        <span id="log-records-count" class="text-[11px] text-slate-400 font-mono">0 Catatan</span>
+                    </div>
+                </div>
+
+                <!-- Table Container -->
+                <div class="overflow-x-auto rounded-2xl border border-dark-border">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead class="bg-dark-card border-b border-dark-border text-slate-400 uppercase tracking-wider font-semibold">
+                            <tr>
+                                <th class="p-3">Kendaraan</th>
+                                <th class="p-3">Driver & Bagian</th>
+                                <th class="p-3">Jam Keluar</th>
+                                <th class="p-3">Jam Masuk</th>
+                                <th class="p-3">Tujuan & Keperluan</th>
+                                <th class="p-3">Odometer (KM)</th>
+                                <th class="p-3">Status</th>
+                                <th class="p-3 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-table-body" class="divide-y divide-dark-border text-slate-300"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: DAFTAR ARMADA -->
+        <div id="tab-vehicles" class="tab-content hidden space-y-4">
+            <div class="bg-dark-surface/90 rounded-3xl p-4 sm:p-5 border border-dark-border shadow-xl space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-base font-bold text-white flex items-center space-x-2">
+                            <i class="fa-solid fa-car-side text-cyan-400"></i>
+                            <span>Daftar Master Armada</span>
+                        </h2>
+                        <p class="text-xs text-slate-400">Status aktif operasional, nomor lambung, serta kategori armada</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <select id="fleet-filter-active" onchange="renderFleetTable()" class="px-3 py-1.5 rounded-xl border border-dark-border bg-dark-card text-xs text-slate-200">
+                            <option value="ALL">Semua Armada</option>
+                            <option value="ON">Hanya ON (Aktif)</option>
+                            <option value="OFF">Hanya OFF (Nonaktif)</option>
+                        </select>
+                        <button id="btn-add-vehicle" onclick="openModal('modal-add-vehicle')" class="hidden px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-xs items-center space-x-1.5 shadow-md shadow-cyan-600/30 transition">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>+ Tambah Armada</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-2xl border border-dark-border">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead class="bg-dark-card border-b border-dark-border text-slate-400 uppercase tracking-wider font-semibold">
+                            <tr>
+                                <th class="p-3">No. Unit</th>
+                                <th class="p-3">Plat Nomor</th>
+                                <th class="p-3">Model Kendaraan</th>
+                                <th class="p-3">Kategori</th>
+                                <th class="p-3">Odometer</th>
+                                <th class="p-3">Status Operasional</th>
+                                <th class="p-3">Posisi</th>
+                                <th class="p-3 text-center admin-col hidden">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fleet-table-body" class="divide-y divide-dark-border text-slate-300"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: DAFTAR DRIVER -->
+        <div id="tab-drivers" class="tab-content hidden space-y-4">
+            <div class="bg-dark-surface/90 rounded-3xl p-4 sm:p-5 border border-dark-border shadow-xl space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-base font-bold text-white flex items-center space-x-2">
+                            <i class="fa-solid fa-users text-indigo-400"></i>
+                            <span>Daftar Pengemudi / Driver</span>
+                        </h2>
+                        <p class="text-xs text-slate-400">Manajemen status driver aktif, nomor kontak, dan penugasan</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <select id="driver-filter-active" onchange="renderDriversGrid()" class="px-3 py-1.5 rounded-xl border border-dark-border bg-dark-card text-xs text-slate-200">
+                            <option value="ALL">Semua Driver</option>
+                            <option value="ON">Hanya ON (Aktif)</option>
+                            <option value="OFF">Hanya OFF (Cuti/Izin)</option>
+                        </select>
+                        <button id="btn-add-driver" onclick="openModal('modal-add-driver')" class="hidden px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs items-center space-x-1.5 shadow-md shadow-indigo-600/30 transition">
+                            <i class="fa-solid fa-user-plus"></i>
+                            <span>+ Tambah Driver</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="drivers-cards-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-4"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL ADMIN AUTH PIN -->
+    <div id="modal-admin-auth" class="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 hidden">
+        <div class="bg-dark-surface w-full max-w-sm rounded-3xl shadow-2xl border border-dark-border overflow-hidden text-center p-6 space-y-4">
+            <div class="w-12 h-12 rounded-2xl bg-cyan-950 border border-cyan-800/50 text-cyan-400 flex items-center justify-center mx-auto text-xl shadow-lg shadow-cyan-950/40">
+                <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-base text-white">Masukkan PIN Admin</h3>
+                <p class="text-xs text-slate-400 mt-1">Otorisasi diperlukan untuk aksi master & konfigurasi</p>
+            </div>
+            <input type="password" id="admin-pin-input" maxlength="8" placeholder="••••" class="w-full text-center tracking-widest text-xl font-mono px-4 py-2.5 rounded-xl border border-dark-border bg-dark-card text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+            <div class="flex items-center space-x-2">
+                <button type="button" onclick="closeModal('modal-admin-auth')" class="w-1/2 py-2.5 rounded-xl border border-dark-border text-slate-300 text-xs font-semibold hover:bg-dark-card">Batal</button>
+                <button type="button" onclick="submitAdminPin()" class="w-1/2 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold">Masuk</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL GANTI PIN -->
+    <div id="modal-change-pin" class="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 hidden">
+        <div class="bg-dark-surface w-full max-w-sm rounded-3xl shadow-2xl border border-dark-border overflow-hidden">
+            <div class="bg-indigo-600 px-5 py-4 text-white flex items-center justify-between">
+                <h3 class="font-extrabold text-sm"><i class="fa-solid fa-key mr-2"></i>Ganti PIN Otorisasi Admin</h3>
+                <button onclick="closeModal('modal-change-pin')" class="text-white/80 hover:text-white text-lg font-bold">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form onsubmit="handleChangePinSubmit(event)" class="p-5 space-y-3.5 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-200 mb-1">PIN Lama <span class="text-rose-400">*</span></label>
+                    <input type="password" id="pin-old" required placeholder="Masukkan PIN saat ini" class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-white font-mono focus:ring-2 focus:ring-indigo-500/40">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-200 mb-1">PIN Baru (4-8 Karakter) <span class="text-rose-400">*</span></label>
+                    <input type="password" id="pin-new" required maxlength="8" placeholder="Masukkan PIN baru" class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-white font-mono focus:ring-2 focus:ring-indigo-500/40">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-200 mb-1">Konfirmasi PIN Baru <span class="text-rose-400">*</span></label>
+                    <input type="password" id="pin-confirm" required maxlength="8" placeholder="Ketik ulang PIN baru" class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-white font-mono focus:ring-2 focus:ring-indigo-500/40">
+                </div>
+                <div class="pt-2 flex justify-end space-x-2">
+                    <button type="button" onclick="closeModal('modal-change-pin')" class="px-3.5 py-2 rounded-xl border border-dark-border text-slate-300">Batal</button>
+                    <button type="submit" class="px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-bold">Simpan PIN Baru</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL CHECKOUT (CATAT KELUAR) -->
+    <div id="modal-checkout" class="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 hidden">
+        <div class="bg-dark-surface w-full max-w-lg rounded-3xl shadow-2xl border border-dark-border overflow-hidden max-h-[92vh] flex flex-col">
+            <div class="bg-gradient-to-r from-amber-600 to-amber-500 px-5 sm:px-6 py-4 text-slate-950 flex items-center justify-between">
+                <div>
+                    <h3 class="font-extrabold text-base"><i class="fa-solid fa-arrow-right-from-bracket mr-2"></i>Catat Kendaraan Keluar Garasi</h3>
+                    <p class="text-[11px] text-amber-950 font-medium">Hanya kendaraan & pengemudi yang wajib diisi</p>
+                </div>
+                <button onclick="closeModal('modal-checkout')" class="text-amber-950/80 hover:text-amber-950 text-xl font-bold">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="form-checkout" onsubmit="handleCheckoutSubmit(event)" class="p-5 sm:p-6 space-y-4 overflow-y-auto text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-200 mb-1">Pilih Kendaraan <span class="text-rose-400">*</span></label>
+                    <select id="checkout-vehicle-id" required onchange="updateCheckoutVehicleKM()" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100 focus:ring-2 focus:ring-amber-500/40"></select>
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label class="font-semibold text-slate-200">Pilih Pengemudi <span class="text-rose-400">*</span></label>
+                        <div class="flex items-center space-x-1 bg-dark-card p-1 rounded-xl text-[11px] border border-dark-border">
+                            <button type="button" id="btn-driver-registered" onclick="setDriverMode('registered')" class="px-2.5 py-1 rounded-lg font-semibold bg-cyan-600 text-white shadow-sm">Daftar Driver</button>
+                            <button type="button" id="btn-driver-custom" onclick="setDriverMode('custom')" class="px-2.5 py-1 rounded-lg font-semibold text-slate-400 hover:text-slate-200">+ Custom / Manual</button>
+                        </div>
+                    </div>
+                    <div id="driver-registered-box">
+                        <select id="checkout-driver-id" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100 focus:ring-2 focus:ring-amber-500/40"></select>
+                    </div>
+                    <div id="driver-custom-box" class="hidden p-3 rounded-xl bg-amber-950/30 border border-amber-800/40 space-y-2.5">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div>
+                                <label class="block font-medium text-amber-200 mb-1 text-[11px]">Nama Driver <span class="text-rose-400">*</span></label>
+                                <input type="text" id="checkout-custom-name" placeholder="Contoh: Budi Santoso" class="w-full px-3 py-2 rounded-lg border border-dark-border bg-dark-card text-slate-100 focus:ring-2 focus:ring-amber-500/40">
+                            </div>
+                            <div>
+                                <label class="block font-medium text-amber-200 mb-1 text-[11px]">Bagian / Divisi</label>
+                                <input type="text" id="checkout-custom-dept" placeholder="Contoh: IT, Marketing, Tamu" class="w-full px-3 py-2 rounded-lg border border-dark-border bg-dark-card text-slate-100 focus:ring-2 focus:ring-amber-500/40">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-200 mb-1">Odometer Awal (KM)</label>
+                        <input type="number" id="checkout-km-start" min="0" placeholder="Auto KM unit" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100 font-mono focus:ring-2 focus:ring-amber-500/40">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-200 mb-1">Level BBM Awal</label>
+                        <select id="checkout-fuel" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100 focus:ring-2 focus:ring-amber-500/40">
+                            <option value="Penuh (Full)">Penuh (Full)</option>
+                            <option value="3/4 Tangki">3/4 Tangki</option>
+                            <option value="1/2 Tangki" selected>1/2 Tangki</option>
+                            <option value="1/4 Tangki">1/4 Tangki</option>
+                            <option value="Hampir Habis (E)">Hampir Habis (E)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-200 mb-1">Tujuan Perjalanan</label>
+                    <input type="text" id="checkout-destination" placeholder="Contoh: Kantor Dinas Semarang, Bandara Solo" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100 focus:ring-2 focus:ring-amber-500/40">
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-200 mb-1">Keperluan / Keterangan</label>
+                    <input type="text" id="checkout-purpose" placeholder="Contoh: Antar Tamu Rektorat, Pengiriman Dokumen" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100 focus:ring-2 focus:ring-amber-500/40">
+                </div>
+
+                <div class="pt-3 flex items-center justify-end space-x-2 border-t border-dark-border">
+                    <button type="button" onclick="closeModal('modal-checkout')" class="px-4 py-2.5 rounded-xl border border-dark-border text-slate-300 font-semibold hover:bg-dark-card">Batal</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-md shadow-amber-500/20">Simpan Catatan Keluar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL CHECKIN (CATAT MASUK) -->
+    <div id="modal-checkin" class="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 hidden">
+        <div class="bg-dark-surface w-full max-w-lg rounded-3xl shadow-2xl border border-dark-border overflow-hidden max-h-[92vh] flex flex-col">
+            <div class="bg-gradient-to-r from-emerald-600 to-teal-500 px-5 sm:px-6 py-4 text-slate-950 flex items-center justify-between">
+                <div>
+                    <h3 class="font-extrabold text-base"><i class="fa-solid fa-arrow-right-to-bracket mr-2"></i>Catat Kendaraan Masuk Garasi</h3>
+                    <p class="text-[11px] text-emerald-950 font-medium">Hanya kendaraan yang wajib dipilih</p>
+                </div>
+                <button onclick="closeModal('modal-checkin')" class="text-emerald-950/80 hover:text-emerald-950 text-xl font-bold">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="form-checkin" onsubmit="handleCheckinSubmit(event)" class="p-5 sm:p-6 space-y-4 overflow-y-auto text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-200 mb-1">Pilih Kendaraan Yang Masuk <span class="text-rose-400">*</span></label>
+                    <select id="checkin-trip-id" required onchange="updateCheckinTripDetails()" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100 focus:ring-2 focus:ring-emerald-500/40"></select>
+                </div>
+
+                <div id="checkin-trip-summary" class="hidden bg-dark-card p-3 rounded-xl border border-dark-border space-y-1.5 text-xs text-slate-300">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><span class="text-slate-400">Driver:</span> <strong id="chk-driver-name" class="text-white">-</strong></div>
+                        <div><span class="text-slate-400">KM Awal:</span> <strong id="chk-km-start" class="text-white font-mono">-</strong></div>
+                        <div><span class="text-slate-400">Tujuan:</span> <span id="chk-dest" class="text-white">-</span></div>
+                        <div><span class="text-slate-400">Jam Keluar:</span> <span id="chk-time-out" class="text-white">-</span></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-200 mb-1">Odometer Akhir (KM)</label>
+                        <input type="number" id="checkin-km-end" oninput="calculateTripDistance()" placeholder="Boleh kosong" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100 font-mono focus:ring-2 focus:ring-emerald-500/40">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-200 mb-1">Jarak Tempuh Trip</label>
+                        <div id="checkin-distance-calc" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-200 font-mono font-bold flex items-center justify-between">
+                            <span>-</span>
+                            <span class="text-slate-400 font-normal">KM</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-200 mb-1">BBM Akhir</label>
+                        <select id="checkin-fuel" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100 focus:ring-2 focus:ring-emerald-500/40">
+                            <option value="Penuh (Full)">Penuh (Full)</option>
+                            <option value="3/4 Tangki">3/4 Tangki</option>
+                            <option value="1/2 Tangki" selected>1/2 Tangki</option>
+                            <option value="1/4 Tangki">1/4 Tangki</option>
+                            <option value="Hampir Habis (E)">Hampir Habis (E)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-200 mb-1">Kondisi Fisik Kendaraan</label>
+                        <select id="checkin-condition" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100 focus:ring-2 focus:ring-emerald-500/40">
+                            <option value="Baik & Bersih">Baik & Bersih</option>
+                            <option value="Perlu Dicuci">Perlu Dicuci</option>
+                            <option value="Perlu Servis / Cek Mesin">Perlu Servis / Cek Mesin</option>
+                            <option value="Ada Baret / Lecet Fisik">Ada Baret / Lecet Fisik</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-200 mb-1">Catatan Tambahan Perjalanan</label>
+                    <textarea id="checkin-notes" rows="2" placeholder="Catatan kendala di jalan, kondisi khusus, dll..." class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-emerald-500/40"></textarea>
+                </div>
+
+                <div class="pt-3 flex items-center justify-end space-x-2 border-t border-dark-border">
+                    <button type="button" onclick="closeModal('modal-checkin')" class="px-4 py-2.5 rounded-xl border border-dark-border text-slate-300 font-semibold hover:bg-dark-card">Batal</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold shadow-md shadow-emerald-500/20">Simpan Catatan Masuk</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL DETAIL STATISTIK -->
+    <div id="modal-stat-detail" class="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 hidden">
+        <div class="bg-dark-surface w-full max-w-2xl rounded-3xl shadow-2xl border border-dark-border overflow-hidden max-h-[88vh] flex flex-col">
+            <div id="stat-modal-header" class="px-5 sm:px-6 py-4 text-white flex items-center justify-between bg-cyan-600">
+                <div class="flex items-center space-x-2.5">
+                    <div id="stat-modal-icon" class="w-8 h-8 rounded-lg bg-black/20 flex items-center justify-center text-white">
+                        <i class="fa-solid fa-list"></i>
+                    </div>
+                    <div>
+                        <h3 id="stat-modal-title" class="font-bold text-base">Detail Informasi</h3>
+                        <p id="stat-modal-subtitle" class="text-xs text-white/80">Rincian data sistem</p>
+                    </div>
+                </div>
+                <button onclick="closeModal('modal-stat-detail')" class="text-white/80 hover:text-white text-xl font-bold">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-3.5 sm:p-4 border-b border-dark-border bg-dark-card flex items-center justify-between gap-3">
+                <div class="relative flex-1">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                    <input type="text" id="stat-modal-search" oninput="filterStatModalItems(this.value)" placeholder="Cari data..." class="w-full pl-8 pr-3 py-1.5 rounded-xl border border-dark-border bg-dark-surface text-xs text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-cyan-500/30">
+                </div>
+                <div id="stat-modal-extra-actions" class="hidden">
+                    <button onclick="openModal('modal-add-etoll'); closeModal('modal-stat-detail')" class="px-3 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold flex items-center space-x-1.5 whitespace-nowrap shadow-sm">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>+ Tambah E-Toll</span>
+                    </button>
+                </div>
+            </div>
+            <div id="stat-modal-body" class="p-4 sm:p-6 overflow-y-auto space-y-3 flex-1 text-xs"></div>
+            <div class="p-3.5 sm:p-4 border-t border-dark-border bg-dark-card flex items-center justify-between">
+                <span id="stat-modal-count" class="text-xs text-slate-400 font-medium">0 Data ditampilkan</span>
+                <button type="button" onclick="closeModal('modal-stat-detail')" class="px-4 py-2 rounded-xl border border-dark-border bg-dark-surface hover:bg-dark-cardHover text-slate-200 text-xs font-semibold">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL CONFIG CLOUD FIREBASE -->
+    <div id="modal-firebase-config" class="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 hidden">
+        <div class="bg-dark-surface w-full max-w-lg rounded-3xl shadow-2xl border border-dark-border overflow-hidden max-h-[92vh] flex flex-col">
+            <div class="bg-emerald-600 px-5 sm:px-6 py-4 text-slate-950 flex items-center justify-between">
+                <div>
+                    <h3 class="font-extrabold text-base"><i class="fa-solid fa-database mr-2"></i>Koneksi Cloud Database (Firebase)</h3>
+                    <p class="text-[11px] text-emerald-950 font-medium">Sinkronisasi real-time data gerbang & armada</p>
+                </div>
+                <button onclick="closeModal('modal-firebase-config')" class="text-slate-950/80 hover:text-slate-950 text-xl font-bold">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="form-firebase-config" onsubmit="saveFirebaseSettings(event)" class="p-5 sm:p-6 space-y-4 text-xs overflow-y-auto">
+                <div class="p-3 bg-dark-card rounded-xl border border-dark-border text-slate-300 space-y-1.5">
+                    <span class="font-semibold text-emerald-400 block"><i class="fa-solid fa-circle-info mr-1"></i>Status Database:</span>
+                    <p id="firebase-current-status" class="text-slate-200">Mode Penyimpanan: Lokal (Offline Standalone)</p>
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-200 mb-1">Firebase Web Config (Format JSON)</label>
+                    <textarea id="firebase-config-json" rows="7" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100 font-mono text-[11px] focus:ring-2 focus:ring-emerald-500/40">{
+  "apiKey": "AIzaSyCiWsAbEW-tU0FZ54yE3A3-kuHdSuiYWAQ",
+  "authDomain": "garasiuns-73bf0.firebaseapp.com",
+  "projectId": "garasiuns-73bf0",
+  "storageBucket": "garasiuns-73bf0.firebasestorage.app",
+  "messagingSenderId": "340693292191",
+  "appId": "1:340693292191:web:a7ee1efbea7e03021a3eaa"
+}</textarea>
+                </div>
+                <div class="pt-2 flex items-center justify-between">
+                    <button type="button" onclick="disconnectFirebase()" class="px-3 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 font-semibold">
+                        Gunakan Mode Lokal
+                    </button>
+                    <div class="flex space-x-2">
+                        <button type="button" onclick="closeModal('modal-firebase-config')" class="px-3 py-2 rounded-xl border border-dark-border text-slate-300 font-semibold hover:bg-dark-card">Batal</button>
+                        <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold">Simpan & Hubungkan</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- PRINTABLE SLIP / TIKET MODAL -->
+    <div id="modal-ticket" class="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 hidden">
+        <div class="bg-dark-surface w-full max-w-md rounded-3xl shadow-2xl border border-dark-border overflow-hidden">
+            <div class="bg-slate-950 px-6 py-4 text-white flex items-center justify-between no-print border-b border-dark-border">
+                <h3 class="font-bold text-sm"><i class="fa-solid fa-print mr-2 text-cyan-400"></i>Tiket Keluar-Masuk Gerbang</h3>
+                <button onclick="closeModal('modal-ticket')" class="text-slate-400 hover:text-white text-xl font-bold">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="printable-ticket" class="p-6 space-y-4 text-xs text-slate-200">
+                <div class="text-center border-b border-dashed border-dark-borderLight pb-3">
+                    <h2 class="font-extrabold text-base uppercase tracking-wider text-white">GarasiKu Gate Log</h2>
+                    <p class="text-[11px] text-slate-400">Bukti Jalan Gerbang Kendaraan Dinas</p>
+                </div>
+                <div id="ticket-content" class="space-y-2"></div>
+                <div class="border-t border-dashed border-dark-borderLight pt-4 grid grid-cols-2 text-center text-[10px] text-slate-400">
+                    <div>
+                        <p class="mb-8">Driver / Pengemudi</p>
+                        <p class="font-bold text-white" id="ticket-driver-sign">( .................... )</p>
+                    </div>
+                    <div>
+                        <p class="mb-8">Petugas Gerbang</p>
+                        <p class="font-bold text-white">( Security / Admin )</p>
+                    </div>
+                </div>
+                <div class="pt-3 flex justify-end space-x-2 no-print border-t border-dark-border">
+                    <button type="button" onclick="closeModal('modal-ticket')" class="px-3 py-2 rounded-xl border border-dark-border text-slate-300 font-semibold hover:bg-dark-card">Tutup</button>
+                    <button type="button" onclick="window.print()" class="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold flex items-center space-x-1.5 shadow-md shadow-cyan-500/20">
+                        <i class="fa-solid fa-print"></i>
+                        <span>Cetak Tiket</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <!-- Firebase SDK Modules -->
+    <script type="module">
+        import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { initializeFirestore, getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const DEFAULT_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyCiWsAbEW-tU0FZ54yE3A3-kuHdSuiYWAQ",
+            authDomain: "garasiuns-73bf0.firebaseapp.com",
+            projectId: "garasiuns-73bf0",
+            storageBucket: "garasiuns-73bf0.firebasestorage.app",
+            messagingSenderId: "340693292191",
+            appId: "1:340693292191:web:a7ee1efbea7e03021a3eaa"
+        };
+
+        window.FirebaseBridge = {
+            app: null,
+            db: null,
+            auth: null,
+            currentUser: null,
+            unsubscribers: [],
+
+            async initialize(customConfig = null) {
+                try {
+                    let config = customConfig;
+                    if (!config) {
+                        const saved = localStorage.getItem('garasiku_firebase_cfg');
+                        if (saved) {
+                            try { config = JSON.parse(saved); } catch (e) { config = null; }
+                        }
+                    }
+                    if (!config) config = DEFAULT_FIREBASE_CONFIG;
+
+                    this.app = getApps().length > 0 ? getApp() : initializeApp(config);
+                    try {
+                        this.db = initializeFirestore(this.app, { experimentalForceLongPolling: true });
+                    } catch (e) {
+                        this.db = getFirestore(this.app);
+                    }
+
+                    this.auth = getAuth(this.app);
+                    try {
+                        await signInAnonymously(this.auth);
+                    } catch (authErr) {
+                        console.warn("Auth anonymous belum aktif, melanjutkan tanpa auth:", authErr);
+                    }
+
+                    this.currentUser = this.auth.currentUser || { uid: 'anonymous' };
+                    this.updateStatusUI(true, `Terhubung ke Cloud (${config.projectId})`);
+                    this.startRealtimeSync();
+                    return true;
+                } catch (error) {
+                    console.error("Firebase connection error:", error);
+                    this.updateStatusUI(false, error.message);
+                    return false;
+                }
+            },
+
+            updateStatusUI(isConnected, text) {
+                const dot = document.getElementById('cloud-status-dot');
+                const label = document.getElementById('cloud-status-text');
+                const statusInfo = document.getElementById('firebase-current-status');
+
+                if (dot) dot.className = isConnected ? "w-2 h-2 rounded-full bg-emerald-400 animate-pulse ring-2 ring-emerald-400/40" : "w-2 h-2 rounded-full bg-amber-400";
+                if (label) label.innerText = isConnected ? "Cloud Sync" : "Cloud DB";
+                if (statusInfo) {
+                    statusInfo.innerHTML = isConnected 
+                        ? `<span class="text-emerald-400 font-semibold"><i class="fa-solid fa-cloud-check mr-1"></i>${text}</span>` 
+                        : `<span class="text-rose-400 font-medium"><i class="fa-solid fa-circle-exclamation mr-1"></i>${text}</span>`;
+                }
+            },
+
+            startRealtimeSync() {
+                if (!this.db) return;
+                this.unsubscribers.forEach(unsub => unsub && unsub());
+                this.unsubscribers = [];
+
+                const syncDoc = doc(this.db, 'garasiku_fleet', 'shared_state');
+                const unsub = onSnapshot(syncDoc, (snapshot) => {
+                    if (snapshot.exists()) {
+                        const data = snapshot.data();
+                        if (window.syncFromCloud) window.syncFromCloud(data);
+                    } else {
+                        this.pushStateToCloud();
+                    }
+                }, (error) => {
+                    console.error("Firestore sync error:", error);
+                    this.updateStatusUI(false, "Firestore: " + error.message);
+                });
+
+                this.unsubscribers.push(unsub);
+            },
+
+            async pushStateToCloud() {
+                if (!this.db) return;
+                try {
+                    const syncDoc = doc(this.db, 'garasiku_fleet', 'shared_state');
+                    await setDoc(syncDoc, {
+                        vehicles: window.vehicles || [],
+                        drivers: window.drivers || [],
+                        etolls: window.etolls || [],
+                        logs: window.logs || [],
+                        adminPin: window.adminPin || "1234",
+                        updatedAt: new Date().toISOString()
+                    });
+                } catch (e) {
+                    console.error("Error pushing to cloud:", e);
+                }
+            }
+        };
+
+        window.FirebaseBridge.initialize();
+    </script>
+
+    <!-- CORE LOGIC JAVASCRIPT -->
+    <script>
+        // MASTER DATASET (38 ARMADA RESMI UNS)
+        const INITIAL_VEHICLES = [
+            { id: "V-14", unitNo: 14, plate: "AD-1067-XA", model: "Toyota Altis", category: "Sedan", odometer: 45200, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-17", unitNo: 17, plate: "AD-1022-XA", model: "Toyota Vios", category: "Sedan", odometer: 62100, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-08", unitNo: 8, plate: "AD-1066-XA", model: "Toyota Camry Lama", category: "Sedan", odometer: 98300, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-33", unitNo: 33, plate: "AD-1068-XA", model: "Toyota Vios", category: "Sedan", odometer: 58900, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-06", unitNo: 6, plate: "AD-1060-XA", model: "Toyota Corolla Altis V A/T", category: "Sedan", odometer: 32400, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-22", unitNo: 22, plate: "AD-1095-XA", model: "Toyota Corolla Altis V A/T", category: "Sedan", odometer: 37100, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-13", unitNo: 13, plate: "AD-1367-XA", model: "Toyota Inova Diesel", category: "MPV", odometer: 81200, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-15", unitNo: 15, plate: "AD-1121-XA", model: "Toyota Avanza Veloz 1.5 M/T", category: "MPV", odometer: 49800, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-05", unitNo: 5, plate: "AD-1156-XA", model: "Toyota Corolla Altis V A/T", category: "Sedan", odometer: 29800, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-49", unitNo: 49, plate: "AD-1461-XA", model: "Suzuki APV", category: "MPV", odometer: 76500, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-18", unitNo: 18, plate: "AD-1146-XA", model: "Toyota Avanza", category: "MPV", odometer: 54300, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-39", unitNo: 39, plate: "AD-7741-A", model: "Bus Hino XZU720R (BRI)", category: "Bus", odometer: 88400, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-07", unitNo: 7, plate: "AD-1055-XA", model: "Toyota Corolla Altis V A/T", category: "Sedan", odometer: 31200, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-41", unitNo: 41, plate: "AD-1032-XA", model: "Toyota Inova Reborn", category: "MPV", odometer: 42100, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-45", unitNo: 45, plate: "AD-1048-XA", model: "Toyota Inova", category: "MPV", odometer: 87600, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-29", unitNo: 29, plate: "AD-1236-XA", model: "Hyundai Staria Signature 7", category: "MPV", odometer: 19400, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-31", unitNo: 31, plate: "AD-7010-XA", model: "Bus Hino FB 130 (BNI)", category: "Bus", odometer: 93200, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-16", unitNo: 16, plate: "AD-1215-XA", model: "Toyota Avanza 1.3 E M/T", category: "MPV", odometer: 51200, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-19", unitNo: 19, plate: "AD-1148-XA", model: "Toyota Avanza", category: "MPV", odometer: 63100, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-10", unitNo: 10, plate: "AD-1126-XA", model: "Toyota Corolla Altis 1.8 V A/T", category: "Sedan", odometer: 36700, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-40", unitNo: 40, plate: "AD-1284-XA", model: "Isuzu Panther", category: "MPV", odometer: 165400, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-27", unitNo: 27, plate: "AD-1506-XA", model: "Toyota Avanza", category: "MPV", odometer: 47200, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-28", unitNo: 28, plate: "AD-7153-XA", model: "Toyota Hiace", category: "HiAce / Minibus", odometer: 68900, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-38", unitNo: 38, plate: "AD-8075-XA", model: "Toyota Hilux2.4", category: "Pick Up / Box", odometer: 59400, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-52", unitNo: 52, plate: "AD-1209-XA", model: "Toyota Avansa 1.5 V", category: "MPV", odometer: 41800, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-03", unitNo: 3, plate: "AD-1062-XA", model: "Toyota Camry Type V A/T", category: "Sedan", odometer: 74200, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-44", unitNo: 44, plate: "AD-1697-XA", model: "Toyota Inova", category: "MPV", odometer: 83100, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-25", unitNo: 25, plate: "AD-1047-XA", model: "Toyota Inova Lama - silver", category: "MPV", odometer: 96500, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-24", unitNo: 24, plate: "AD-1015-XH", model: "Toyota Zenix", category: "MPV", odometer: 18200, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-04", unitNo: 4, plate: "AD-1061-XA", model: "Toyota Alpard 2.5 G A/T", category: "MPV", odometer: 29400, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-32", unitNo: 32, plate: "AD-7040-XA", model: "Bus Mitsubishi 125PS", category: "Bus", odometer: 112000, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-20", unitNo: 20, plate: "AD-1507-XA", model: "Toyota Avanza 1.3 G - MT", category: "MPV", odometer: 42100, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-43", unitNo: 43, plate: "AD-8049-XA", model: "Mitsubishi Pick Up L300", category: "Pick Up / Box", odometer: 89200, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-09", unitNo: 9, plate: "AD-1127-XA", model: "Toyota Corolla Altis 1.8 V A/T", category: "Sedan", odometer: 34100, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-02", unitNo: 2, plate: "AD-1016-XH", model: "Toyota Zenix", category: "MPV", odometer: 21500, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-26", unitNo: 26, plate: "AD-1150-XA", model: "Toyota Inova Lama - Hitam", category: "MPV", odometer: 76200, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-23", unitNo: 23, plate: "AD-1014-XH", model: "Toyota Zenix", category: "MPV", odometer: 18450, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-01", unitNo: 1, plate: "AD-1214-XU", model: "Toyota Inova Reborn", category: "MPV", odometer: 52100, status: "IN_GARAGE", operational: true, active: true }
+        ];
+
+        const INITIAL_DRIVERS = [
+            { id: "D-01", name: "Joko Susilo", sim: "SIM A", phone: "0812-3456-7890", status: "AVAILABLE", active: true },
+            { id: "D-02", name: "Bambang Pamungkas", sim: "SIM B1", phone: "0813-9876-5432", status: "AVAILABLE", active: true },
+            { id: "D-03", name: "Agus Santoso", sim: "SIM A", phone: "0857-1122-3344", status: "AVAILABLE", active: true },
+            { id: "D-04", name: "Slamet Rahardjo", sim: "SIM B1", phone: "0878-5566-7788", status: "AVAILABLE", active: true },
+            { id: "D-05", name: "Supriadi", sim: "SIM A", phone: "0821-4455-6677", status: "AVAILABLE", active: true }
+        ];
+
+        const INITIAL_ETOLL = [
+            { id: "ET-01", name: "Mandiri e-Money Pool #01", bank: "Mandiri", balance: 250000, cardNo: "6032-9812-4411-0001", status: "AVAILABLE", holderName: null },
+            { id: "ET-02", name: "BCA Flazz Pool #02", bank: "BCA", balance: 300000, cardNo: "6011-8844-3322-0002", status: "AVAILABLE", holderName: null },
+            { id: "ET-03", name: "BRI Brizzi Pool #03", bank: "BRI", balance: 150000, cardNo: "6019-7755-2211-0003", status: "AVAILABLE", holderName: null },
+            { id: "ET-04", name: "BNI TapCash Pool #04", bank: "BNI", balance: 200000, cardNo: "6024-6633-1100-0004", status: "AVAILABLE", holderName: null }
+        ];
+
+        // State Initialization
+        window.vehicles = JSON.parse(localStorage.getItem('garasiku_vehicles')) || INITIAL_VEHICLES;
+        window.drivers = JSON.parse(localStorage.getItem('garasiku_drivers')) || INITIAL_DRIVERS;
+        window.etolls = JSON.parse(localStorage.getItem('garasiku_etolls')) || INITIAL_ETOLL;
+        window.logs = JSON.parse(localStorage.getItem('garasiku_logs')) || [];
+        window.adminPin = localStorage.getItem('garasiku_admin_pin') || "1234";
+
+        let isAdminLoggedIn = false;
+        let pendingAdminCallback = null;
+        let selectedCategoryFilter = "Semua";
+        let selectedSortMode = "frequent";
+        let activeStatType = "total";
+        let driverInputMode = "registered";
+
+        function saveToStorage() {
+            localStorage.setItem('garasiku_vehicles', JSON.stringify(window.vehicles));
+            localStorage.setItem('garasiku_drivers', JSON.stringify(window.drivers));
+            localStorage.setItem('garasiku_etolls', JSON.stringify(window.etolls));
+            localStorage.setItem('garasiku_logs', JSON.stringify(window.logs));
+            localStorage.setItem('garasiku_admin_pin', window.adminPin);
+
+            if (window.FirebaseBridge && window.FirebaseBridge.pushStateToCloud) {
+                window.FirebaseBridge.pushStateToCloud();
+            }
+        }
+
+        window.syncFromCloud = function(cloudData) {
+            if (!cloudData) return;
+            if (cloudData.vehicles && Array.isArray(cloudData.vehicles)) window.vehicles = cloudData.vehicles;
+            if (cloudData.drivers && Array.isArray(cloudData.drivers)) window.drivers = cloudData.drivers;
+            if (cloudData.etolls && Array.isArray(cloudData.etolls)) window.etolls = cloudData.etolls;
+            if (cloudData.logs && Array.isArray(cloudData.logs)) window.logs = cloudData.logs;
+            if (cloudData.adminPin) {
+                window.adminPin = String(cloudData.adminPin);
+                localStorage.setItem('garasiku_admin_pin', window.adminPin);
+            }
+            renderAll();
+        };
+
+        // Live Clock
+        function updateLiveClock() {
+            const now = new Date();
+            const timeEl = document.getElementById('live-time');
+            const dateEl = document.getElementById('live-date');
+            if (timeEl) timeEl.innerText = now.toLocaleTimeString('id-ID', { hour12: false }) + " WIB";
+            if (dateEl) dateEl.innerText = now.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });
+        }
+        setInterval(updateLiveClock, 1000);
+        updateLiveClock();
+
+        // Admin Auth & PIN Logic
+        function toggleAdminState() {
+            if (isAdminLoggedIn) {
+                isAdminLoggedIn = false;
+                updateAdminBadgeUI();
+                showToast("Mode Tamu", "Anda telah kembali ke Mode Tamu.", "info");
+                renderAll();
+            } else {
+                openAdminAuthModal();
+            }
+        }
+
+        function openAdminAuthModal(callback = null) {
+            pendingAdminCallback = callback;
+            const input = document.getElementById('admin-pin-input');
+            if (input) input.value = '';
+            openModal('modal-admin-auth');
+            setTimeout(() => { if (input) input.focus(); }, 150);
+        }
+
+        function submitAdminPin() {
+            const input = document.getElementById('admin-pin-input');
+            if (!input) return;
+            if (input.value === window.adminPin) {
+                isAdminLoggedIn = true;
+                closeModal('modal-admin-auth');
+                updateAdminBadgeUI();
+                showToast("Akses Diterima", "Mode Admin aktif penuh.", "success");
+                renderAll();
+                if (pendingAdminCallback) {
+                    const cb = pendingAdminCallback;
+                    pendingAdminCallback = null;
+                    cb();
+                }
+            } else {
+                showToast("PIN Salah", "PIN otorisasi salah. Coba lagi.", "error");
+                input.value = '';
+                input.focus();
+            }
+        }
+
+        function requireAdminAction(actionCallback) {
+            if (isAdminLoggedIn) {
+                actionCallback();
+            } else {
+                openAdminAuthModal(actionCallback);
+            }
+        }
+
+        function updateAdminBadgeUI() {
+            const badgeIcon = document.getElementById('admin-badge-icon');
+            const badgeText = document.getElementById('admin-badge-text');
+            const authBtn = document.getElementById('btn-admin-auth');
+            const btnChangePin = document.getElementById('btn-change-pin');
+            const btnCloud = document.getElementById('btn-cloud-config');
+            const btnTg = document.getElementById('btn-telegram-config');
+            const btnAddVeh = document.getElementById('btn-add-vehicle');
+            const btnAddDrv = document.getElementById('btn-add-driver');
+
+            if (isAdminLoggedIn) {
+                if (badgeIcon) badgeIcon.className = "fa-solid fa-lock-open text-emerald-400 text-xs";
+                if (badgeText) badgeText.innerText = "Admin (Aktif)";
+                if (authBtn) authBtn.className = "px-2.5 sm:px-3 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-950/40 text-emerald-300 text-xs font-semibold flex items-center space-x-1.5 transition";
+                if (btnChangePin) btnChangePin.classList.remove('hidden');
+                if (btnCloud) btnCloud.classList.remove('hidden');
+                if (btnTg) btnTg.classList.remove('hidden');
+                if (btnAddVeh) btnAddVeh.classList.remove('hidden');
+                if (btnAddDrv) btnAddDrv.classList.remove('hidden');
+                document.querySelectorAll('.admin-col').forEach(el => el.classList.remove('hidden'));
+            } else {
+                if (badgeIcon) badgeIcon.className = "fa-solid fa-user-shield text-slate-400 text-xs";
+                if (badgeText) badgeText.innerText = "Mode Tamu";
+                if (authBtn) authBtn.className = "px-2.5 sm:px-3 py-1.5 rounded-xl border border-dark-border bg-dark-card hover:bg-dark-cardHover text-slate-300 text-xs font-semibold flex items-center space-x-1.5 transition";
+                if (btnChangePin) btnChangePin.classList.add('hidden');
+                if (btnCloud) btnCloud.classList.add('hidden');
+                if (btnTg) btnTg.classList.add('hidden');
+                if (btnAddVeh) btnAddVeh.classList.add('hidden');
+                if (btnAddDrv) btnAddDrv.classList.add('hidden');
+                document.querySelectorAll('.admin-col').forEach(el => el.classList.add('hidden'));
+            }
+        }
+
+        function openChangePinModal() {
+            if (!isAdminLoggedIn) {
+                openAdminAuthModal(() => openModal('modal-change-pin'));
+                return;
+            }
+            document.getElementById('pin-old').value = '';
+            document.getElementById('pin-new').value = '';
+            document.getElementById('pin-confirm').value = '';
+            openModal('modal-change-pin');
+        }
+
+        function handleChangePinSubmit(event) {
+            event.preventDefault();
+            const oldPin = document.getElementById('pin-old').value.trim();
+            const newPin = document.getElementById('pin-new').value.trim();
+            const confirmPin = document.getElementById('pin-confirm').value.trim();
+
+            if (oldPin !== window.adminPin) {
+                showToast("PIN Lama Salah", "PIN otorisasi saat ini tidak cocok.", "error");
+                document.getElementById('pin-old').focus();
+                return;
+            }
+            if (newPin.length < 4) {
+                showToast("PIN Terlalu Pendek", "PIN minimal 4 digit karakter.", "warning");
+                return;
+            }
+            if (newPin !== confirmPin) {
+                showToast("Konfirmasi Salah", "Konfirmasi PIN baru tidak sesuai.", "error");
+                return;
+            }
+
+            window.adminPin = newPin;
+            saveToStorage();
+            closeModal('modal-change-pin');
+            showToast("PIN Berhasil Diganti", "PIN baru telah aktif & tersimpan di Firebase.", "success");
+        }
+
+        // Navigation & Modal Helpers
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+
+            const contentEl = document.getElementById(tabId);
+            if (contentEl) contentEl.classList.remove('hidden');
+
+            const btnEl = document.getElementById(`tab-btn-${tabId.replace('tab-', '')}`);
+            if (btnEl) btnEl.classList.add('active');
+
+            if (tabId === 'tab-monitoring') renderMonitoringBay();
+            if (tabId === 'tab-logbook') renderLogsTable();
+            if (tabId === 'tab-vehicles') renderFleetTable();
+            if (tabId === 'tab-drivers') renderDriversGrid();
+        }
+
+        function openModal(modalId) {
+            const el = document.getElementById(modalId);
+            if (el) {
+                el.classList.remove('hidden');
+                if (modalId === 'modal-checkout') prepareCheckoutOptions();
+                if (modalId === 'modal-checkin') prepareCheckinOptions();
+            }
+        }
+
+        function closeModal(modalId) {
+            const el = document.getElementById(modalId);
+            if (el) el.classList.add('hidden');
+        }
+
+        function showToast(title, message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            toast.className = `p-4 rounded-2xl shadow-2xl border text-xs max-w-sm w-full pointer-events-auto flex items-start space-x-3 transition-all duration-300 translate-y-3 opacity-0 backdrop-blur-md ${
+                type === 'success' ? 'bg-emerald-950/90 text-emerald-200 border-emerald-500/50' :
+                type === 'error' ? 'bg-rose-950/90 text-rose-200 border-rose-500/50' :
+                type === 'warning' ? 'bg-amber-950/90 text-amber-200 border-amber-500/50' :
+                'bg-slate-900/90 text-cyan-200 border-cyan-500/50'
+            }`;
+
+            const iconClass = type === 'success' ? 'fa-circle-check text-emerald-400' :
+                              type === 'error' ? 'fa-circle-exclamation text-rose-400' :
+                              type === 'warning' ? 'fa-triangle-exclamation text-amber-400' :
+                              'fa-circle-info text-cyan-400';
+
+            toast.innerHTML = `
+                <i class="fa-solid ${iconClass} text-base mt-0.5"></i>
+                <div class="flex-1">
+                    <h4 class="font-bold text-white">${title}</h4>
+                    <p class="text-[11px] text-slate-300 mt-0.5">${message}</p>
+                </div>
+            `;
+
+            container.appendChild(toast);
+            requestAnimationFrame(() => toast.classList.remove('translate-y-3', 'opacity-0'));
+            setTimeout(() => {
+                toast.classList.add('translate-y-3', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        // Dashboard Stats
+        function updateDashboardStats() {
+            const activeVehicles = window.vehicles.filter(v => v.active !== false);
+            const totalVehicles = window.vehicles.length;
+            const inGarage = window.vehicles.filter(v => v.status === 'IN_GARAGE' && v.operational !== false && v.active !== false).length;
+            const onTrip = window.vehicles.filter(v => v.status === 'ON_TRIP').length;
+            const activeDrivers = window.logs.filter(l => l.status === 'ACTIVE').length;
+            const activeDriverMaster = window.drivers.filter(d => d.active !== false).length;
+
+            const totalEtoll = window.etolls.length;
+            const readyEtoll = window.etolls.filter(e => e.status === 'AVAILABLE').length;
+            const totalBalance = window.etolls.reduce((sum, e) => sum + (Number(e.balance) || 0), 0);
+
+            document.getElementById('stat-total-vehicles').innerText = `${activeVehicles.length} / ${totalVehicles}`;
+            document.getElementById('stat-in-garage').innerText = inGarage;
+            document.getElementById('stat-on-trip').innerText = onTrip;
+            document.getElementById('stat-active-drivers').innerText = activeDrivers;
+            document.getElementById('stat-drivers-sub').innerText = `Dari ${activeDriverMaster} Driver ON`;
+
+            document.getElementById('stat-etoll-ratio').innerText = `${readyEtoll} / ${totalEtoll}`;
+            document.getElementById('stat-etoll-sub').innerText = `Total: Rp ${totalBalance.toLocaleString('id-ID')}`;
+
+            const activeBadge = document.getElementById('active-trips-badge');
+            if (activeBadge) activeBadge.innerText = `${onTrip} Unit`;
+        }
+
+        function getTripCountForVehicle(vehicleId, plate) {
+            return window.logs.filter(l => l.vehicleId === vehicleId || l.plate === plate).length;
+        }
+
+        // Monitoring View
+        function renderCategoryPills() {
+            const container = document.getElementById('category-filter-pills');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const categories = ["Semua", "MPV", "Sedan", "Bus", "HiAce / Minibus", "Pick Up / Box"];
+
+            categories.forEach(cat => {
+                const count = cat === "Semua" ? window.vehicles.length : window.vehicles.filter(v => v.category === cat).length;
+                if (count === 0 && cat !== "Semua") return;
+
+                const isActive = selectedCategoryFilter === cat;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.onclick = () => {
+                    selectedCategoryFilter = cat;
+                    renderCategoryPills();
+                    renderMonitoringBay();
+                };
+                btn.className = `px-2.5 sm:px-3 py-1 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition whitespace-nowrap ${
+                    isActive ?
+                    'bg-cyan-500 text-slate-950 font-bold shadow-md shadow-cyan-500/20' :
+                    'bg-dark-card hover:bg-dark-cardHover text-slate-300 border border-dark-border'
+                }`;
+                btn.innerHTML = `<span>${cat}</span><span class="px-1.5 py-0.2 rounded-full text-[10px] ${isActive ? 'bg-black/25 text-slate-950' : 'bg-slate-800 text-slate-400'}">${count}</span>`;
+                container.appendChild(btn);
+            });
+        }
+
+        function handleSortVehicles(val) {
+            selectedSortMode = val;
+            renderMonitoringBay();
+        }
+
+        function renderMonitoringBay() {
+            renderActiveTrips();
+            renderCategoryPills();
+
+            const grid = document.getElementById('monitoring-vehicles-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            let list = [...window.vehicles];
+
+            if (selectedCategoryFilter !== "Semua") {
+                list = list.filter(v => v.category === selectedCategoryFilter);
+            }
+
+            if (selectedSortMode === 'frequent') {
+                list.sort((a, b) => {
+                    const tripA = getTripCountForVehicle(a.id, a.plate);
+                    const tripB = getTripCountForVehicle(b.id, b.plate);
+                    return tripB - tripA || (a.unitNo || 999) - (b.unitNo || 999);
+                });
+            } else if (selectedSortMode === 'unit-asc') {
+                list.sort((a, b) => (a.unitNo || 999) - (b.unitNo || 999));
+            } else if (selectedSortMode === 'category') {
+                list.sort((a, b) => (a.category || '').localeCompare(b.category || '') || (a.unitNo || 999) - (b.unitNo || 999));
+            } else if (selectedSortMode === 'plate-asc') {
+                list.sort((a, b) => a.plate.localeCompare(b.plate));
+            } else if (selectedSortMode === 'garage-first') {
+                list.sort((a, b) => (a.status === 'IN_GARAGE' ? -1 : 1));
+            } else if (selectedSortMode === 'km-asc') {
+                list.sort((a, b) => (a.odometer || 0) - (b.odometer || 0));
+            } else if (selectedSortMode === 'km-desc') {
+                list.sort((a, b) => (b.odometer || 0) - (a.odometer || 0));
+            }
+
+            list.forEach(v => {
+                const isDamaged = v.operational === false;
+                const isOff = v.active === false;
+                const isOut = v.status === 'ON_TRIP';
+                const activeTrip = isOut ? window.logs.find(l => l.vehicleId === v.id && l.status === 'ACTIVE') : null;
+                const tripFreq = getTripCountForVehicle(v.id, v.plate);
+
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-2xl border transition relative flex flex-col justify-between ${
+                    isOff ? 'bg-slate-950/60 border-slate-800/80 opacity-60' :
+                    isDamaged ? 'bg-rose-950/20 border-rose-800/50' :
+                    isOut ? 'bg-amber-950/20 border-amber-800/50' :
+                    'bg-dark-card border-dark-border hover:border-cyan-500/50 hover:shadow-lg'
+                }`;
+
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-1.5">
+                                ${v.unitNo ? `<span class="px-1.5 py-0.5 rounded bg-cyan-950 border border-cyan-700/60 text-cyan-300 font-mono text-[10px] font-bold">#${v.unitNo}</span>` : ''}
+                                <span class="font-mono font-extrabold text-sm text-white">${v.plate}</span>
+                            </div>
+                            ${isOff ?
+                                `<span class="px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-slate-400 text-[10px] font-bold"><i class="fa-solid fa-power-off mr-1"></i>OFF</span>` :
+                                (isDamaged ?
+                                    `<span class="px-2 py-0.5 rounded-full bg-rose-950 border border-rose-700 text-rose-300 text-[10px] font-bold">Rusak</span>` :
+                                    (isOut ?
+                                        `<span class="px-2 py-0.5 rounded-full bg-amber-950 border border-amber-700 text-amber-300 text-[10px] font-bold">Keluar</span>` :
+                                        `<span class="px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-700 text-emerald-300 text-[10px] font-bold">Di Garasi</span>`))}
+                        </div>
+                        <h4 class="font-bold text-xs text-slate-200 mt-1">${v.model}</h4>
+                        <div class="mt-2 flex items-center space-x-2">
+                            <span class="px-2 py-0.5 rounded-md bg-dark-surface border border-dark-border text-cyan-300 text-[10px] font-semibold">${v.category || 'Armada'}</span>
+                            <span class="text-[11px] font-mono text-slate-400">KM: ${(v.odometer || 0).toLocaleString()}</span>
+                            <span class="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-amber-300 font-bold">${tripFreq}x Pakai</span>
+                        </div>
+                        ${isOut && activeTrip ? `
+                            <div class="mt-2 p-2 rounded-xl bg-amber-950/40 border border-amber-800/40 text-[10px] text-amber-300 space-y-0.5">
+                                <p><strong class="text-white">Driver:</strong> ${activeTrip.driverName}</p>
+                                <p><strong class="text-white">Tujuan:</strong> ${activeTrip.destination || '-'}</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div class="mt-4 pt-2.5 border-t border-dark-border flex items-center justify-between">
+                        ${isOff ? `
+                            <span class="text-[11px] text-slate-500 italic">Armada Dinonaktifkan</span>
+                            <button onclick="toggleVehicleActive('${v.id}')" class="text-xs text-cyan-400 font-semibold hover:underline">Nyalakan (ON)</button>
+                        ` : (isDamaged ? `
+                            <span class="text-[11px] text-rose-400 font-semibold italic">Dalam Perbaikan</span>
+                            <button onclick="toggleVehicleOperational('${v.id}')" class="text-xs text-cyan-400 font-semibold hover:underline">Selesai?</button>
+                        ` : (isOut ? `
+                            <button onclick="openQuickCheckin('${activeTrip ? activeTrip.id : ''}')" class="w-full py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center space-x-1 shadow-sm">
+                                <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                                <span>Catat Masuk</span>
+                            </button>
+                        ` : `
+                            <button onclick="openQuickCheckout('${v.id}')" class="w-full py-1.5 rounded-xl bg-dark-surface hover:bg-cyan-500 border border-dark-border hover:border-cyan-400 text-cyan-300 hover:text-slate-950 font-bold text-xs transition flex items-center justify-center space-x-1">
+                                <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                                <span>Tugaskan Keluar</span>
+                            </button>
+                        `))}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function renderActiveTrips() {
+            const container = document.getElementById('active-trips-container');
+            const section = document.getElementById('active-trips-section');
+            if (!container || !section) return;
+
+            const activeList = window.logs.filter(l => l.status === 'ACTIVE');
+            if (activeList.length === 0) {
+                section.classList.add('hidden');
+                container.innerHTML = '';
+                return;
+            }
+
+            section.classList.remove('hidden');
+            container.innerHTML = '';
+
+            activeList.forEach(trip => {
+                const card = document.createElement('div');
+                card.className = "bg-dark-card p-3.5 rounded-2xl border border-amber-800/40 shadow-md flex flex-col justify-between space-y-2";
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center justify-between">
+                            <span class="font-mono font-bold text-white">${trip.plate}</span>
+                            <span class="text-[10px] text-slate-400 font-mono"><i class="fa-regular fa-clock mr-1"></i>${formatTimeOnly(trip.timeOut)}</span>
+                        </div>
+                        <p class="font-semibold text-xs text-slate-200">${trip.model}</p>
+                        <div class="mt-1 text-[11px] text-slate-300">
+                            <p><i class="fa-solid fa-user text-amber-400 mr-1"></i>${trip.driverName}</p>
+                            <p><i class="fa-solid fa-location-dot text-rose-400 mr-1"></i>${trip.destination || '-'}</p>
+                        </div>
+                    </div>
+                    <div class="pt-2 border-t border-dark-border flex items-center justify-between gap-2">
+                        <button onclick="showTicketModal('${trip.id}')" class="px-2.5 py-1.5 rounded-xl border border-dark-border text-slate-300 hover:bg-dark-cardHover text-[11px]">
+                            <i class="fa-solid fa-ticket text-cyan-400 mr-1"></i>Tiket
+                        </button>
+                        <button onclick="openQuickCheckin('${trip.id}')" class="flex-1 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center space-x-1 shadow-sm">
+                            <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                            <span>Catat Masuk</span>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // Checkout & Checkin
+        function prepareCheckoutOptions() {
+            setDriverMode('registered');
+            const vehSelect = document.getElementById('checkout-vehicle-id');
+            const drvSelect = document.getElementById('checkout-driver-id');
+
+            const readyVehicles = window.vehicles.filter(v => v.status === 'IN_GARAGE' && v.operational !== false && v.active !== false);
+            readyVehicles.sort((a, b) => (a.unitNo || 999) - (b.unitNo || 999));
+
+            vehSelect.innerHTML = '<option value="">-- Pilih Kendaraan Tersedia --</option>' +
+                readyVehicles.map(v => `<option value="${v.id}">[No. ${v.unitNo || '-'}] ${v.plate} - ${v.model} (${v.category || 'Armada'})</option>`).join('');
+
+            const readyDrivers = window.drivers.filter(d => d.active !== false);
+            drvSelect.innerHTML = '<option value="">-- Pilih Driver Dari Master --</option>' +
+                readyDrivers.map(d => `<option value="${d.id}">${d.name} (${d.sim})</option>`).join('');
+
+            document.getElementById('checkout-km-start').value = '';
+            document.getElementById('checkout-destination').value = '';
+            document.getElementById('checkout-purpose').value = '';
+        }
+
+        function setDriverMode(mode) {
+            driverInputMode = mode;
+            const regBox = document.getElementById('driver-registered-box');
+            const customBox = document.getElementById('driver-custom-box');
+            const btnReg = document.getElementById('btn-driver-registered');
+            const btnCustom = document.getElementById('btn-driver-custom');
+
+            if (mode === 'registered') {
+                if (regBox) regBox.classList.remove('hidden');
+                if (customBox) customBox.classList.add('hidden');
+                if (btnReg) btnReg.className = "px-2.5 py-1 rounded-lg font-semibold bg-cyan-600 text-white shadow-sm";
+                if (btnCustom) btnCustom.className = "px-2.5 py-1 rounded-lg font-semibold text-slate-400 hover:text-slate-200";
+            } else {
+                if (regBox) regBox.classList.add('hidden');
+                if (customBox) customBox.classList.remove('hidden');
+                if (btnCustom) btnCustom.className = "px-2.5 py-1 rounded-lg font-semibold bg-cyan-600 text-white shadow-sm";
+                if (btnReg) btnReg.className = "px-2.5 py-1 rounded-lg font-semibold text-slate-400 hover:text-slate-200";
+            }
+        }
+
+        function updateCheckoutVehicleKM() {
+            const vId = document.getElementById('checkout-vehicle-id').value;
+            const veh = window.vehicles.find(v => v.id === vId);
+            const kmInput = document.getElementById('checkout-km-start');
+            if (veh && kmInput) kmInput.value = veh.odometer || 0;
+        }
+
+        function openQuickCheckout(vehicleId) {
+            openModal('modal-checkout');
+            const select = document.getElementById('checkout-vehicle-id');
+            if (select) {
+                select.value = vehicleId;
+                updateCheckoutVehicleKM();
+            }
+        }
+
+        function handleCheckoutSubmit(event) {
+            event.preventDefault();
+            const vehicleId = document.getElementById('checkout-vehicle-id').value;
+            const vehicle = window.vehicles.find(v => v.id === vehicleId);
+            if (!vehicle) return;
+
+            let driverId = null;
+            let driverName = "";
+            let driverDept = "";
+
+            if (driverInputMode === 'registered') {
+                driverId = document.getElementById('checkout-driver-id').value;
+                if (!driverId) {
+                    showToast("Pilih Driver", "Tentukan driver dari daftar atau gunakan mode manual.", "warning");
+                    return;
+                }
+                const drv = window.drivers.find(d => d.id === driverId);
+                driverName = drv ? drv.name : "Driver";
+                driverDept = "Driver Resmi";
+            } else {
+                driverName = document.getElementById('checkout-custom-name').value.trim();
+                driverDept = document.getElementById('checkout-custom-dept').value.trim();
+                if (!driverName) {
+                    showToast("Nama Driver Wajib", "Masukkan nama pengemudi manual.", "warning");
+                    return;
+                }
+            }
+
+            const kmStartVal = document.getElementById('checkout-km-start').value;
+            const kmStart = kmStartVal !== '' ? parseInt(kmStartVal) : (vehicle.odometer || 0);
+
+            const newLog = {
+                id: `TRIP-${Date.now()}`,
+                vehicleId: vehicle.id,
+                plate: vehicle.plate,
+                model: vehicle.model,
+                driverId: driverId,
+                driverName: driverName,
+                driverDept: driverDept,
+                timeOut: new Date().toISOString(),
+                timeIn: null,
+                kmStart: kmStart,
+                kmEnd: null,
+                distance: null,
+                fuelStart: document.getElementById('checkout-fuel').value,
+                fuelEnd: null,
+                destination: document.getElementById('checkout-destination').value.trim() || "-",
+                purpose: document.getElementById('checkout-purpose').value.trim() || "-",
+                condition: 'Baik',
+                notes: '',
+                status: 'ACTIVE'
+            };
+
+            vehicle.status = 'ON_TRIP';
+            vehicle.odometer = kmStart;
+            window.logs.unshift(newLog);
+
+            saveToStorage();
+            closeModal('modal-checkout');
+            document.getElementById('form-checkout').reset();
+            renderAll();
+            showToast("Berhasil Keluar", `${vehicle.plate} (${driverName}) tercatat keluar.`, "success");
+        }
+
+        function prepareCheckinOptions() {
+            const select = document.getElementById('checkin-trip-id');
+            const activeTrips = window.logs.filter(l => l.status === 'ACTIVE');
+
+            select.innerHTML = '<option value="">-- Pilih Kendaraan Yang Masuk --</option>' +
+                activeTrips.map(trip => `<option value="${trip.id}">${trip.plate} - ${trip.model} (${trip.driverName})</option>`).join('');
+
+            document.getElementById('checkin-trip-summary').classList.add('hidden');
+            document.getElementById('checkin-km-end').value = '';
+            document.getElementById('checkin-distance-calc').innerHTML = `<span>-</span><span class="text-slate-400 font-normal">KM</span>`;
+        }
+
+        function updateCheckinTripDetails() {
+            const tripId = document.getElementById('checkin-trip-id').value;
+            const trip = window.logs.find(l => l.id === tripId);
+            const summaryBox = document.getElementById('checkin-trip-summary');
+
+            if (trip) {
+                summaryBox.classList.remove('hidden');
+                document.getElementById('chk-driver-name').innerText = trip.driverName;
+                document.getElementById('chk-km-start').innerText = trip.kmStart ? `${trip.kmStart.toLocaleString()} KM` : '-';
+                document.getElementById('chk-dest').innerText = trip.destination || '-';
+                document.getElementById('chk-time-out').innerText = formatDateTime(trip.timeOut);
+            } else {
+                summaryBox.classList.add('hidden');
+            }
+        }
+
+        function calculateTripDistance() {
+            const tripId = document.getElementById('checkin-trip-id').value;
+            const trip = window.logs.find(l => l.id === tripId);
+            const kmEndVal = document.getElementById('checkin-km-end').value;
+            const calcBox = document.getElementById('checkin-distance-calc');
+
+            if (!trip || kmEndVal === '' || !calcBox) {
+                if (calcBox) calcBox.innerHTML = `<span>-</span><span class="text-slate-400 font-normal">KM</span>`;
+                return;
+            }
+
+            const kmEnd = parseInt(kmEndVal);
+            const kmStart = trip.kmStart || 0;
+            const diff = kmEnd - kmStart;
+
+            if (diff >= 0) {
+                calcBox.innerHTML = `<span class="text-emerald-400">+${diff.toLocaleString()}</span><span class="text-slate-400 font-normal">KM</span>`;
+            } else {
+                calcBox.innerHTML = `<span class="text-rose-400 font-bold">KM Akhir < KM Awal</span>`;
+            }
+        }
+
+        function openQuickCheckin(tripId) {
+            openModal('modal-checkin');
+            const select = document.getElementById('checkin-trip-id');
+            if (select) {
+                select.value = tripId;
+                updateCheckinTripDetails();
+            }
+        }
+
+        function handleCheckinSubmit(event) {
+            event.preventDefault();
+            const tripId = document.getElementById('checkin-trip-id').value;
+            const trip = window.logs.find(l => l.id === tripId);
+            if (!trip) return;
+
+            const vehicle = window.vehicles.find(v => v.id === trip.vehicleId);
+            const kmEndVal = document.getElementById('checkin-km-end').value;
+            let kmEnd = null;
+            let distance = null;
+
+            if (kmEndVal !== '') {
+                kmEnd = parseInt(kmEndVal);
+                distance = Math.max(0, kmEnd - (trip.kmStart || 0));
+                if (vehicle) vehicle.odometer = kmEnd;
+            }
+
+            trip.kmEnd = kmEnd;
+            trip.distance = distance;
+            trip.timeIn = new Date().toISOString();
+            trip.fuelEnd = document.getElementById('checkin-fuel').value;
+            trip.condition = document.getElementById('checkin-condition').value;
+            trip.notes = document.getElementById('checkin-notes').value.trim();
+            trip.status = 'COMPLETED';
+
+            if (vehicle) {
+                vehicle.status = 'IN_GARAGE';
+                if (trip.condition === 'Perlu Servis / Cek Mesin') vehicle.operational = false;
+            }
+
+            saveToStorage();
+            closeModal('modal-checkin');
+            document.getElementById('form-checkin').reset();
+            renderAll();
+            showToast("Berhasil Masuk", `${trip.plate} telah aman kembali ke garasi.`, "success");
+        }
+
+        // Logbook & Filter Tanggal
+        function setLogDatePreset(preset) {
+            const startInput = document.getElementById('log-filter-start-date');
+            const endInput = document.getElementById('log-filter-end-date');
+            const now = new Date();
+            const todayStr = now.toISOString().slice(0, 10);
+
+            if (preset === 'today') {
+                startInput.value = todayStr;
+                endInput.value = todayStr;
+            } else if (preset === 'week') {
+                const past = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                startInput.value = past.toISOString().slice(0, 10);
+                endInput.value = todayStr;
+            } else if (preset === 'month') {
+                const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                startInput.value = firstDay.toISOString().slice(0, 10);
+                endInput.value = todayStr;
+            } else if (preset === 'all') {
+                startInput.value = '';
+                endInput.value = '';
+            }
+            renderLogsTable();
+        }
+
+        function renderLogsTable() {
+            const tbody = document.getElementById('logs-table-body');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            const searchQuery = (document.getElementById('log-search')?.value || '').toLowerCase().trim();
+            const statusFilter = document.getElementById('log-filter-status')?.value || 'ALL';
+            const startDate = document.getElementById('log-filter-start-date')?.value || '';
+            const endDate = document.getElementById('log-filter-end-date')?.value || '';
+
+            let filtered = window.logs.filter(l => {
+                const matchSearch = l.plate.toLowerCase().includes(searchQuery) ||
+                                    l.driverName.toLowerCase().includes(searchQuery) ||
+                                    (l.destination && l.destination.toLowerCase().includes(searchQuery));
+                const matchStatus = statusFilter === 'ALL' || l.status === statusFilter;
+                
+                let matchDate = true;
+                const tripDate = l.timeOut ? l.timeOut.slice(0, 10) : '';
+                if (startDate && tripDate < startDate) matchDate = false;
+                if (endDate && tripDate > endDate) matchDate = false;
+
+                return matchSearch && matchStatus && matchDate;
+            });
+
+            const countEl = document.getElementById('log-records-count');
+            if (countEl) countEl.innerText = `${filtered.length} Catatan`;
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400">Tidak ada riwayat catatan perjalanan.</td></tr>`;
+                return;
+            }
+
+            filtered.forEach(log => {
+                const isOut = log.status === 'ACTIVE';
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-dark-cardHover transition";
+                tr.innerHTML = `
+                    <td class="p-3 font-semibold text-white">
+                        <div class="font-mono font-bold">${log.plate}</div>
+                        <div class="text-[11px] text-slate-400 font-normal">${log.model}</div>
+                    </td>
+                    <td class="p-3">
+                        <div class="font-semibold text-slate-200">${log.driverName}</div>
+                        <div class="text-[10px] text-slate-400">${log.driverDept || '-'}</div>
+                    </td>
+                    <td class="p-3 text-slate-300 font-mono text-[11px]">${formatDateTime(log.timeOut)}</td>
+                    <td class="p-3 text-slate-300 font-mono text-[11px]">${log.timeIn ? formatDateTime(log.timeIn) : '<span class="text-amber-400 italic">Sedang keluar</span>'}</td>
+                    <td class="p-3 text-slate-200">
+                        <div class="font-medium">${log.destination || '-'}</div>
+                        <div class="text-[10px] text-slate-400 truncate max-w-xs">${log.purpose || '-'}</div>
+                        ${log.notes ? `<div class="mt-1 px-2 py-0.5 rounded bg-amber-950/40 border border-amber-800/40 text-[10px] text-amber-300"><i class="fa-solid fa-note-sticky mr-1"></i>${log.notes}</div>` : ''}
+                    </td>
+                    <td class="p-3 font-mono text-[11px] text-slate-300">
+                        <div>Awal: ${log.kmStart ? log.kmStart.toLocaleString() : '-'}</div>
+                        <div>Akhir: ${log.kmEnd ? log.kmEnd.toLocaleString() : '-'}</div>
+                        ${log.distance !== null && log.distance !== undefined ? `<div class="text-emerald-400 font-bold">+${log.distance.toLocaleString()} KM</div>` : ''}
+                    </td>
+                    <td class="p-3">
+                        ${isOut ?
+                            `<span class="px-2 py-0.5 rounded-full bg-amber-950 border border-amber-700 text-amber-300 text-[10px] font-bold">Bertugas</span>` :
+                            `<span class="px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-700 text-emerald-300 text-[10px] font-bold">Selesai</span>`}
+                    </td>
+                    <td class="p-3 text-center space-x-1 whitespace-nowrap">
+                        <button onclick="showTicketModal('${log.id}')" title="Cetak Tiket" class="w-7 h-7 rounded-lg border border-dark-border text-slate-300 hover:bg-cyan-950 inline-flex items-center justify-center">
+                            <i class="fa-solid fa-print text-xs"></i>
+                        </button>
+                        ${isOut ? `
+                            <button onclick="openQuickCheckin('${log.id}')" class="px-2 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[11px] font-bold">
+                                Masuk
+                            </button>
+                        ` : ''}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function exportLogsToCSV() {
+            if (window.logs.length === 0) {
+                showToast("Tidak Ada Data", "Belum ada catatan logbook untuk diekspor.", "info");
+                return;
+            }
+
+            let csv = "ID Trip,Plat Nomor,Model,Driver,Bagian,Jam Keluar,Jam Masuk,Tujuan,Keperluan,KM Awal,KM Akhir,Jarak Tempuh (KM),Catatan\n";
+            window.logs.forEach(l => {
+                csv += `"${l.id}","${l.plate}","${l.model}","${l.driverName}","${l.driverDept || ''}","${l.timeOut || ''}","${l.timeIn || ''}","${l.destination || ''}","${l.purpose || ''}","${l.kmStart || ''}","${l.kmEnd || ''}","${l.distance || ''}","${l.notes || ''}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Logbook_GarasiKu_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast("Ekspor Selesai", "File CSV logbook berhasil diunduh.", "success");
+        }
+
+        // Fleet Master Table
+        function renderFleetTable() {
+            const tbody = document.getElementById('fleet-table-body');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            const activeFilter = document.getElementById('fleet-filter-active')?.value || 'ALL';
+
+            let list = [...window.vehicles];
+            if (activeFilter === 'ON') list = list.filter(v => v.active !== false);
+            if (activeFilter === 'OFF') list = list.filter(v => v.active === false);
+
+            list.sort((a, b) => (a.unitNo || 999) - (b.unitNo || 999));
+
+            list.forEach(v => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-dark-cardHover transition";
+                const isOff = v.active === false;
+                const isDamaged = v.operational === false;
+
+                tr.innerHTML = `
+                    <td class="p-3 font-mono font-bold text-cyan-400">#${v.unitNo || '-'}</td>
+                    <td class="p-3 font-mono font-bold text-white">${v.plate}</td>
+                    <td class="p-3 font-semibold text-slate-200">${v.model}</td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded-md bg-dark-card border border-dark-border text-cyan-300 text-[10px] font-semibold">${v.category || 'Armada'}</span></td>
+                    <td class="p-3 font-mono text-slate-300">${(v.odometer || 0).toLocaleString()} KM</td>
+                    <td class="p-3">
+                        <button onclick="toggleVehicleActive('${v.id}')" class="px-2.5 py-1 rounded-full text-[10px] font-bold transition flex items-center space-x-1.5 ${
+                            isOff ? 'bg-slate-900 border border-slate-700 text-slate-400 hover:bg-slate-800' :
+                            'bg-emerald-950 border border-emerald-700 text-emerald-300 hover:bg-emerald-900'
+                        }">
+                            <i class="fa-solid fa-power-off"></i>
+                            <span>${isOff ? 'OFF (Nonaktif)' : 'ON (Aktif)'}</span>
+                        </button>
+                    </td>
+                    <td class="p-3">
+                        ${v.status === 'IN_GARAGE' ?
+                            `<span class="px-2 py-0.5 rounded-md bg-dark-card border border-dark-border text-slate-300 text-[10px]">Di Garasi</span>` :
+                            `<span class="px-2 py-0.5 rounded-md bg-amber-950 border border-amber-700 text-amber-300 text-[10px]">Keluar</span>`}
+                    </td>
+                    <td class="p-3 text-center space-x-1 admin-col ${isAdminLoggedIn ? '' : 'hidden'}">
+                        <button onclick="requireAdminAction(() => deleteVehicle('${v.id}'))" class="w-7 h-7 rounded-lg border border-dark-border text-slate-400 hover:text-rose-400 hover:bg-rose-950 inline-flex items-center justify-center">
+                            <i class="fa-solid fa-trash text-xs"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function toggleVehicleActive(id) {
+            const v = window.vehicles.find(item => item.id === id);
+            if (!v) return;
+            if (v.status === 'ON_TRIP') {
+                showToast("Armada Sedang Tugas", "Tidak dapat menonaktifkan unit yang berada di luar.", "warning");
+                return;
+            }
+            requireAdminAction(() => {
+                v.active = v.active === false ? true : false;
+                saveToStorage();
+                renderAll();
+                showToast("Status Diperbarui", `${v.plate} berstatus ${v.active ? 'ON (Aktif)' : 'OFF (Nonaktif)'}.`, "info");
+            });
+        }
+
+        function toggleVehicleOperational(id) {
+            const v = window.vehicles.find(item => item.id === id);
+            if (!v) return;
+            requireAdminAction(() => {
+                v.operational = v.operational === false ? true : false;
+                saveToStorage();
+                renderAll();
+                showToast("Kondisi Diperbarui", `${v.plate} kini: ${v.operational ? 'Siap Jalan' : 'Dalam Perbaikan'}.`, "info");
+            });
+        }
+
+        function deleteVehicle(id) {
+            const v = window.vehicles.find(item => item.id === id);
+            if (!v) return;
+            if (v.status === 'ON_TRIP') {
+                showToast("Gagal Menghapus", "Armada sedang digunakan di luar.", "error");
+                return;
+            }
+            window.vehicles = window.vehicles.filter(item => item.id !== id);
+            saveToStorage();
+            renderAll();
+            showToast("Armada Dihapus", `${v.plate} telah dihapus.`, "info");
+        }
+
+        // Driver Master Cards
+        function renderDriversGrid() {
+            const grid = document.getElementById('drivers-cards-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            const activeFilter = document.getElementById('driver-filter-active')?.value || 'ALL';
+
+            let list = [...window.drivers];
+            if (activeFilter === 'ON') list = list.filter(d => d.active !== false);
+            if (activeFilter === 'OFF') list = list.filter(d => d.active === false);
+
+            list.forEach(d => {
+                const activeTrip = window.logs.find(l => l.driverId === d.id && l.status === 'ACTIVE');
+                const isOff = d.active === false;
+
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-2xl border transition relative flex flex-col justify-between ${
+                    isOff ? 'bg-slate-950/60 border-slate-800 opacity-60' :
+                    activeTrip ? 'bg-amber-950/20 border-amber-800/50' :
+                    'bg-dark-card border-dark-border hover:shadow-lg'
+                }`;
+
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center justify-between">
+                            <h4 class="font-bold text-sm text-white">${d.name}</h4>
+                            <span class="px-2 py-0.5 rounded-md bg-indigo-950 border border-indigo-800/60 text-indigo-300 text-[10px] font-bold">${d.sim}</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-1"><i class="fa-solid fa-phone mr-1.5 text-slate-500"></i>${d.phone || '-'}</p>
+                        <div class="mt-2.5">
+                            ${activeTrip ? `
+                                <div class="p-2 rounded-xl bg-amber-950/40 border border-amber-800/40 text-amber-300 text-[11px] font-semibold">
+                                    <i class="fa-solid fa-car-side mr-1"></i>Membawa: <span class="text-white">${activeTrip.plate}</span>
+                                </div>
+                            ` : `
+                                <button onclick="toggleDriverActive('${d.id}')" class="px-2.5 py-1 rounded-full text-[10px] font-bold transition flex items-center space-x-1.5 ${
+                                    isOff ? 'bg-slate-900 border border-slate-700 text-slate-400' :
+                                    'bg-emerald-950 border border-emerald-700 text-emerald-300'
+                                }">
+                                    <i class="fa-solid fa-power-off"></i>
+                                    <span>${isOff ? 'OFF (Cuti/Izin)' : 'ON (Aktif Standby)'}</span>
+                                </button>
+                            `}
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-2.5 border-t border-dark-border flex items-center justify-end space-x-2 admin-col ${isAdminLoggedIn ? '' : 'hidden'}">
+                        <button onclick="requireAdminAction(() => deleteDriver('${d.id}'))" class="w-7 h-7 rounded-lg border border-dark-border text-slate-400 hover:text-rose-400 hover:bg-rose-950 inline-flex items-center justify-center">
+                            <i class="fa-solid fa-trash text-xs"></i>
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function toggleDriverActive(id) {
+            const d = window.drivers.find(item => item.id === id);
+            if (!d) return;
+            const activeTrip = window.logs.find(l => l.driverId === d.id && l.status === 'ACTIVE');
+            if (activeTrip) {
+                showToast("Driver Bertugas", "Driver sedang mengemudikan kendaraan di jalan.", "warning");
+                return;
+            }
+            requireAdminAction(() => {
+                d.active = d.active === false ? true : false;
+                saveToStorage();
+                renderAll();
+                showToast("Status Pengemudi", `${d.name} kini ${d.active ? 'ON (Aktif)' : 'OFF (Cuti)'}.`, "info");
+            });
+        }
+
+        function deleteDriver(id) {
+            const d = window.drivers.find(item => item.id === id);
+            if (!d) return;
+            window.drivers = window.drivers.filter(item => item.id !== id);
+            saveToStorage();
+            renderAll();
+            showToast("Driver Dihapus", `${d.name} telah dihapus.`, "info");
+        }
+
+        // Tiket Cetak
+        function showTicketModal(tripId) {
+            const trip = window.logs.find(l => l.id === tripId);
+            if (!trip) return;
+
+            const container = document.getElementById('ticket-content');
+            const signEl = document.getElementById('ticket-driver-sign');
+            if (signEl) signEl.innerText = `( ${trip.driverName} )`;
+
+            if (container) {
+                container.innerHTML = `
+                    <div class="flex justify-between py-1 border-b border-dark-border"><span class="text-slate-400">ID Tiket:</span><strong class="font-mono text-white">${trip.id}</strong></div>
+                    <div class="flex justify-between py-1 border-b border-dark-border"><span class="text-slate-400">Armada:</span><strong class="font-mono text-cyan-300">${trip.plate} (${trip.model})</strong></div>
+                    <div class="flex justify-between py-1 border-b border-dark-border"><span class="text-slate-400">Pengemudi:</span><strong class="text-white">${trip.driverName}</strong></div>
+                    <div class="flex justify-between py-1 border-b border-dark-border"><span class="text-slate-400">Jam Keluar:</span><span class="font-mono text-white">${formatDateTime(trip.timeOut)}</span></div>
+                    <div class="flex justify-between py-1 border-b border-dark-border"><span class="text-slate-400">Jam Masuk:</span><span class="font-mono text-white">${trip.timeIn ? formatDateTime(trip.timeIn) : 'Belum Kembali'}</span></div>
+                    <div class="flex justify-between py-1 border-b border-dark-border"><span class="text-slate-400">Tujuan:</span><span class="text-white">${trip.destination || '-'}</span></div>
+                    <div class="flex justify-between py-1 border-b border-dark-border"><span class="text-slate-400">Keperluan:</span><span class="text-white">${trip.purpose || '-'}</span></div>
+                    <div class="flex justify-between py-1 border-b border-dark-border"><span class="text-slate-400">Odometer:</span><span class="font-mono text-white">${trip.kmStart || 0} KM &rarr; ${trip.kmEnd ? trip.kmEnd + ' KM' : '...'} (${trip.distance !== null && trip.distance !== undefined ? trip.distance + ' KM' : '-'})</span></div>
+                    ${trip.notes ? `<div class="flex justify-between py-1 border-b border-dark-border"><span class="text-slate-400">Catatan:</span><span class="text-amber-300 font-medium">${trip.notes}</span></div>` : ''}
+                `;
+            }
+            openModal('modal-ticket');
+        }
+
+        // Stat Details
+        function openStatDetail(type) {
+            activeStatType = type;
+            const title = document.getElementById('stat-modal-title');
+            const searchInput = document.getElementById('stat-modal-search');
+            if (searchInput) searchInput.value = '';
+
+            if (type === 'total') title.innerText = "Daftar Seluruh Armada";
+            else if (type === 'garage') title.innerText = "Armada Siap di Garasi";
+            else if (type === 'out') title.innerText = "Armada Sedang di Luar";
+            else if (type === 'drivers') title.innerText = "Status Pengemudi";
+            else if (type === 'etoll') title.innerText = "Inventaris Kartu E-Toll";
+
+            renderStatModalContent('');
+            openModal('modal-stat-detail');
+        }
+
+        function filterStatModalItems(query) {
+            renderStatModalContent(query.toLowerCase().trim());
+        }
+
+        function renderStatModalContent(filterText = '') {
+            const body = document.getElementById('stat-modal-body');
+            const countEl = document.getElementById('stat-modal-count');
+            if (!body) return;
+            body.innerHTML = '';
+
+            let count = 0;
+            if (activeStatType === 'total' || activeStatType === 'garage') {
+                let list = window.vehicles;
+                if (activeStatType === 'garage') list = list.filter(v => v.status === 'IN_GARAGE' && v.operational !== false && v.active !== false);
+                if (filterText) list = list.filter(v => v.plate.toLowerCase().includes(filterText) || v.model.toLowerCase().includes(filterText));
+                count = list.length;
+
+                list.forEach(v => {
+                    const card = document.createElement('div');
+                    card.className = "p-3 bg-dark-card rounded-2xl border border-dark-border flex items-center justify-between";
+                    card.innerHTML = `
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <span class="font-mono font-bold text-white">${v.plate}</span>
+                                <span class="px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 text-[10px] font-semibold">${v.category || 'Armada'}</span>
+                            </div>
+                            <p class="text-slate-300 text-xs mt-0.5">${v.model}</p>
+                            <p class="text-[11px] text-slate-400 font-mono">KM: ${(v.odometer || 0).toLocaleString()}</p>
+                        </div>
+                    `;
+                    body.appendChild(card);
+                });
+            } else if (activeStatType === 'drivers') {
+                let list = window.drivers;
+                if (filterText) list = list.filter(d => d.name.toLowerCase().includes(filterText));
+                count = list.length;
+
+                list.forEach(d => {
+                    const card = document.createElement('div');
+                    card.className = "p-3 bg-dark-card rounded-2xl border border-dark-border flex items-center justify-between";
+                    card.innerHTML = `<div><strong class="text-white">${d.name}</strong> (${d.sim})<p class="text-[11px] text-slate-400">${d.phone || '-'}</p></div>`;
+                    body.appendChild(card);
+                });
+            } else if (activeStatType === 'etoll') {
+                let list = window.etolls;
+                count = list.length;
+                list.forEach(e => {
+                    const card = document.createElement('div');
+                    card.className = "p-3 bg-dark-card rounded-2xl border border-dark-border flex items-center justify-between";
+                    card.innerHTML = `<div><strong class="text-white">${e.name}</strong><p class="text-[11px] text-slate-400">Saldo: Rp ${(Number(e.balance) || 0).toLocaleString('id-ID')}</p></div>`;
+                    body.appendChild(card);
+                });
+            }
+            if (countEl) countEl.innerText = `${count} Data ditampilkan`;
+        }
+
+        // Formatters
+        function formatDateTime(isoString) {
+            if (!isoString) return '-';
+            const d = new Date(isoString);
+            return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function formatTimeOnly(isoString) {
+            if (!isoString) return '-';
+            const d = new Date(isoString);
+            return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function renderAll() {
+            updateDashboardStats();
+            renderMonitoringBay();
+            renderLogsTable();
+            renderFleetTable();
+            renderDriversGrid();
+            updateAdminBadgeUI();
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            renderAll();
+        });
+    </script>
+</body>
+</html>
