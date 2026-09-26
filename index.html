@@ -89,7 +89,7 @@
         }
     </style>
 </head>
-<body class="bg-dark-base text-slate-200 min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-black pb-20 md:pb-6">
+<body class="bg-dark-base text-slate-200 min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-black pb-28 md:pb-6">
 
     <!-- TOP NAVIGATION BAR -->
     <header class="bg-dark-surface/90 backdrop-blur-md border-b border-dark-border sticky top-0 z-30 shadow-lg shadow-black/30">
@@ -450,14 +450,14 @@
         </div>
     </main>
 
-    <!-- FLOATING MOBILE BOTTOM BAR (Thumb-friendly gate buttons) -->
-    <div class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-dark-surface/95 backdrop-blur-md border-t border-dark-border px-4 py-2.5 flex items-center justify-between gap-3 shadow-2xl">
-        <button onclick="openModal('modal-checkout')" class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 active:scale-95 text-slate-950 text-xs font-extrabold flex items-center justify-center space-x-1.5 shadow-md shadow-amber-500/20">
-            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+    <!-- FLOATING MOBILE BOTTOM BAR (Thumb-friendly enlarged gate buttons) -->
+    <div class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-dark-surface/95 backdrop-blur-lg border-t border-dark-border px-3.5 py-3 pb-4 flex items-center justify-between gap-3 shadow-[0_-10px_25px_rgba(0,0,0,0.6)]">
+        <button onclick="openModal('modal-checkout')" class="flex-1 py-3.5 px-3 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-500 to-amber-600 active:scale-95 text-slate-950 text-sm font-black flex items-center justify-center space-x-2 shadow-lg shadow-amber-500/30 border border-amber-400/40 tracking-tight">
+            <i class="fa-solid fa-arrow-right-from-bracket text-base"></i>
             <span>Catat Keluar</span>
         </button>
-        <button onclick="openModal('modal-checkin')" class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 active:scale-95 text-slate-950 text-xs font-extrabold flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-500/20">
-            <i class="fa-solid fa-arrow-right-to-bracket"></i>
+        <button onclick="openModal('modal-checkin')" class="flex-1 py-3.5 px-3 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-500 to-teal-600 active:scale-95 text-slate-950 text-sm font-black flex items-center justify-center space-x-2 shadow-lg shadow-emerald-500/30 border border-emerald-400/40 tracking-tight">
+            <i class="fa-solid fa-arrow-right-to-bracket text-base"></i>
             <span>Catat Masuk</span>
         </button>
     </div>
@@ -906,19 +906,22 @@
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
-            <form id="form-borrow-etoll" onsubmit="handleBorrowEtoll(event)" class="p-5 sm:p-6 space-y-3.5 text-xs">
+            <form id="form-borrow-etoll" onsubmit="handleBorrowEtoll(event)" class="p-5 sm:p-6 space-y-4 text-xs">
                 <input type="hidden" id="borrow-etoll-id">
                 <div>
-                    <label class="block font-semibold text-slate-200 mb-1">Pilih Driver Terdaftar</label>
-                    <select id="borrow-driver-select" onchange="document.getElementById('borrow-driver-custom').value = this.value ? '' : document.getElementById('borrow-driver-custom').value" class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-100 focus:ring-2 focus:ring-rose-500/40"></select>
+                    <label class="block font-semibold text-slate-200 mb-1.5 text-xs">Pilih Driver Terdaftar</label>
+                    <select id="borrow-driver-select" onchange="document.getElementById('borrow-driver-custom').value = this.value ? '' : document.getElementById('borrow-driver-custom').value" class="w-full px-3.5 py-3 rounded-xl border border-dark-border bg-dark-card text-slate-100 text-xs sm:text-sm focus:ring-2 focus:ring-rose-500/40"></select>
                 </div>
                 <div>
-                    <label class="block font-semibold text-slate-200 mb-1">Atau Ketik Manual Driver / Keperluan</label>
-                    <input type="text" id="borrow-driver-custom" placeholder="Contoh: Pak Budi (Dinas Solo-Semarang)" class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-white focus:ring-2 focus:ring-rose-500/40">
+                    <label class="block font-semibold text-slate-200 mb-1.5 text-xs">Atau Ketik Manual Driver / Keperluan</label>
+                    <input type="text" id="borrow-driver-custom" placeholder="Contoh: Pak Budi (Dinas Solo-Semarang)" class="w-full px-3.5 py-3 rounded-xl border border-dark-border bg-dark-card text-white text-xs sm:text-sm focus:ring-2 focus:ring-rose-500/40">
                 </div>
-                <div class="pt-3 flex justify-end space-x-2 border-t border-dark-border">
-                    <button type="button" onclick="closeModal('modal-borrow-etoll'); openStatDetail('etoll');" class="px-3.5 py-2 rounded-xl border border-dark-border text-slate-300">Batal</button>
-                    <button type="submit" class="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-bold">Konfirmasi Serahkan</button>
+                <div class="pt-3 flex items-center justify-end space-x-2.5 border-t border-dark-border">
+                    <button type="button" onclick="closeModal('modal-borrow-etoll'); openStatDetail('etoll');" class="py-2.5 px-4 rounded-xl border border-dark-border text-slate-300 font-semibold hover:bg-dark-card">Batal</button>
+                    <button type="submit" class="flex-1 sm:flex-none py-3 px-5 rounded-xl bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-400 hover:to-red-500 text-white font-black text-xs sm:text-sm shadow-lg shadow-rose-500/25 active:scale-95 transition flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-check"></i>
+                        <span>Konfirmasi Serahkan</span>
+                    </button>
                 </div>
             </form>
         </div>
@@ -936,19 +939,22 @@
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
-            <form id="form-return-etoll" onsubmit="handleReturnEtoll(event)" class="p-5 sm:p-6 space-y-3.5 text-xs">
+            <form id="form-return-etoll" onsubmit="handleReturnEtoll(event)" class="p-5 sm:p-6 space-y-4 text-xs">
                 <input type="hidden" id="return-etoll-id">
-                <div class="bg-emerald-950/40 p-3 rounded-xl border border-emerald-800/40 text-emerald-300 space-y-1">
+                <div class="bg-emerald-950/40 p-3.5 rounded-xl border border-emerald-800/40 text-emerald-300 space-y-1.5 text-xs sm:text-sm">
                     <div><span class="text-slate-400">Pemegang:</span> <strong id="return-holder-name" class="text-emerald-300">-</strong></div>
                     <div><span class="text-slate-400">Saldo Awal:</span> <strong id="return-balance-curr" class="font-mono text-emerald-300">Rp 0</strong></div>
                 </div>
                 <div>
-                    <label class="block font-semibold text-slate-200 mb-1">Update Sisa Saldo Akhir (Rp)</label>
-                    <input type="number" id="return-etoll-new-balance" min="0" placeholder="Biarkan kosong jika saldo tetap" class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-white font-mono focus:ring-2 focus:ring-emerald-500/40">
+                    <label class="block font-semibold text-slate-200 mb-1.5 text-xs">Update Sisa Saldo Akhir (Rp)</label>
+                    <input type="number" id="return-etoll-new-balance" min="0" placeholder="Biarkan kosong jika saldo tetap" class="w-full px-3.5 py-3 rounded-xl border border-dark-border bg-dark-card text-white font-mono text-xs sm:text-sm focus:ring-2 focus:ring-emerald-500/40">
                 </div>
-                <div class="pt-3 flex justify-end space-x-2 border-t border-dark-border">
-                    <button type="button" onclick="closeModal('modal-return-etoll'); openStatDetail('etoll');" class="px-3.5 py-2 rounded-xl border border-dark-border text-slate-300">Batal</button>
-                    <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold">Simpan Pengembalian</button>
+                <div class="pt-3 flex items-center justify-end space-x-2.5 border-t border-dark-border">
+                    <button type="button" onclick="closeModal('modal-return-etoll'); openStatDetail('etoll');" class="py-2.5 px-4 rounded-xl border border-dark-border text-slate-300 font-semibold hover:bg-dark-card">Batal</button>
+                    <button type="submit" class="flex-1 sm:flex-none py-3 px-5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-emerald-500/25 active:scale-95 transition flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-arrow-rotate-left"></i>
+                        <span>Simpan Pengembalian</span>
+                    </button>
                 </div>
             </form>
         </div>
@@ -2688,25 +2694,31 @@
                 list.forEach(e => {
                     const isBorrowed = e.status === 'BORROWED';
                     const card = document.createElement('div');
-                    card.className = `p-3.5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${isBorrowed ? 'bg-amber-950/20 border-amber-800/40' : 'bg-dark-card border-dark-border'}`;
+                    card.className = `p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 ${isBorrowed ? 'bg-amber-950/20 border-amber-800/40 shadow-sm' : 'bg-dark-card border-dark-border shadow-sm'}`;
                     card.innerHTML = `
-                        <div>
-                            <div class="flex items-center space-x-2">
-                                <strong class="text-white">${e.name}</strong>
-                                <span class="px-1.5 py-0.5 rounded text-[10px] bg-rose-950 text-rose-300 border border-rose-800">${e.bank}</span>
-                                ${isBorrowed ? `<span class="text-[10px] font-bold text-amber-300 bg-amber-950 px-2 py-0.5 rounded">Dibawa: ${e.holderName}</span>` : `<span class="text-[10px] font-bold text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded">Di Garasi</span>`}
+                        <div class="space-y-1.5 flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <strong class="text-white text-sm sm:text-base">${e.name}</strong>
+                                <span class="px-2 py-0.5 rounded text-[10px] sm:text-xs font-bold bg-rose-950 text-rose-300 border border-rose-800">${e.bank}</span>
+                                ${isBorrowed ? `<span class="text-[11px] font-bold text-amber-300 bg-amber-950/90 border border-amber-700/60 px-2 py-0.5 rounded-lg flex items-center gap-1"><i class="fa-solid fa-user-tag text-xs"></i> Dibawa: ${e.holderName}</span>` : `<span class="text-[11px] font-bold text-emerald-400 bg-emerald-950/90 border border-emerald-700/60 px-2 py-0.5 rounded-lg flex items-center gap-1"><i class="fa-solid fa-circle-check text-xs"></i> Di Garasi</span>`}
                             </div>
-                            <p class="text-[11px] text-slate-400 font-mono mt-0.5">Saldo: <strong class="text-rose-400">Rp ${(Number(e.balance) || 0).toLocaleString('id-ID')}</strong> ${e.cardNo ? `| ${e.cardNo}` : ''}</p>
+                            <p class="text-xs sm:text-sm text-slate-300 font-mono">Saldo: <strong class="text-rose-400 font-extrabold text-sm sm:text-base">Rp ${(Number(e.balance) || 0).toLocaleString('id-ID')}</strong> ${e.cardNo ? `<span class="text-slate-500 font-normal">| ${e.cardNo}</span>` : ''}</p>
                         </div>
-                        <div class="flex items-center space-x-1.5 self-end sm:self-center">
+                        <div class="flex items-center gap-2 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-dark-border">
                             ${isBorrowed ? `
-                                <button onclick="openReturnEtollModal('${e.id}')" class="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[11px] font-bold">Kembalikan</button>
+                                <button onclick="openReturnEtollModal('${e.id}')" class="flex-1 sm:flex-none py-2.5 sm:py-2 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs sm:text-sm font-black flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition">
+                                    <i class="fa-solid fa-arrow-rotate-left text-sm"></i>
+                                    <span>Kembalikan</span>
+                                </button>
                             ` : `
-                                <button onclick="openBorrowEtollModal('${e.id}')" class="px-2.5 py-1 rounded-lg bg-rose-500 hover:bg-rose-400 text-white text-[11px] font-bold">Serahkan</button>
+                                <button onclick="openBorrowEtollModal('${e.id}')" class="flex-1 sm:flex-none py-2.5 sm:py-2 px-4 rounded-xl bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-400 hover:to-red-500 text-white text-xs sm:text-sm font-black flex items-center justify-center space-x-1.5 shadow-md shadow-rose-500/25 active:scale-95 transition">
+                                    <i class="fa-solid fa-hand-holding-hand text-sm"></i>
+                                    <span>Serahkan</span>
+                                </button>
                             `}
                             ${isAdminLoggedIn ? `
-                                <button onclick="requireAdminAction(() => deleteEtoll('${e.id}'))" class="w-7 h-7 rounded-lg border border-dark-border text-slate-400 hover:text-rose-400 inline-flex items-center justify-center">
-                                    <i class="fa-solid fa-trash text-xs"></i>
+                                <button onclick="requireAdminAction(() => deleteEtoll('${e.id}'))" class="w-10 h-10 sm:w-8 sm:h-8 rounded-xl border border-dark-border text-slate-400 hover:text-rose-400 hover:bg-rose-950 inline-flex items-center justify-center transition active:scale-95">
+                                    <i class="fa-solid fa-trash text-sm sm:text-xs"></i>
                                 </button>
                             ` : ''}
                         </div>
