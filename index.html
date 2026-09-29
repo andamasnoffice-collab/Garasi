@@ -43,7 +43,7 @@
         }
         @media (max-width: 640px) {
             html {
-                font-size: 15px;
+                font-size: 16px;
             }
         }
         ::-webkit-scrollbar {
@@ -107,7 +107,7 @@
                     </div>
                 </div>
 
-                <!-- Clock, Connection Indicator, Admin Controls & Actions -->
+                <!-- Clock, Connection Status, Admin Controls & Actions -->
                 <div class="flex items-center space-x-1.5 sm:space-x-2.5">
                     <!-- Live Clock -->
                     <div class="hidden lg:flex flex-col text-right pr-3 border-r border-dark-border">
@@ -116,7 +116,7 @@
                     </div>
 
                     <!-- Online / Database Connection Indicator -->
-                    <button id="connection-status-badge" onclick="handleConnectionBadgeClick()" type="button" class="px-2 sm:px-3 py-1.5 rounded-xl border border-dark-border bg-dark-card hover:bg-dark-cardHover flex items-center space-x-1.5 transition active:scale-95 shadow-sm" title="Klik untuk rincian status koneksi">
+                    <button id="connection-status-badge" onclick="handleConnectionBadgeClick()" type="button" class="px-2 sm:px-3 py-1.5 rounded-xl border border-dark-border bg-dark-card hover:bg-dark-cardHover flex items-center space-x-1.5 transition active:scale-95 shadow-sm" title="Klik untuk melihat detail koneksi">
                         <span id="conn-status-dot" class="w-2.5 h-2.5 rounded-full bg-slate-600 transition-colors"></span>
                         <i id="conn-status-icon" class="fa-solid fa-cloud text-[11px] text-slate-400"></i>
                         <span id="conn-status-label" class="text-[11px] sm:text-xs font-bold text-slate-300">Cek Status</span>
@@ -446,7 +446,7 @@
                             <option value="EXECUTIVE">Driver Pimpinan</option>
                         </select>
                         <select id="driver-filter-active" onchange="renderDriversGrid()" class="px-3 py-1.5 rounded-xl border border-dark-border bg-dark-card text-xs text-slate-200">
-                            <option value="ALL">Semua Status</option>
+                            <option value="ALL">Semua Driver</option>
                             <option value="ON">Hanya ON (Aktif)</option>
                             <option value="OFF">Hanya OFF (Cuti/Izin)</option>
                         </select>
@@ -537,12 +537,12 @@
 
     <!-- MOBILE BOTTOM ACTION DOCK -->
     <div class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-dark-surface/95 backdrop-blur-md border-t border-dark-border p-3 shadow-2xl flex items-center space-x-2">
-        <button onclick="openModal('modal-checkout')" class="flex-1 py-3.5 px-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 active:from-amber-400 text-slate-950 font-black text-sm flex items-center justify-center space-x-2 shadow-lg shadow-amber-500/30">
-            <i class="fa-solid fa-arrow-right-from-bracket text-base"></i>
+        <button onclick="openModal('modal-checkout')" class="flex-1 py-3 px-2 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 active:from-amber-400 text-slate-950 font-black text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-amber-500/30">
+            <i class="fa-solid fa-arrow-right-from-bracket text-sm"></i>
             <span>Catat Keluar</span>
         </button>
-        <button onclick="openModal('modal-checkin')" class="flex-1 py-3.5 px-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 active:from-emerald-400 text-slate-950 font-black text-sm flex items-center justify-center space-x-2 shadow-lg shadow-emerald-500/30">
-            <i class="fa-solid fa-arrow-right-to-bracket text-base"></i>
+        <button onclick="openModal('modal-checkin')" class="flex-1 py-3 px-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 active:from-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-500/30">
+            <i class="fa-solid fa-arrow-right-to-bracket text-sm"></i>
             <span>Catat Masuk</span>
         </button>
     </div>
@@ -643,7 +643,7 @@
                         <span>Uji Koneksi</span>
                     </button>
                     <div class="flex items-center space-x-2">
-                        <button type="button" onclick="handleOpenCloudSettingsFromModal()" class="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold">
+                        <button id="btn-cloud-settings-modal" type="button" onclick="handleOpenCloudSettingsFromModal()" class="hidden px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold">
                             Pengaturan DB
                         </button>
                     </div>
@@ -679,7 +679,7 @@
                         <i class="fa-solid fa-receipt"></i>
                         <span>Rekap Mutasi</span>
                     </button>
-                    <button onclick="requireAdminAction(() => { closeModal('modal-stat-detail'); openModal('modal-add-etoll'); })" class="px-3 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold flex items-center space-x-1 shadow-sm">
+                    <button id="btn-stat-add-etoll" onclick="requireAdminAction(() => { closeModal('modal-stat-detail'); openModal('modal-add-etoll'); })" class="hidden px-3 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold items-center space-x-1 shadow-sm">
                         <i class="fa-solid fa-plus"></i>
                         <span>+ Tambah</span>
                     </button>
@@ -870,13 +870,13 @@
                     <input type="number" id="swap-balance-current" min="0" placeholder="Ketik saldo saat ini jika sudah dipakai" class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-100 font-mono focus:ring-2 focus:ring-blue-500/40">
                 </div>
 
-                <!-- Mode 1: Tukar ke Kartu Cadangan OFF (Tetap 5 Kartu ON) -->
+                <!-- Mode 1: Tukar ke Kartu Cadangan OFF (Tetap Kuota Kartu ON Konstan) -->
                 <div id="swap-box-off-swap" class="space-y-2">
                     <label class="block font-semibold text-slate-200">Pilih Kartu Cadangan (Saat ini OFF) <span class="text-rose-400">*</span></label>
                     <select id="swap-select-off-card" class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-100 focus:ring-2 focus:ring-blue-500/40"></select>
                     <div class="p-2.5 rounded-xl bg-blue-950/40 border border-blue-800/40 text-[11px] text-blue-200 space-y-1">
                         <p><i class="fa-solid fa-circle-check mr-1 text-cyan-400"></i>Kartu cadangan yang dipilih otomatis menjadi <b>ON (Aktif)</b>.</p>
-                        <p><i class="fa-solid fa-power-off mr-1 text-slate-400"></i>Kartu ini otomatis menjadi <b>OFF (Nonaktif)</b> dan ditaruh di bawah.</p>
+                        <p><i class="fa-solid fa-power-off mr-1 text-slate-400"></i>Kartu ini otomatis menjadi <b>OFF (Nonaktif)</b> dan ditaruh di paling bawah.</p>
                         <p class="font-bold text-cyan-300">Total jumlah kartu ON tetap sama & konsisten!</p>
                     </div>
                 </div>
@@ -1032,6 +1032,10 @@
                     <label class="flex items-center space-x-2 cursor-pointer">
                         <input type="checkbox" id="tg-notify-checkin" checked class="rounded border-slate-700 bg-slate-900 text-sky-500 focus:ring-sky-500/30">
                         <span class="text-slate-300">Kendaraan Masuk Garasi (Check-In)</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" id="tg-notify-etoll" checked class="rounded border-slate-700 bg-slate-900 text-sky-500 focus:ring-sky-500/30">
+                        <span class="text-slate-300">Aktivitas Kartu E-Toll (Serah / Kembali / Tukar)</span>
                     </label>
                 </div>
                 <div class="pt-2 flex items-center justify-between">
@@ -1475,8 +1479,7 @@
             { id: "ET-02", name: "BCA Flazz Pool #02", bank: "BCA", balance: 300000, cardNo: "6011-8844-3322-0002", status: "AVAILABLE", holderName: null, active: true },
             { id: "ET-03", name: "BRI Brizzi Pool #03", bank: "BRI", balance: 150000, cardNo: "6019-7755-2211-0003", status: "AVAILABLE", holderName: null, active: true },
             { id: "ET-04", name: "BNI TapCash Pool #04", bank: "BNI", balance: 200000, cardNo: "6024-6633-1100-0004", status: "AVAILABLE", holderName: null, active: true },
-            { id: "ET-05", name: "Mandiri e-Money Cadangan #05", bank: "Mandiri", balance: 100000, cardNo: "6032-9812-4411-0005", status: "AVAILABLE", holderName: null, active: false },
-            { id: "ET-06", name: "BCA Flazz Cadangan #06", bank: "BCA", balance: 100000, cardNo: "6011-8844-3322-0006", status: "AVAILABLE", holderName: null, active: false }
+            { id: "ET-05", name: "Mandiri e-Money Cadangan #05", bank: "Mandiri", balance: 100000, cardNo: "6032-9812-4411-0005", status: "AVAILABLE", holderName: null, active: false }
         ];
 
         // Global State & Settings
@@ -1491,7 +1494,8 @@
             botToken: '',
             chatId: '',
             notifyCheckout: true,
-            notifyCheckin: true
+            notifyCheckin: true,
+            notifyEtoll: true
         };
 
         let isAdminLoggedIn = false;
@@ -1534,7 +1538,8 @@
                     botToken: cloudData.telegramConfig.botToken || '',
                     chatId: cloudData.telegramConfig.chatId || '',
                     notifyCheckout: cloudData.telegramConfig.notifyCheckout !== false,
-                    notifyCheckin: cloudData.telegramConfig.notifyCheckin !== false
+                    notifyCheckin: cloudData.telegramConfig.notifyCheckin !== false,
+                    notifyEtoll: cloudData.telegramConfig.notifyEtoll !== false
                 };
                 localStorage.setItem('garasiku_telegram', JSON.stringify(window.telegramConfig));
                 initTelegramConfig();
@@ -1543,6 +1548,7 @@
             renderAll();
         };
 
+        // Global Connection & Online/Offline Indicator Logic
         window.updateGlobalConnectionIndicator = function() {
             const badge = document.getElementById('connection-status-badge');
             const dot = document.getElementById('conn-status-dot');
@@ -1709,6 +1715,8 @@
             const btnTg = document.getElementById('btn-telegram-config');
             const btnAddVeh = document.getElementById('btn-add-vehicle');
             const btnAddDrv = document.getElementById('btn-add-driver');
+            const btnCloudModal = document.getElementById('btn-cloud-settings-modal');
+            const btnStatAddEtoll = document.getElementById('btn-stat-add-etoll');
 
             if (isAdminLoggedIn) {
                 if (badgeIcon) badgeIcon.className = "fa-solid fa-lock-open text-emerald-400 text-xs";
@@ -1719,6 +1727,8 @@
                 if (btnTg) btnTg.classList.remove('hidden');
                 if (btnAddVeh) btnAddVeh.classList.remove('hidden');
                 if (btnAddDrv) btnAddDrv.classList.remove('hidden');
+                if (btnCloudModal) btnCloudModal.classList.remove('hidden');
+                if (btnStatAddEtoll) btnStatAddEtoll.classList.remove('hidden');
                 document.querySelectorAll('.admin-col').forEach(el => el.classList.remove('hidden'));
             } else {
                 if (badgeIcon) badgeIcon.className = "fa-solid fa-user-shield text-slate-400 text-xs";
@@ -1729,6 +1739,8 @@
                 if (btnTg) btnTg.classList.add('hidden');
                 if (btnAddVeh) btnAddVeh.classList.add('hidden');
                 if (btnAddDrv) btnAddDrv.classList.add('hidden');
+                if (btnCloudModal) btnCloudModal.classList.add('hidden');
+                if (btnStatAddEtoll) btnStatAddEtoll.classList.add('hidden');
                 document.querySelectorAll('.admin-col').forEach(el => el.classList.add('hidden'));
             }
         }
@@ -1866,7 +1878,7 @@
             return window.logs.filter(l => l.vehicleId === vehicleId || l.plate === plate).length;
         }
 
-        // Monitoring
+        // Monitoring Bay
         function renderCategoryPills() {
             const container = document.getElementById('category-filter-pills');
             if (!container) return;
@@ -1981,10 +1993,10 @@
                     <div class="mt-4 pt-2.5 border-t border-dark-border flex items-center justify-between">
                         ${isOff ? `
                             <span class="text-[11px] text-slate-500 italic">Armada Dinonaktifkan</span>
-                            <button onclick="toggleVehicleActive('${v.id}')" class="text-xs text-cyan-400 font-semibold hover:underline">Nyalakan (ON)</button>
+                            ${isAdminLoggedIn ? `<button onclick="toggleVehicleActive('${v.id}')" class="text-xs text-cyan-400 font-semibold hover:underline">Nyalakan (ON)</button>` : ''}
                         ` : (isDamaged ? `
                             <span class="text-[11px] text-rose-400 font-semibold italic">Dalam Perbaikan</span>
-                            <button onclick="toggleVehicleOperational('${v.id}')" class="text-xs text-cyan-400 font-semibold hover:underline">Selesai?</button>
+                            ${isAdminLoggedIn ? `<button onclick="toggleVehicleOperational('${v.id}')" class="text-xs text-cyan-400 font-semibold hover:underline">Selesai?</button>` : ''}
                         ` : (isOut ? `
                             <button onclick="openQuickCheckin('${activeTrip ? activeTrip.id : ''}')" class="w-full py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center space-x-1 shadow-sm">
                                 <i class="fa-solid fa-arrow-right-to-bracket"></i>
@@ -2420,13 +2432,23 @@
                     <td class="p-3"><span class="px-2 py-0.5 rounded-md bg-dark-card border border-dark-border text-cyan-300 text-[10px] font-semibold">${v.category || 'Armada'}</span></td>
                     <td class="p-3 font-mono text-slate-300">${(v.odometer || 0).toLocaleString()} KM</td>
                     <td class="p-3">
-                        <button onclick="toggleVehicleActive('${v.id}')" class="px-2.5 py-1 rounded-full text-[10px] font-bold transition flex items-center space-x-1.5 ${
-                            isOff ? 'bg-slate-900 border border-slate-700 text-slate-400 hover:bg-slate-800' :
-                            'bg-emerald-950 border border-emerald-700 text-emerald-300 hover:bg-emerald-900'
-                        }">
-                            <i class="fa-solid fa-power-off"></i>
-                            <span>${isOff ? 'OFF (Nonaktif)' : 'ON (Aktif)'}</span>
-                        </button>
+                        ${isAdminLoggedIn ? `
+                            <button onclick="toggleVehicleActive('${v.id}')" class="px-2.5 py-1 rounded-full text-[10px] font-bold transition flex items-center space-x-1.5 ${
+                                isOff ? 'bg-slate-900 border border-slate-700 text-slate-400 hover:bg-slate-800' :
+                                'bg-emerald-950 border border-emerald-700 text-emerald-300 hover:bg-emerald-900'
+                            }">
+                                <i class="fa-solid fa-power-off"></i>
+                                <span>${isOff ? 'OFF (Nonaktif)' : 'ON (Aktif)'}</span>
+                            </button>
+                        ` : `
+                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center space-x-1.5 ${
+                                isOff ? 'bg-slate-900 border border-slate-700 text-slate-400' :
+                                'bg-emerald-950 border border-emerald-700 text-emerald-300'
+                            }">
+                                <i class="fa-solid fa-power-off"></i>
+                                <span>${isOff ? 'OFF' : 'ON'}</span>
+                            </span>
+                        `}
                     </td>
                     <td class="p-3">
                         ${v.status === 'IN_GARAGE' ?
@@ -2522,12 +2544,12 @@
             grid.innerHTML = '';
 
             const activeFilter = document.getElementById('driver-filter-active')?.value || 'ALL';
-            const categoryFilter = document.getElementById('driver-filter-category')?.value || 'ALL';
+            const catFilter = document.getElementById('driver-filter-category')?.value || 'ALL';
 
             let list = [...window.drivers];
             if (activeFilter === 'ON') list = list.filter(d => d.active !== false);
             if (activeFilter === 'OFF') list = list.filter(d => d.active === false);
-            if (categoryFilter !== 'ALL') list = list.filter(d => (d.category || 'OPERATIONAL') === categoryFilter);
+            if (catFilter !== 'ALL') list = list.filter(d => (d.category || 'OPERATIONAL') === catFilter);
 
             list.forEach(d => {
                 const activeTrip = window.logs.find(l => l.driverId === d.id && l.status === 'ACTIVE');
@@ -2560,7 +2582,7 @@
                                 <div class="p-2 rounded-xl bg-amber-950/40 border border-amber-800/40 text-amber-300 text-[11px] font-semibold">
                                     <i class="fa-solid fa-car-side mr-1"></i>Membawa: <span class="text-white">${activeTrip.plate}</span>
                                 </div>
-                            ` : `
+                            ` : (isAdminLoggedIn ? `
                                 <button onclick="toggleDriverActive('${d.id}')" class="px-2.5 py-1 rounded-full text-[10px] font-bold transition flex items-center space-x-1.5 ${
                                     isOff ? 'bg-slate-900 border border-slate-700 text-slate-400' :
                                     'bg-emerald-950 border border-emerald-700 text-emerald-300'
@@ -2568,7 +2590,15 @@
                                     <i class="fa-solid fa-power-off"></i>
                                     <span>${isOff ? 'OFF (Cuti/Izin)' : 'ON (Aktif Standby)'}</span>
                                 </button>
-                            `}
+                            ` : `
+                                <span class="px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center space-x-1.5 ${
+                                    isOff ? 'bg-slate-900 border border-slate-700 text-slate-400' :
+                                    'bg-emerald-950 border border-emerald-700 text-emerald-300'
+                                }">
+                                    <i class="fa-solid fa-power-off"></i>
+                                    <span>${isOff ? 'OFF (Cuti)' : 'ON (Standby)'}</span>
+                                </span>
+                            `)}
                         </div>
                     </div>
                     <div class="mt-4 pt-2.5 border-t border-dark-border flex items-center justify-end space-x-2 admin-col ${isAdminLoggedIn ? '' : 'hidden'}">
@@ -2780,6 +2810,10 @@
                 openStatDetail('etoll');
                 renderAll();
                 showToast("Kartu Diserahkan", `${card.name} dibawa oleh ${holder}.`, "success");
+
+                if (window.telegramConfig.notifyEtoll !== false && window.telegramConfig.botToken && window.telegramConfig.chatId) {
+                    sendTelegramEtollBorrowNotification(card, holder);
+                }
             }
         }
 
@@ -2831,6 +2865,10 @@
                 openStatDetail('etoll');
                 renderAll();
                 showToast("Kartu Dikembalikan", `${card.name} telah kembali di pool garasi.`, "success");
+
+                if (window.telegramConfig.notifyEtoll !== false && window.telegramConfig.botToken && window.telegramConfig.chatId) {
+                    sendTelegramEtollReturnNotification(card, oldHolder, oldBal, newBal, spent);
+                }
             }
         }
 
@@ -2847,7 +2885,6 @@
             document.getElementById('swap-custom-new-driver').value = '';
             document.getElementById('swap-notes').value = '';
 
-            // Populate kartu cadangan yang saat ini OFF
             const offCardsSelect = document.getElementById('swap-select-off-card');
             const offCards = window.etolls.filter(e => e.active === false && e.id !== card.id);
             if (offCards.length === 0) {
@@ -2921,17 +2958,14 @@
                 const reserveCard = window.etolls.find(e => e.id === offCardId);
                 if (!reserveCard) return;
 
-                // Kartu cadangan OFF berubah jadi ON
                 reserveCard.active = true;
 
-                // Jika kartu asal sedang dibawa driver, alihkan pembawa ke kartu cadangan ini
                 if (card.status === 'BORROWED') {
                     reserveCard.status = 'BORROWED';
                     reserveCard.holderName = oldHolder;
                     card.holderName = null;
                 }
                 
-                // Kartu asal kembali ke pool dan berubah status jadi OFF
                 card.status = 'AVAILABLE';
                 card.active = false;
                 card.balance = intermediateBal;
@@ -2950,6 +2984,14 @@
                 };
                 window.etollLogs.unshift(newRecap);
                 showToast("Kartu Ditukar", `${card.name} kini OFF, ${reserveCard.name} kini ON.`, "success");
+
+                if (window.telegramConfig.notifyEtoll !== false && window.telegramConfig.botToken && window.telegramConfig.chatId) {
+                    const lines = `🎴 <b>Tukar:</b> <code>${escapeTg(card.name)}</code> [OFF] ⇄ <code>${escapeTg(reserveCard.name)}</code> [ON]\n` +
+                                  `👤 <b>Pemegang Saat Ini:</b> ${escapeTg(reserveCard.holderName || 'Pool Garasi')}\n` +
+                                  `💵 <b>Saldo Terpakai Saat Tukar:</b> Rp ${spent.toLocaleString('id-ID')}\n` +
+                                  `💰 <b>Saldo Baru Tersedia:</b> Rp ${(Number(reserveCard.balance) || 0).toLocaleString('id-ID')}`;
+                    sendTelegramEtollSwapNotification('Tukar ON ⇄ OFF (Kuota ON Konstan)', lines, notes);
+                }
 
             } else if (swapMode === 'driver') {
                 const selectVal = document.getElementById('swap-select-new-driver').value;
@@ -2978,6 +3020,14 @@
                 };
                 window.etollLogs.unshift(newRecap);
                 showToast("Kartu Dioper", `${card.name} telah dioper ke ${newHolder}.`, "success");
+
+                if (window.telegramConfig.notifyEtoll !== false && window.telegramConfig.botToken && window.telegramConfig.chatId) {
+                    const lines = `🏷 <b>Kartu:</b> <code>${escapeTg(card.name)}</code>\n` +
+                                  `👤 <b>Oper Dari:</b> ${escapeTg(oldHolder)} ➔ <b>Ke:</b> ${escapeTg(newHolder)}\n` +
+                                  `💵 <b>Saldo Terpakai:</b> Rp ${spent.toLocaleString('id-ID')}\n` +
+                                  `💰 <b>Sisa Saldo:</b> Rp ${(Number(card.balance) || 0).toLocaleString('id-ID')}`;
+                    sendTelegramEtollSwapNotification('Oper Driver di Jalan', lines, notes);
+                }
 
             } else {
                 const targetCardId = document.getElementById('swap-select-new-card').value;
@@ -3009,6 +3059,14 @@
                 };
                 window.etollLogs.unshift(newRecap);
                 showToast("Kartu Ditukar", `${card.name} diganti dengan ${newCard.name} untuk ${oldHolder}.`, "success");
+
+                if (window.telegramConfig.notifyEtoll !== false && window.telegramConfig.botToken && window.telegramConfig.chatId) {
+                    const lines = `🎴 <b>Kartu Lama (Kembali):</b> <code>${escapeTg(card.name)}</code> (Sisa Rp ${card.balance.toLocaleString('id-ID')})\n` +
+                                  `💳 <b>Kartu Baru (Diberikan):</b> <code>${escapeTg(newCard.name)}</code> (Saldo Rp ${newCard.balance.toLocaleString('id-ID')})\n` +
+                                  `👤 <b>Driver:</b> ${escapeTg(oldHolder)}\n` +
+                                  `📉 <b>Biaya Terpakai:</b> Rp ${spent.toLocaleString('id-ID')}`;
+                    sendTelegramEtollSwapNotification('Tukar Kartu Pool Garasi', lines, notes);
+                }
             }
 
             saveToStorage();
@@ -3137,8 +3195,16 @@
             if (searchInput) searchInput.value = '';
 
             if (extraActions) {
-                if (type === 'etoll') extraActions.classList.remove('hidden');
-                else extraActions.classList.add('hidden');
+                if (type === 'etoll') {
+                    extraActions.classList.remove('hidden');
+                    const btnAdd = document.getElementById('btn-stat-add-etoll');
+                    if (btnAdd) {
+                        if (isAdminLoggedIn) btnAdd.classList.remove('hidden');
+                        else btnAdd.classList.add('hidden');
+                    }
+                } else {
+                    extraActions.classList.add('hidden');
+                }
             }
 
             if (type === 'total') title.innerText = "Daftar Seluruh Armada";
@@ -3225,47 +3291,59 @@
                     const isOff = card.active === false;
 
                     const el = document.createElement('div');
-                    el.className = `p-4 sm:p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md ${
-                        isOff ? 'bg-slate-950/70 border-slate-800 opacity-60' :
-                        isBorrowed ? 'bg-amber-950/25 border-amber-800/50' :
+                    el.className = `p-3.5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        isOff ? 'bg-slate-950/60 border-slate-800 opacity-60' :
+                        isBorrowed ? 'bg-amber-950/20 border-amber-800/40' :
                         'bg-dark-card border-dark-border'
                     }`;
 
                     el.innerHTML = `
-                        <div class="space-y-1.5">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span class="font-extrabold text-sm sm:text-base text-white">${card.name}</span>
-                                <span class="px-2.5 py-0.5 rounded-md bg-rose-950 border border-rose-800/70 text-rose-300 text-xs font-bold">${card.bank || 'E-Toll'}</span>
-                                ${isOff ? '<span class="px-2.5 py-0.5 rounded-md bg-slate-900 border border-slate-700 text-slate-300 text-xs font-black">OFF</span>' :
-                                  (isBorrowed ? `<span class="px-2.5 py-0.5 rounded-md bg-amber-950 border border-amber-700 text-amber-200 text-xs font-black flex items-center"><i class="fa-solid fa-user mr-1.5"></i>${card.holderName}</span>` :
-                                  '<span class="px-2.5 py-0.5 rounded-md bg-emerald-950 border border-emerald-700 text-emerald-300 text-xs font-black">Di Garasi</span>')}
+                        <div class="space-y-1">
+                            <div class="flex items-center space-x-2">
+                                <span class="font-bold text-white">${card.name}</span>
+                                <span class="px-2 py-0.5 rounded-md bg-rose-950 border border-rose-800/60 text-rose-300 text-[10px] font-semibold">${card.bank || 'E-Toll'}</span>
+                                ${isOff ? '<span class="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-700 text-slate-400 text-[10px] font-bold">OFF (Nonaktif)</span>' :
+                                  (isBorrowed ? `<span class="px-2 py-0.5 rounded-md bg-amber-950 border border-amber-700 text-amber-300 text-[10px] font-bold"><i class="fa-solid fa-user mr-1"></i>${card.holderName}</span>` :
+                                  '<span class="px-2 py-0.5 rounded-md bg-emerald-950 border border-emerald-700 text-emerald-300 text-[10px] font-bold">Di Garasi</span>')}
                             </div>
-                            <div class="flex flex-wrap items-center gap-3 text-xs text-slate-300">
-                                <span>Saldo: <strong class="text-white font-mono font-black text-sm">Rp ${(Number(card.balance) || 0).toLocaleString('id-ID')}</strong></span>
-                                <span>No: <code class="font-mono text-slate-300 font-semibold">${card.cardNo || '-'}</code></span>
+                            <div class="flex items-center space-x-3 text-[11px] text-slate-400">
+                                <span>Saldo: <strong class="text-white font-mono font-bold">Rp ${(Number(card.balance) || 0).toLocaleString('id-ID')}</strong></span>
+                                <span>No: <code class="font-mono text-slate-300">${card.cardNo || '-'}</code></span>
                             </div>
                         </div>
-                        <div class="flex flex-wrap items-center gap-2 pt-1 sm:pt-0 self-stretch sm:self-center">
+                        <div class="flex flex-wrap items-center gap-1.5 self-end sm:self-center">
                             ${!isOff && isBorrowed ? `
-                                <button onclick="openSwapEtollModal('${card.id}')" class="flex-1 sm:flex-none py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs sm:text-sm flex items-center justify-center space-x-1.5 shadow-md active:scale-95 transition">
-                                    <i class="fa-solid fa-repeat text-sm"></i>
+                                <button onclick="openSwapEtollModal('${card.id}')" class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center space-x-1 shadow-sm">
+                                    <i class="fa-solid fa-repeat"></i>
                                     <span>Tukar Kartu</span>
                                 </button>
-                                <button onclick="openReturnEtollModal('${card.id}')" class="flex-1 sm:flex-none py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center space-x-1.5 shadow-md active:scale-95 transition">
-                                    <i class="fa-solid fa-arrow-rotate-left text-sm"></i>
+                                <button onclick="openReturnEtollModal('${card.id}')" class="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center space-x-1 shadow-sm">
+                                    <i class="fa-solid fa-arrow-rotate-left"></i>
                                     <span>Kembalikan</span>
                                 </button>
                             ` : (!isOff ? `
-                                <button onclick="openBorrowEtollModal('${card.id}')" class="flex-1 sm:flex-none py-2.5 px-4 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center space-x-1.5 shadow-md active:scale-95 transition">
-                                    <i class="fa-solid fa-hand-holding-hand text-sm"></i>
+                                <button onclick="openSwapEtollModal('${card.id}')" class="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center space-x-1 shadow-sm" title="Tukar kartu ini dengan kartu cadangan yang OFF">
+                                    <i class="fa-solid fa-repeat"></i>
+                                    <span>Tukar ON⇄OFF</span>
+                                </button>
+                                <button onclick="openBorrowEtollModal('${card.id}')" class="px-3 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs flex items-center space-x-1 shadow-sm">
+                                    <i class="fa-solid fa-hand-holding-hand"></i>
                                     <span>Serahkan</span>
                                 </button>
                             ` : '')}
-                            <button onclick="toggleEtollActive('${card.id}')" title="ON / OFF Kartu" class="py-2.5 px-3.5 rounded-xl border border-dark-border text-xs sm:text-sm font-black transition active:scale-95 ${
-                                isOff ? 'bg-emerald-950 border-emerald-700 text-emerald-300' : 'bg-slate-900 border-slate-700 text-slate-400'
-                            }">
-                                ${isOff ? 'Nyalakan (ON)' : 'OFF'}
-                            </button>
+                            ${isAdminLoggedIn ? `
+                                <button onclick="toggleEtollActive('${card.id}')" title="ON / OFF Kartu" class="px-2.5 py-1.5 rounded-xl border border-dark-border text-xs font-bold ${
+                                    isOff ? 'bg-emerald-950 text-emerald-300 hover:bg-emerald-900' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
+                                }">
+                                    ${isOff ? 'Nyalakan (ON)' : 'OFF'}
+                                </button>
+                                <button onclick="openEditEtollModal('${card.id}')" title="Edit Kartu (Admin)" class="w-8 h-8 rounded-xl border border-dark-border hover:bg-indigo-950 text-slate-400 hover:text-indigo-400 flex items-center justify-center transition">
+                                    <i class="fa-solid fa-pen-to-square text-xs"></i>
+                                </button>
+                                <button onclick="deleteEtoll('${card.id}')" title="Hapus Kartu (Admin)" class="w-8 h-8 rounded-xl border border-dark-border hover:bg-rose-950 text-slate-400 hover:text-rose-400 flex items-center justify-center transition">
+                                    <i class="fa-solid fa-trash text-xs"></i>
+                                </button>
+                            ` : ''}
                         </div>
                     `;
                     body.appendChild(el);
@@ -3293,11 +3371,13 @@
             const chatInput = document.getElementById('tg-chatid');
             const chkOut = document.getElementById('tg-notify-checkout');
             const chkIn = document.getElementById('tg-notify-checkin');
+            const chkEtoll = document.getElementById('tg-notify-etoll');
 
             if (tokenInput) tokenInput.value = window.telegramConfig.botToken || '';
             if (chatInput) chatInput.value = window.telegramConfig.chatId || '';
             if (chkOut) chkOut.checked = window.telegramConfig.notifyCheckout !== false;
             if (chkIn) chkIn.checked = window.telegramConfig.notifyCheckin !== false;
+            if (chkEtoll) chkEtoll.checked = window.telegramConfig.notifyEtoll !== false;
 
             updateTelegramStatusDot();
         }
@@ -3319,6 +3399,7 @@
             window.telegramConfig.chatId = document.getElementById('tg-chatid').value.trim();
             window.telegramConfig.notifyCheckout = document.getElementById('tg-notify-checkout').checked;
             window.telegramConfig.notifyCheckin = document.getElementById('tg-notify-checkin').checked;
+            window.telegramConfig.notifyEtoll = document.getElementById('tg-notify-etoll') ? document.getElementById('tg-notify-etoll').checked : true;
 
             saveToStorage();
             updateTelegramStatusDot();
@@ -3428,6 +3509,40 @@
                          `⛽ <b>BBM Akhir:</b> ${escapeTg(trip.fuelEnd || '-')}\n` +
                          `🔧 <b>Kondisi:</b> ${escapeTg(trip.condition || 'Baik')}\n` +
                          `📌 <b>Catatan:</b> ${escapeTg(trip.notes || '-')}`;
+            sendTelegramMessage(text);
+        }
+
+        function sendTelegramEtollBorrowNotification(card, holder) {
+            const text = `💳 <b>PENYERAHAN KARTU E-TOLL</b>\n` +
+                         `━━━━━━━━━━━━━━━━━━━━\n` +
+                         `🏷 <b>Kartu:</b> <code>${escapeTg(card.name)}</code> (${escapeTg(card.bank || 'E-Toll')})\n` +
+                         `👤 <b>Penerima / Driver:</b> ${escapeTg(holder)}\n` +
+                         `💰 <b>Saldo Awal:</b> Rp ${(Number(card.balance) || 0).toLocaleString('id-ID')}\n` +
+                         `🔢 <b>No. Kartu:</b> <code>${escapeTg(card.cardNo || '-')}</code>\n` +
+                         `⏱ <b>Waktu:</b> ${formatDateTime(new Date().toISOString())}`;
+            sendTelegramMessage(text);
+        }
+
+        function sendTelegramEtollReturnNotification(card, oldHolder, oldBal, newBal, spent) {
+            const text = `💳 <b>PENGEMBALIAN KARTU E-TOLL</b>\n` +
+                         `━━━━━━━━━━━━━━━━━━━━\n` +
+                         `🏷 <b>Kartu:</b> <code>${escapeTg(card.name)}</code> (${escapeTg(card.bank || 'E-Toll')})\n` +
+                         `👤 <b>Pengemudi:</b> ${escapeTg(oldHolder)}\n` +
+                         `💵 <b>Saldo Awal:</b> Rp ${(Number(oldBal) || 0).toLocaleString('id-ID')}\n` +
+                         `💰 <b>Saldo Akhir:</b> Rp ${(Number(newBal) || 0).toLocaleString('id-ID')}\n` +
+                         `📉 <b>Saldo Terpakai:</b> Rp ${(Number(spent) || 0).toLocaleString('id-ID')}\n` +
+                         `⏱ <b>Waktu:</b> ${formatDateTime(new Date().toISOString())}\n` +
+                         `📍 <b>Status:</b> Kembali Tersedia di Pool Garasi`;
+            sendTelegramMessage(text);
+        }
+
+        function sendTelegramEtollSwapNotification(title, detailLines, notes) {
+            const text = `🔄 <b>TUKAR / OPER KARTU E-TOLL</b>\n` +
+                         `━━━━━━━━━━━━━━━━━━━━\n` +
+                         `📌 <b>Tipe Mutasi:</b> ${escapeTg(title)}\n` +
+                         `${detailLines}\n` +
+                         `⏱ <b>Waktu:</b> ${formatDateTime(new Date().toISOString())}` +
+                         (notes ? `\n📝 <b>Catatan:</b> ${escapeTg(notes)}` : '');
             sendTelegramMessage(text);
         }
 
