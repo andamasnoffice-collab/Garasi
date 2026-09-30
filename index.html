@@ -66,6 +66,45 @@
             border-color: #0284C7;
             font-weight: 700;
         }
+
+        /* ===== MOBILE UX ===== */
+        @media (max-width: 640px) {
+            html { font-size: 15px; scroll-behavior: smooth; }
+            body { padding-bottom: 88px !important; overflow-x: hidden; }
+            button, a, select, input, textarea { -webkit-tap-highlight-color: transparent; }
+            button { touch-action: manipulation; }
+            .mobile-compact-header { min-height: 58px; }
+            main { padding-top: 12px !important; padding-bottom: 18px !important; }
+            main > .grid { gap: 8px !important; }
+            main > .grid > div { padding: 11px !important; border-radius: 17px !important; min-height: 104px; }
+            main > .grid > div .w-8 { width: 30px !important; height: 30px !important; }
+            main > .grid > div h3 { font-size: 1.15rem !important; }
+            main > .grid > div p { font-size: 10px !important; }
+            main > .grid > div span { font-size: 10px !important; }
+            .tab-content { scroll-margin-top: 70px; }
+            #active-trips-section, .tab-content > .bg-dark-surface, .tab-content > div { border-radius: 18px !important; }
+            .tab-content .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+            /* Navigation tabs become compact, horizontally scrollable chips */
+            .mobile-tabs { position: sticky; top: 58px; z-index: 20; margin: 0 -2px; }
+            .mobile-tabs .tab-btn { min-width: 78px; justify-content: center; flex-direction: column; gap: 3px !important; padding: 8px 9px !important; font-size: 10px !important; border-radius: 13px !important; }
+            .mobile-tabs .tab-btn i { font-size: 14px; }
+            .mobile-tabs .tab-btn span { display: block !important; }
+            /* Make form controls comfortable for touch */
+            .modal-content input, .modal-content select, .modal-content textarea,
+            input:not([type="hidden"]), select, textarea { min-height: 42px; }
+            /* Tables remain readable without shrinking text too much */
+            table { min-width: 760px; }
+            th, td { white-space: nowrap; }
+            /* Hide decorative descriptions in dense mobile cards */
+            .mobile-hide-desc { display: none !important; }
+            .mobile-dock-btn { background: rgba(19,29,49,.72); border: 1px solid rgba(51,65,85,.45); }
+            .mobile-dock-btn:active { background: rgba(30,41,59,.95); transform: scale(.96); }
+        }
+        @media (max-width: 380px) {
+            main > .grid > div { min-height: 96px; padding: 9px !important; }
+            .mobile-tabs .tab-btn { min-width: 70px; padding-left: 7px !important; padding-right: 7px !important; }
+            .mobile-tabs .tab-btn span { font-size: 9px !important; }
+        }
         @media print {
             body * { visibility: hidden !important; }
             #printable-ticket, #printable-ticket * {
@@ -245,7 +284,7 @@
         </div>
 
         <!-- NAVIGATION TABS -->
-        <div class="bg-dark-surface/90 backdrop-blur-sm rounded-2xl p-1.5 shadow-lg border border-dark-border flex items-center space-x-1.5 overflow-x-auto text-xs sm:text-sm">
+        <div class="mobile-tabs bg-dark-surface/90 backdrop-blur-sm rounded-2xl p-1.5 shadow-lg border border-dark-border flex items-center space-x-1.5 overflow-x-auto text-xs sm:text-sm">
             <button onclick="switchTab('tab-monitoring')" id="tab-btn-monitoring" class="tab-btn active px-3.5 py-2.5 rounded-xl font-medium border border-transparent text-slate-300 hover:text-white transition flex items-center space-x-2 whitespace-nowrap">
                 <i class="fa-solid fa-border-all"></i>
                 <span>Monitoring Garasi</span>
@@ -298,7 +337,10 @@
                         <select id="vehicle-sort-select" onchange="handleSortVehicles(this.value)" class="text-xs px-3 py-1.5 rounded-xl border border-dark-border bg-dark-card font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                             <option value="frequent" selected>Sort: Sering Dipakai</option>
                             <option value="unit-asc">Sort: No. Unit (1-52)</option>
-                            <option value="category">Sort: Kategori</option>
+                            <option value="category">Sort: Jenis Kendaraan</option>
+                            <option value="usage-ops">Sort: Mobil Operasional</option>
+                            <option value="usage-pimpinan">Sort: Mobil Pimpinan</option>
+                            <option value="usage-category">Sort: Kategori Mobil</option>
                             <option value="plate-asc">Sort: Plat (A-Z)</option>
                             <option value="garage-first">Sort: Siap di Garasi</option>
                             <option value="km-asc">Sort: KM Terendah</option>
@@ -376,6 +418,7 @@
                                 <th class="p-3">Odometer (KM)</th>
                                 <th class="p-3">Status</th>
                                 <th class="p-3 text-center">Aksi</th>
+                                <th class="p-3 text-center admin-col">Admin</th>
                             </tr>
                         </thead>
                         <tbody id="logs-table-body" class="divide-y divide-dark-border text-slate-300"></tbody>
@@ -415,7 +458,8 @@
                                 <th class="p-3">No. Unit</th>
                                 <th class="p-3">Plat Nomor</th>
                                 <th class="p-3">Model Kendaraan</th>
-                                <th class="p-3">Kategori</th>
+                                <th class="p-3">Jenis</th>
+                                <th class="p-3">Kategori Mobil</th>
                                 <th class="p-3">Odometer</th>
                                 <th class="p-3">Status Operasional</th>
                                 <th class="p-3">Posisi</th>
@@ -470,7 +514,7 @@
                             <i class="fa-solid fa-receipt text-rose-400"></i>
                             <span>Rekap Mutasi & Penggunaan E-Toll</span>
                         </h2>
-                        <p class="text-xs text-slate-400">Catatan penyerahan, pengembalian, dan tukar kartu pengemudi</p>
+                        <p class="text-xs text-slate-400">Penyerahan dan pengembalian kartu digabung dalam satu baris agar mutasi mudah dibaca</p>
                     </div>
                     <div class="flex items-center space-x-2">
                         <button onclick="exportEtollLogsToCSV()" class="px-3 py-2 rounded-xl border border-rose-900/60 bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 text-xs font-semibold flex items-center space-x-1.5 transition">
@@ -526,6 +570,7 @@
                                 <th class="p-3">Saldo Akhir</th>
                                 <th class="p-3">Terpakai</th>
                                 <th class="p-3">Keterangan</th>
+                                <th class="p-3 text-center admin-col">Admin</th>
                             </tr>
                         </thead>
                         <tbody id="etoll-recap-table-body" class="divide-y divide-dark-border text-slate-300"></tbody>
@@ -535,16 +580,25 @@
         </div>
     </main>
 
-    <!-- MOBILE BOTTOM ACTION DOCK -->
-    <div class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-dark-surface/95 backdrop-blur-md border-t border-dark-border p-3 shadow-2xl flex items-center space-x-2">
-        <button onclick="openModal('modal-checkout')" class="flex-1 py-3 px-2 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 active:from-amber-400 text-slate-950 font-black text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-amber-500/30">
-            <i class="fa-solid fa-arrow-right-from-bracket text-sm"></i>
-            <span>Catat Keluar</span>
-        </button>
-        <button onclick="openModal('modal-checkin')" class="flex-1 py-3 px-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 active:from-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-500/30">
-            <i class="fa-solid fa-arrow-right-to-bracket text-sm"></i>
-            <span>Catat Masuk</span>
-        </button>
+    <!-- MOBILE QUICK NAVIGATION -->
+    <div class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-dark-surface/97 backdrop-blur-xl border-t border-dark-border shadow-[0_-10px_30px_rgba(0,0,0,.35)] px-2 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))]">
+        <div class="grid grid-cols-5 gap-1.5 max-w-lg mx-auto">
+            <button onclick="switchTab('tab-monitoring')" class="mobile-dock-btn py-2 rounded-xl text-[9px] font-bold text-slate-300 flex flex-col items-center justify-center gap-1 active:scale-95 transition">
+                <i class="fa-solid fa-house text-sm text-cyan-400"></i><span>Beranda</span>
+            </button>
+            <button onclick="openModal('modal-checkout')" class="py-2 rounded-xl bg-amber-500 text-slate-950 text-[9px] font-black flex flex-col items-center justify-center gap-1 shadow-md shadow-amber-500/25 active:scale-95 transition">
+                <i class="fa-solid fa-arrow-right-from-bracket text-sm"></i><span>Keluar</span>
+            </button>
+            <button onclick="openModal('modal-checkin')" class="py-2 rounded-xl bg-emerald-500 text-slate-950 text-[9px] font-black flex flex-col items-center justify-center gap-1 shadow-md shadow-emerald-500/25 active:scale-95 transition">
+                <i class="fa-solid fa-arrow-right-to-bracket text-sm"></i><span>Masuk</span>
+            </button>
+            <button onclick="switchTab('tab-logbook')" class="mobile-dock-btn py-2 rounded-xl text-[9px] font-bold text-slate-300 flex flex-col items-center justify-center gap-1 active:scale-95 transition">
+                <i class="fa-solid fa-book-open text-sm text-indigo-400"></i><span>Logbook</span>
+            </button>
+            <button onclick="switchTab('tab-etoll-recap')" class="mobile-dock-btn py-2 rounded-xl text-[9px] font-bold text-slate-300 flex flex-col items-center justify-center gap-1 active:scale-95 transition">
+                <i class="fa-solid fa-credit-card text-sm text-rose-400"></i><span>E-Toll</span>
+            </button>
+        </div>
     </div>
 
     <!-- MODAL ADMIN AUTH PIN -->
@@ -933,13 +987,20 @@
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block font-semibold text-slate-200 mb-1">Kategori</label>
+                        <label class="block font-semibold text-slate-200 mb-1">Jenis Kendaraan</label>
                         <select id="veh-category" class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-100 focus:ring-2 focus:ring-cyan-500/40">
                             <option value="MPV">MPV</option>
                             <option value="Sedan">Sedan</option>
                             <option value="Bus">Bus</option>
                             <option value="HiAce / Minibus">HiAce / Minibus</option>
                             <option value="Pick Up / Box">Pick Up / Box</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-200 mb-1">Kategori Mobil</label>
+                        <select id="veh-usage-category" class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-100 focus:ring-2 focus:ring-cyan-500/40">
+                            <option value="OPERATIONAL">Operasional</option>
+                            <option value="PIMPINAN">Pimpinan</option>
                         </select>
                     </div>
                     <div>
@@ -1262,7 +1323,7 @@
                 <div>
                     <label class="block font-semibold text-slate-200 mb-1">Firebase Web Config (Format JSON)</label>
                     <textarea id="firebase-config-json" rows="7" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100 font-mono text-[11px] focus:ring-2 focus:ring-emerald-500/40">{
-  "apiKey": "AIzaSyCiWsAbEW-tU0FZ54yE3A3-kuHdSuiYWAQ",
+  "apiKey": "AIzaSyCiWsAbEW-tU0FZ54E3A3-kuHdSuiYWAQ",
   "authDomain": "garasiuns-73bf0.firebaseapp.com",
   "projectId": "garasiuns-73bf0",
   "storageBucket": "garasiuns-73bf0.firebasestorage.app",
@@ -1288,7 +1349,7 @@
 
     <!-- Firebase SDK Modules -->
     <script type="module">
-        import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { initializeApp, getApps, getApp, deleteApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { initializeFirestore, getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -1309,6 +1370,7 @@
             unsubscribers: [],
             isConnected: false,
             lastSyncTime: null,
+            configProjectId: null,
 
             async initialize(customConfig = null) {
                 try {
@@ -1321,7 +1383,17 @@
                     }
                     if (!config) config = DEFAULT_FIREBASE_CONFIG;
 
-                    this.app = getApps().length > 0 ? getApp() : initializeApp(config);
+                    // Jika admin mengganti project Firebase, jangan memakai instance app lama.
+                    if (this.app && this.configProjectId && this.configProjectId !== config.projectId) {
+                        this.unsubscribers.forEach(unsub => unsub && unsub());
+                        this.unsubscribers = [];
+                        try { await deleteApp(this.app); } catch (e) { console.warn('Gagal menutup Firebase app lama:', e); }
+                        this.app = null;
+                        this.db = null;
+                        this.auth = null;
+                    }
+                    this.app = this.app || (getApps().length > 0 ? getApp() : initializeApp(config));
+                    this.configProjectId = config.projectId || null;
                     try {
                         this.db = initializeFirestore(this.app, { experimentalForceLongPolling: true });
                     } catch (e) {
@@ -1403,7 +1475,13 @@
                         etollLogs: window.etollLogs || [],
                         logs: window.logs || [],
                         adminPin: window.adminPin || "1234",
-                        telegramConfig: window.telegramConfig || {},
+                        telegramConfig: window.telegramConfig || {
+                            botToken: '',
+                            chatId: '',
+                            notifyCheckout: true,
+                            notifyCheckin: true,
+                            notifyEtoll: true
+                        },
                         updatedAt: new Date().toISOString()
                     }, { merge: true });
                     this.isConnected = true;
@@ -1419,51 +1497,51 @@
             }
         };
 
-        window.FirebaseBridge.initialize();
+        window.addEventListener('DOMContentLoaded', () => window.FirebaseBridge.initialize(), { once: true });
     </script>
 
     <!-- CORE LOGIC JAVASCRIPT -->
     <script>
         // MASTER DATASET (38 ARMADA RESMI UNS)
         const INITIAL_VEHICLES = [
-            { id: "V-14", unitNo: 14, plate: "AD-1067-XA", model: "Toyota Altis", category: "Sedan", odometer: 45200, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-17", unitNo: 17, plate: "AD-1022-XA", model: "Toyota Vios", category: "Sedan", odometer: 62100, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-08", unitNo: 8, plate: "AD-1066-XA", model: "Toyota Camry Lama", category: "Sedan", odometer: 98300, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-33", unitNo: 33, plate: "AD-1068-XA", model: "Toyota Vios", category: "Sedan", odometer: 58900, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-06", unitNo: 6, plate: "AD-1060-XA", model: "Toyota Corolla Altis V A/T", category: "Sedan", odometer: 32400, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-22", unitNo: 22, plate: "AD-1095-XA", model: "Toyota Corolla Altis V A/T", category: "Sedan", odometer: 37100, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-13", unitNo: 13, plate: "AD-1367-XA", model: "Toyota Inova Diesel", category: "MPV", odometer: 81200, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-15", unitNo: 15, plate: "AD-1121-XA", model: "Toyota Avanza Veloz 1.5 M/T", category: "MPV", odometer: 49800, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-05", unitNo: 5, plate: "AD-1156-XA", model: "Toyota Corolla Altis V A/T", category: "Sedan", odometer: 29800, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-49", unitNo: 49, plate: "AD-1461-XA", model: "Suzuki APV", category: "MPV", odometer: 76500, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-18", unitNo: 18, plate: "AD-1146-XA", model: "Toyota Avanza", category: "MPV", odometer: 54300, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-39", unitNo: 39, plate: "AD-7741-A", model: "Bus Hino XZU720R (BRI)", category: "Bus", odometer: 88400, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-07", unitNo: 7, plate: "AD-1055-XA", model: "Toyota Corolla Altis V A/T", category: "Sedan", odometer: 31200, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-41", unitNo: 41, plate: "AD-1032-XA", model: "Toyota Inova Reborn", category: "MPV", odometer: 42100, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-45", unitNo: 45, plate: "AD-1048-XA", model: "Toyota Inova", category: "MPV", odometer: 87600, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-29", unitNo: 29, plate: "AD-1236-XA", model: "Hyundai Staria Signature 7", category: "MPV", odometer: 19400, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-31", unitNo: 31, plate: "AD-7010-XA", model: "Bus Hino FB 130 (BNI)", category: "Bus", odometer: 93200, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-16", unitNo: 16, plate: "AD-1215-XA", model: "Toyota Avanza 1.3 E M/T", category: "MPV", odometer: 51200, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-19", unitNo: 19, plate: "AD-1148-XA", model: "Toyota Avanza", category: "MPV", odometer: 63100, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-10", unitNo: 10, plate: "AD-1126-XA", model: "Toyota Corolla Altis 1.8 V A/T", category: "Sedan", odometer: 36700, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-40", unitNo: 40, plate: "AD-1284-XA", model: "Isuzu Panther", category: "MPV", odometer: 165400, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-27", unitNo: 27, plate: "AD-1506-XA", model: "Toyota Avanza", category: "MPV", odometer: 47200, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-28", unitNo: 28, plate: "AD-7153-XA", model: "Toyota Hiace", category: "HiAce / Minibus", odometer: 68900, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-38", unitNo: 38, plate: "AD-8075-XA", model: "Toyota Hilux2.4", category: "Pick Up / Box", odometer: 59400, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-52", unitNo: 52, plate: "AD-1209-XA", model: "Toyota Avansa 1.5 V", category: "MPV", odometer: 41800, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-03", unitNo: 3, plate: "AD-1062-XA", model: "Toyota Camry Type V A/T", category: "Sedan", odometer: 74200, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-44", unitNo: 44, plate: "AD-1697-XA", model: "Toyota Inova", category: "MPV", odometer: 83100, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-25", unitNo: 25, plate: "AD-1047-XA", model: "Toyota Inova Lama - silver", category: "MPV", odometer: 96500, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-24", unitNo: 24, plate: "AD-1015-XH", model: "Toyota Zenix", category: "MPV", odometer: 18200, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-04", unitNo: 4, plate: "AD-1061-XA", model: "Toyota Alpard 2.5 G A/T", category: "MPV", odometer: 29400, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-32", unitNo: 32, plate: "AD-7040-XA", model: "Bus Mitsubishi 125PS", category: "Bus", odometer: 112000, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-20", unitNo: 20, plate: "AD-1507-XA", model: "Toyota Avanza 1.3 G - MT", category: "MPV", odometer: 42100, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-43", unitNo: 43, plate: "AD-8049-XA", model: "Mitsubishi Pick Up L300", category: "Pick Up / Box", odometer: 89200, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-09", unitNo: 9, plate: "AD-1127-XA", model: "Toyota Corolla Altis 1.8 V A/T", category: "Sedan", odometer: 34100, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-02", unitNo: 2, plate: "AD-1016-XH", model: "Toyota Zenix", category: "MPV", odometer: 21500, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-26", unitNo: 26, plate: "AD-1150-XA", model: "Toyota Inova Lama - Hitam", category: "MPV", odometer: 76200, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-23", unitNo: 23, plate: "AD-1014-XH", model: "Toyota Zenix", category: "MPV", odometer: 18450, status: "IN_GARAGE", operational: true, active: true },
-            { id: "V-01", unitNo: 1, plate: "AD-1214-XU", model: "Toyota Inova Reborn", category: "MPV", odometer: 52100, status: "IN_GARAGE", operational: true, active: true }
+            { id: "V-14", unitNo: 14, plate: "AD-1067-XA", model: "Toyota Altis", category: "Sedan", usageCategory: "OPERATIONAL", odometer: 45200, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-17", unitNo: 17, plate: "AD-1022-XA", model: "Toyota Vios", category: "Sedan", usageCategory: "OPERATIONAL", odometer: 62100, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-08", unitNo: 8, plate: "AD-1066-XA", model: "Toyota Camry Lama", category: "Sedan", usageCategory: "OPERATIONAL", odometer: 98300, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-33", unitNo: 33, plate: "AD-1068-XA", model: "Toyota Vios", category: "Sedan", usageCategory: "OPERATIONAL", odometer: 58900, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-06", unitNo: 6, plate: "AD-1060-XA", model: "Toyota Corolla Altis V A/T", category: "Sedan", usageCategory: "OPERATIONAL", odometer: 32400, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-22", unitNo: 22, plate: "AD-1095-XA", model: "Toyota Corolla Altis V A/T", category: "Sedan", usageCategory: "OPERATIONAL", odometer: 37100, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-13", unitNo: 13, plate: "AD-1367-XA", model: "Toyota Inova Diesel", category: "MPV", usageCategory: "OPERATIONAL", odometer: 81200, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-15", unitNo: 15, plate: "AD-1121-XA", model: "Toyota Avanza Veloz 1.5 M/T", category: "MPV", usageCategory: "OPERATIONAL", odometer: 49800, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-05", unitNo: 5, plate: "AD-1156-XA", model: "Toyota Corolla Altis V A/T", category: "Sedan", usageCategory: "OPERATIONAL", odometer: 29800, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-49", unitNo: 49, plate: "AD-1461-XA", model: "Suzuki APV", category: "MPV", usageCategory: "OPERATIONAL", odometer: 76500, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-18", unitNo: 18, plate: "AD-1146-XA", model: "Toyota Avanza", category: "MPV", usageCategory: "OPERATIONAL", odometer: 54300, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-39", unitNo: 39, plate: "AD-7741-A", model: "Bus Hino XZU720R (BRI)", category: "Bus", usageCategory: "OPERATIONAL", odometer: 88400, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-07", unitNo: 7, plate: "AD-1055-XA", model: "Toyota Corolla Altis V A/T", category: "Sedan", usageCategory: "OPERATIONAL", odometer: 31200, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-41", unitNo: 41, plate: "AD-1032-XA", model: "Toyota Inova Reborn", category: "MPV", usageCategory: "OPERATIONAL", odometer: 42100, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-45", unitNo: 45, plate: "AD-1048-XA", model: "Toyota Inova", category: "MPV", usageCategory: "OPERATIONAL", odometer: 87600, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-29", unitNo: 29, plate: "AD-1236-XA", model: "Hyundai Staria Signature 7", category: "MPV", usageCategory: "OPERATIONAL", odometer: 19400, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-31", unitNo: 31, plate: "AD-7010-XA", model: "Bus Hino FB 130 (BNI)", category: "Bus", usageCategory: "OPERATIONAL", odometer: 93200, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-16", unitNo: 16, plate: "AD-1215-XA", model: "Toyota Avanza 1.3 E M/T", category: "MPV", usageCategory: "OPERATIONAL", odometer: 51200, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-19", unitNo: 19, plate: "AD-1148-XA", model: "Toyota Avanza", category: "MPV", usageCategory: "OPERATIONAL", odometer: 63100, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-10", unitNo: 10, plate: "AD-1126-XA", model: "Toyota Corolla Altis 1.8 V A/T", category: "Sedan", usageCategory: "OPERATIONAL", odometer: 36700, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-40", unitNo: 40, plate: "AD-1284-XA", model: "Isuzu Panther", category: "MPV", usageCategory: "OPERATIONAL", odometer: 165400, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-27", unitNo: 27, plate: "AD-1506-XA", model: "Toyota Avanza", category: "MPV", usageCategory: "OPERATIONAL", odometer: 47200, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-28", unitNo: 28, plate: "AD-7153-XA", model: "Toyota Hiace", category: "HiAce / Minibus", usageCategory: "OPERATIONAL", odometer: 68900, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-38", unitNo: 38, plate: "AD-8075-XA", model: "Toyota Hilux2.4", category: "Pick Up / Box", usageCategory: "OPERATIONAL", odometer: 59400, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-52", unitNo: 52, plate: "AD-1209-XA", model: "Toyota Avansa 1.5 V", category: "MPV", usageCategory: "OPERATIONAL", odometer: 41800, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-03", unitNo: 3, plate: "AD-1062-XA", model: "Toyota Camry Type V A/T", category: "Sedan", usageCategory: "OPERATIONAL", odometer: 74200, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-44", unitNo: 44, plate: "AD-1697-XA", model: "Toyota Inova", category: "MPV", usageCategory: "OPERATIONAL", odometer: 83100, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-25", unitNo: 25, plate: "AD-1047-XA", model: "Toyota Inova Lama - silver", category: "MPV", usageCategory: "OPERATIONAL", odometer: 96500, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-24", unitNo: 24, plate: "AD-1015-XH", model: "Toyota Zenix", category: "MPV", usageCategory: "OPERATIONAL", odometer: 18200, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-04", unitNo: 4, plate: "AD-1061-XA", model: "Toyota Alpard 2.5 G A/T", category: "MPV", usageCategory: "OPERATIONAL", odometer: 29400, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-32", unitNo: 32, plate: "AD-7040-XA", model: "Bus Mitsubishi 125PS", category: "Bus", usageCategory: "OPERATIONAL", odometer: 112000, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-20", unitNo: 20, plate: "AD-1507-XA", model: "Toyota Avanza 1.3 G - MT", category: "MPV", usageCategory: "OPERATIONAL", odometer: 42100, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-43", unitNo: 43, plate: "AD-8049-XA", model: "Mitsubishi Pick Up L300", category: "Pick Up / Box", usageCategory: "OPERATIONAL", odometer: 89200, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-09", unitNo: 9, plate: "AD-1127-XA", model: "Toyota Corolla Altis 1.8 V A/T", category: "Sedan", usageCategory: "OPERATIONAL", odometer: 34100, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-02", unitNo: 2, plate: "AD-1016-XH", model: "Toyota Zenix", category: "MPV", usageCategory: "OPERATIONAL", odometer: 21500, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-26", unitNo: 26, plate: "AD-1150-XA", model: "Toyota Inova Lama - Hitam", category: "MPV", usageCategory: "OPERATIONAL", odometer: 76200, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-23", unitNo: 23, plate: "AD-1014-XH", model: "Toyota Zenix", category: "MPV", usageCategory: "OPERATIONAL", odometer: 18450, status: "IN_GARAGE", operational: true, active: true },
+            { id: "V-01", unitNo: 1, plate: "AD-1214-XU", model: "Toyota Inova Reborn", category: "MPV", usageCategory: "OPERATIONAL", odometer: 52100, status: "IN_GARAGE", operational: true, active: true }
         ];
 
         const INITIAL_DRIVERS = [
@@ -1483,20 +1561,32 @@
         ];
 
         // Global State & Settings
-        window.vehicles = JSON.parse(localStorage.getItem('garasiku_vehicles')) || INITIAL_VEHICLES;
-        window.drivers = JSON.parse(localStorage.getItem('garasiku_drivers')) || INITIAL_DRIVERS;
-        window.etolls = JSON.parse(localStorage.getItem('garasiku_etolls')) || INITIAL_ETOLL;
-        window.etollLogs = JSON.parse(localStorage.getItem('garasiku_etoll_logs')) || [];
-        window.logs = JSON.parse(localStorage.getItem('garasiku_logs')) || [];
+        function loadLocalJson(key, fallback) {
+            try {
+                const raw = localStorage.getItem(key);
+                if (!raw) return fallback;
+                const parsed = JSON.parse(raw);
+                return parsed ?? fallback;
+            } catch (error) {
+                console.warn(`Data lokal ${key} rusak, memakai default.`, error);
+                return fallback;
+            }
+        }
+
+        window.vehicles = loadLocalJson('garasiku_vehicles', INITIAL_VEHICLES);
+        window.drivers = loadLocalJson('garasiku_drivers', INITIAL_DRIVERS);
+        window.etolls = loadLocalJson('garasiku_etolls', INITIAL_ETOLL);
+        window.etollLogs = loadLocalJson('garasiku_etoll_logs', []);
+        window.logs = loadLocalJson('garasiku_logs', []);
         window.adminPin = localStorage.getItem('garasiku_admin_pin') || "1234";
 
-        window.telegramConfig = JSON.parse(localStorage.getItem('garasiku_telegram')) || {
+        window.telegramConfig = loadLocalJson('garasiku_telegram', {
             botToken: '',
             chatId: '',
             notifyCheckout: true,
             notifyCheckin: true,
             notifyEtoll: true
-        };
+        });
 
         let isAdminLoggedIn = false;
         let pendingAdminCallback = null;
@@ -1505,46 +1595,63 @@
         let activeStatType = "total";
         let driverInputMode = "registered";
         let swapMode = "off_swap";
+        let cloudSaveTimer = null;
+        let localWriteAt = 0;
 
         function saveToStorage() {
-            localStorage.setItem('garasiku_vehicles', JSON.stringify(window.vehicles));
-            localStorage.setItem('garasiku_drivers', JSON.stringify(window.drivers));
-            localStorage.setItem('garasiku_etolls', JSON.stringify(window.etolls));
-            localStorage.setItem('garasiku_etoll_logs', JSON.stringify(window.etollLogs));
-            localStorage.setItem('garasiku_logs', JSON.stringify(window.logs));
-            localStorage.setItem('garasiku_admin_pin', window.adminPin);
-            localStorage.setItem('garasiku_telegram', JSON.stringify(window.telegramConfig));
-
-            if (window.FirebaseBridge && window.FirebaseBridge.pushStateToCloud) {
-                window.FirebaseBridge.pushStateToCloud();
+            try {
+                localStorage.setItem('garasiku_vehicles', JSON.stringify(window.vehicles));
+                localStorage.setItem('garasiku_drivers', JSON.stringify(window.drivers));
+                localStorage.setItem('garasiku_etolls', JSON.stringify(window.etolls));
+                localStorage.setItem('garasiku_etoll_logs', JSON.stringify(window.etollLogs));
+                localStorage.setItem('garasiku_logs', JSON.stringify(window.logs));
+                localStorage.setItem('garasiku_admin_pin', window.adminPin);
+                localStorage.setItem('garasiku_telegram', JSON.stringify(window.telegramConfig));
+            } catch (error) {
+                console.error('Gagal menyimpan data lokal:', error);
+                showToast('Penyimpanan Gagal', 'Data lokal tidak dapat disimpan. Periksa ruang penyimpanan browser.', 'error');
+                return;
             }
+            localWriteAt = Date.now();
+            clearTimeout(cloudSaveTimer);
+            cloudSaveTimer = setTimeout(() => {
+                if (window.FirebaseBridge && window.FirebaseBridge.pushStateToCloud) {
+                    window.FirebaseBridge.pushStateToCloud();
+                }
+            }, 200);
         }
 
         window.syncFromCloud = function(cloudData) {
             if (!cloudData) return;
+            const cloudTime = cloudData.updatedAt ? Date.parse(cloudData.updatedAt) : 0;
+            if (cloudTime && localWriteAt && cloudTime < localWriteAt) return;
             if (cloudData.vehicles && Array.isArray(cloudData.vehicles)) window.vehicles = cloudData.vehicles;
             if (cloudData.drivers && Array.isArray(cloudData.drivers)) window.drivers = cloudData.drivers;
             if (cloudData.etolls && Array.isArray(cloudData.etolls)) window.etolls = cloudData.etolls;
             if (cloudData.etollLogs && Array.isArray(cloudData.etollLogs)) window.etollLogs = cloudData.etollLogs;
             if (cloudData.logs && Array.isArray(cloudData.logs)) window.logs = cloudData.logs;
-            
-            if (cloudData.adminPin) {
-                window.adminPin = String(cloudData.adminPin);
+
+            // Sinkronkan kredensial/config global agar device baru langsung siap.
+            if (typeof cloudData.adminPin === 'string' && cloudData.adminPin.trim()) {
+                window.adminPin = cloudData.adminPin.trim();
                 localStorage.setItem('garasiku_admin_pin', window.adminPin);
             }
 
             if (cloudData.telegramConfig && typeof cloudData.telegramConfig === 'object') {
                 window.telegramConfig = {
-                    botToken: cloudData.telegramConfig.botToken || '',
-                    chatId: cloudData.telegramConfig.chatId || '',
+                    botToken: typeof cloudData.telegramConfig.botToken === 'string' ? cloudData.telegramConfig.botToken : '',
+                    chatId: typeof cloudData.telegramConfig.chatId === 'string' ? cloudData.telegramConfig.chatId : '',
                     notifyCheckout: cloudData.telegramConfig.notifyCheckout !== false,
                     notifyCheckin: cloudData.telegramConfig.notifyCheckin !== false,
                     notifyEtoll: cloudData.telegramConfig.notifyEtoll !== false
                 };
                 localStorage.setItem('garasiku_telegram', JSON.stringify(window.telegramConfig));
-                initTelegramConfig();
             }
 
+            if (typeof window.updateTelegramStatusDot === 'function') {
+                window.updateTelegramStatusDot();
+            }
+            
             renderAll();
         };
 
@@ -1807,6 +1914,11 @@
                 if (modalId === 'modal-checkout') prepareCheckoutOptions();
                 if (modalId === 'modal-checkin') prepareCheckinOptions();
                 if (modalId === 'modal-telegram') initTelegramConfig();
+                if (modalId === 'modal-firebase-config') {
+                    const cfgEl = document.getElementById('firebase-config-json');
+                    const savedCfg = localStorage.getItem('garasiku_firebase_cfg');
+                    if (cfgEl && savedCfg) cfgEl.value = savedCfg;
+                }
             }
         }
 
@@ -1850,11 +1962,34 @@
 
         // Stats Counter
         function updateDashboardStats() {
+            const activeLogs = window.logs.filter(l => l && l.status === 'ACTIVE');
+
+            // Sumber kebenaran perjalanan aktif adalah LOGBOOK ACTIVE, bukan hanya
+            // status kendaraan. Ini mencegah kotak “Sedang Keluar” dan “Driver
+            // Bertugas” berbeda ketika status kendaraan terlambat tersinkron.
+            const activeVehicleKeys = new Set();
+            activeLogs.forEach(l => {
+                const key = l.vehicleId ? `id:${l.vehicleId}` : `plate:${String(l.plate || '').trim().toUpperCase()}`;
+                if (key !== 'plate:') activeVehicleKeys.add(key);
+            });
+
+            const activeDriverKeys = new Set();
+            activeLogs.forEach(l => {
+                const key = l.driverId ? `id:${l.driverId}` : `name:${String(l.driverName || '').trim().toLowerCase()}`;
+                if (key !== 'name:') activeDriverKeys.add(key);
+            });
+
             const activeVehicles = window.vehicles.filter(v => v.active !== false);
             const totalVehicles = window.vehicles.length;
-            const inGarage = window.vehicles.filter(v => v.status === 'IN_GARAGE' && v.operational !== false && v.active !== false).length;
-            const onTrip = window.vehicles.filter(v => v.status === 'ON_TRIP').length;
-            const activeDrivers = window.logs.filter(l => l.status === 'ACTIVE').length;
+            const inGarage = window.vehicles.filter(v =>
+                v.status === 'IN_GARAGE' &&
+                v.operational !== false &&
+                v.active !== false &&
+                !activeVehicleKeys.has(`id:${v.id}`) &&
+                !activeVehicleKeys.has(`plate:${String(v.plate || '').trim().toUpperCase()}`)
+            ).length;
+            const onTrip = activeVehicleKeys.size;
+            const activeDrivers = activeDriverKeys.size;
             const activeDriverMaster = window.drivers.filter(d => d.active !== false).length;
 
             const totalEtoll = window.etolls.length;
@@ -1913,6 +2048,16 @@
             renderMonitoringBay();
         }
 
+        function normalizeVehicleUsageCategory(v) {
+            const raw = String(v.usageCategory || v.vehicleCategory || '').trim().toUpperCase();
+            if (raw === 'PIMPINAN' || raw === 'EXECUTIVE') return 'PIMPINAN';
+            return 'OPERATIONAL';
+        }
+
+        function vehicleUsageLabel(v) {
+            return normalizeVehicleUsageCategory(v) === 'PIMPINAN' ? 'Pimpinan' : 'Operasional';
+        }
+
         function renderMonitoringBay() {
             renderActiveTrips();
             renderCategoryPills();
@@ -1921,7 +2066,23 @@
             if (!grid) return;
             grid.innerHTML = '';
 
-            let list = [...window.vehicles];
+            // Armada yang sedang ACTIVE/ON_TRIP ditampilkan khusus di panel
+            // "Armada Sedang Bertugas di Luar" dan tidak diulang di daftar ini.
+            const activeVehicleIds = new Set(
+                window.logs
+                    .filter(l => l.status === 'ACTIVE' && l.vehicleId)
+                    .map(l => l.vehicleId)
+            );
+            const activeVehiclePlates = new Set(
+                window.logs
+                    .filter(l => l.status === 'ACTIVE' && l.plate)
+                    .map(l => String(l.plate).trim().toUpperCase())
+            );
+
+            let list = [...window.vehicles].filter(v =>
+                !activeVehicleIds.has(v.id) &&
+                !activeVehiclePlates.has(String(v.plate || '').trim().toUpperCase())
+            );
 
             if (selectedCategoryFilter !== "Semua") {
                 list = list.filter(v => v.category === selectedCategoryFilter);
@@ -1937,6 +2098,12 @@
                 list.sort((a, b) => (a.unitNo || 999) - (b.unitNo || 999));
             } else if (selectedSortMode === 'category') {
                 list.sort((a, b) => (a.category || '').localeCompare(b.category || '') || (a.unitNo || 999) - (b.unitNo || 999));
+            } else if (selectedSortMode === 'usage-ops') {
+                list.sort((a, b) => (normalizeVehicleUsageCategory(a) === 'OPERATIONAL' ? 0 : 1) - (normalizeVehicleUsageCategory(b) === 'OPERATIONAL' ? 0 : 1) || (a.unitNo || 999) - (b.unitNo || 999));
+            } else if (selectedSortMode === 'usage-pimpinan') {
+                list.sort((a, b) => (normalizeVehicleUsageCategory(a) === 'PIMPINAN' ? 0 : 1) - (normalizeVehicleUsageCategory(b) === 'PIMPINAN' ? 0 : 1) || (a.unitNo || 999) - (b.unitNo || 999));
+            } else if (selectedSortMode === 'usage-category') {
+                list.sort((a, b) => vehicleUsageLabel(a).localeCompare(vehicleUsageLabel(b)) || (a.unitNo || 999) - (b.unitNo || 999));
             } else if (selectedSortMode === 'plate-asc') {
                 list.sort((a, b) => a.plate.localeCompare(b.plate));
             } else if (selectedSortMode === 'garage-first') {
@@ -1978,8 +2145,9 @@
                                         `<span class="px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-700 text-emerald-300 text-[10px] font-bold">Di Garasi</span>`))}
                         </div>
                         <h4 class="font-bold text-xs text-slate-200 mt-1">${v.model}</h4>
-                        <div class="mt-2 flex items-center space-x-2">
+                        <div class="mt-2 flex flex-wrap items-center gap-1.5">
                             <span class="px-2 py-0.5 rounded-md bg-dark-surface border border-dark-border text-cyan-300 text-[10px] font-semibold">${v.category || 'Armada'}</span>
+                            <span class="px-2 py-0.5 rounded-md ${normalizeVehicleUsageCategory(v) === 'PIMPINAN' ? 'bg-violet-950 border border-violet-800/50 text-violet-300' : 'bg-emerald-950 border border-emerald-800/50 text-emerald-300'} text-[10px] font-semibold">${vehicleUsageLabel(v)}</span>
                             <span class="text-[11px] font-mono text-slate-400">KM: ${(v.odometer || 0).toLocaleString()}</span>
                             <span class="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-amber-300 font-bold">${tripFreq}x Pakai</span>
                         </div>
@@ -2119,7 +2287,14 @@
             event.preventDefault();
             const vehicleId = document.getElementById('checkout-vehicle-id').value;
             const vehicle = window.vehicles.find(v => v.id === vehicleId);
-            if (!vehicle) return;
+            if (!vehicle) {
+                showToast('Kendaraan Tidak Ditemukan', 'Silakan pilih kendaraan yang valid.', 'error');
+                return;
+            }
+            if (vehicle.active === false || vehicle.operational === false || vehicle.status !== 'IN_GARAGE') {
+                showToast('Kendaraan Tidak Tersedia', 'Kendaraan harus aktif, operasional, dan berada di garasi.', 'warning');
+                return;
+            }
 
             let driverId = null;
             let driverName = "";
@@ -2132,8 +2307,16 @@
                     return;
                 }
                 const drv = window.drivers.find(d => d.id === driverId);
-                driverName = drv ? drv.name : "Driver";
-                driverDept = drv && drv.category === 'EXECUTIVE' ? "Driver Pimpinan" : "Driver Operasional";
+                if (!drv || drv.active === false) {
+                    showToast('Driver Tidak Aktif', 'Pilih driver yang masih aktif.', 'warning');
+                    return;
+                }
+                if (window.logs.some(l => l.driverId === drv.id && l.status === 'ACTIVE')) {
+                    showToast('Driver Sedang Bertugas', `${drv.name} masih membawa kendaraan lain.`, 'warning');
+                    return;
+                }
+                driverName = drv.name;
+                driverDept = drv.category === 'EXECUTIVE' ? "Driver Pimpinan" : "Driver Operasional";
             } else {
                 driverName = document.getElementById('checkout-custom-name').value.trim();
                 driverDept = document.getElementById('checkout-custom-dept').value.trim();
@@ -2144,7 +2327,15 @@
             }
 
             const kmStartVal = document.getElementById('checkout-km-start').value;
-            const kmStart = kmStartVal !== '' ? parseInt(kmStartVal) : (vehicle.odometer || 0);
+            const kmStart = kmStartVal !== '' ? Number(kmStartVal) : Number(vehicle.odometer || 0);
+            if (!Number.isFinite(kmStart) || kmStart < 0) {
+                showToast('KM Tidak Valid', 'KM awal harus berupa angka 0 atau lebih.', 'warning');
+                return;
+            }
+            if (kmStart < Number(vehicle.odometer || 0)) {
+                showToast('KM Mundur', `KM awal tidak boleh lebih kecil dari odometer kendaraan (${Number(vehicle.odometer || 0).toLocaleString()} KM).`, 'warning');
+                return;
+            }
 
             const newLog = {
                 id: `TRIP-${Date.now()}`,
@@ -2254,8 +2445,17 @@
             let distance = null;
 
             if (kmEndVal !== '') {
-                kmEnd = parseInt(kmEndVal);
-                distance = Math.max(0, kmEnd - (trip.kmStart || 0));
+                kmEnd = Number(kmEndVal);
+                if (!Number.isFinite(kmEnd) || kmEnd < 0) {
+                    showToast('KM Tidak Valid', 'KM akhir harus berupa angka 0 atau lebih.', 'warning');
+                    return;
+                }
+                const kmStart = Number(trip.kmStart || 0);
+                if (kmEnd < kmStart) {
+                    showToast('KM Mundur', `KM akhir (${kmEnd.toLocaleString()}) tidak boleh lebih kecil dari KM awal (${kmStart.toLocaleString()}).`, 'warning');
+                    return;
+                }
+                distance = kmEnd - kmStart;
                 if (vehicle) vehicle.odometer = kmEnd;
             }
 
@@ -2336,7 +2536,7 @@
             if (countEl) countEl.innerText = `${filtered.length} Catatan`;
 
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400">Tidak ada riwayat catatan perjalanan.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-slate-400">Tidak ada riwayat catatan perjalanan.</td></tr>`;
                 return;
             }
 
@@ -2380,9 +2580,59 @@
                             </button>
                         ` : ''}
                     </td>
+                    <td class="p-3 text-center admin-col ${isAdminLoggedIn ? '' : 'hidden'}">
+                        <button onclick="requireAdminAction(() => deleteLogbookEntry('${log.id}'))" title="Hapus Logbook (Admin)" class="w-7 h-7 rounded-lg border border-rose-900/60 text-rose-400 hover:bg-rose-950 inline-flex items-center justify-center">
+                            <i class="fa-solid fa-trash text-xs"></i>
+                        </button>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        function deleteLogbookEntry(logId) {
+            if (!isAdminLoggedIn) {
+                openAdminAuthModal(() => deleteLogbookEntry(logId));
+                return;
+            }
+            const log = window.logs.find(l => l.id === logId);
+            if (!log) {
+                showToast("Data Tidak Ditemukan", "Catatan logbook sudah tidak tersedia.", "warning");
+                return;
+            }
+            if (log.status === 'ACTIVE') {
+                showToast("Tidak Dapat Dihapus", "Logbook yang masih berstatus Bertugas harus dicatat Masuk terlebih dahulu.", "warning");
+                return;
+            }
+            const label = `${log.plate || '-'} / ${log.driverName || '-'} / ${formatDateTime(log.timeOut)}`;
+            if (!confirm(`Hapus catatan logbook ini?\n\n${label}\n\nTindakan ini tidak dapat dibatalkan.`)) return;
+
+            const vehicleId = log.vehicleId;
+            window.logs = window.logs.filter(l => l.id !== logId);
+
+            // Pulihkan odometer/status kendaraan berdasarkan riwayat yang masih tersisa.
+            const vehicle = window.vehicles.find(v => v.id === vehicleId);
+            if (vehicle) {
+                const vehicleLogs = window.logs.filter(l => l.vehicleId === vehicleId);
+                const activeTrip = vehicleLogs.find(l => l.status === 'ACTIVE');
+                if (activeTrip) {
+                    vehicle.status = 'OUT';
+                    if (activeTrip.kmStart != null) vehicle.odometer = Number(activeTrip.kmStart) || vehicle.odometer || 0;
+                } else {
+                    vehicle.status = 'IN_GARAGE';
+                    const latest = vehicleLogs
+                        .filter(l => l.status === 'COMPLETED')
+                        .sort((a,b) => new Date(b.timeIn || b.timeOut || 0) - new Date(a.timeIn || a.timeOut || 0))[0];
+                    if (latest) {
+                        const restoredKm = latest.kmEnd != null ? Number(latest.kmEnd) : Number(latest.kmStart);
+                        if (Number.isFinite(restoredKm)) vehicle.odometer = restoredKm;
+                    }
+                }
+            }
+
+            saveToStorage();
+            renderAll();
+            showToast("Logbook Dihapus", "Catatan logbook berhasil dihapus oleh Admin.", "success");
         }
 
         function exportLogsToCSV() {
@@ -2430,6 +2680,14 @@
                     <td class="p-3 font-mono font-bold text-white">${v.plate}</td>
                     <td class="p-3 font-semibold text-slate-200">${v.model}</td>
                     <td class="p-3"><span class="px-2 py-0.5 rounded-md bg-dark-card border border-dark-border text-cyan-300 text-[10px] font-semibold">${v.category || 'Armada'}</span></td>
+                    <td class="p-3">
+                        ${isAdminLoggedIn ? `
+                            <select onchange="changeVehicleUsageCategory('${v.id}', this.value)" class="px-2 py-1 rounded-lg bg-dark-card border border-dark-border text-[10px] font-semibold ${normalizeVehicleUsageCategory(v) === 'PIMPINAN' ? 'text-violet-300' : 'text-emerald-300'}">
+                                <option value="OPERATIONAL" ${normalizeVehicleUsageCategory(v) === 'OPERATIONAL' ? 'selected' : ''}>Operasional</option>
+                                <option value="PIMPINAN" ${normalizeVehicleUsageCategory(v) === 'PIMPINAN' ? 'selected' : ''}>Pimpinan</option>
+                            </select>
+                        ` : `<span class="px-2 py-0.5 rounded-md ${normalizeVehicleUsageCategory(v) === 'PIMPINAN' ? 'bg-violet-950 text-violet-300' : 'bg-emerald-950 text-emerald-300'} text-[10px] font-semibold">${vehicleUsageLabel(v)}</span>`}
+                    </td>
                     <td class="p-3 font-mono text-slate-300">${(v.odometer || 0).toLocaleString()} KM</td>
                     <td class="p-3">
                         ${isAdminLoggedIn ? `
@@ -2491,16 +2749,36 @@
             });
         }
 
+        function changeVehicleUsageCategory(id, value) {
+            const v = window.vehicles.find(item => item.id === id);
+            if (!v) return;
+            requireAdminAction(() => {
+                v.usageCategory = value === 'PIMPINAN' ? 'PIMPINAN' : 'OPERATIONAL';
+                saveToStorage();
+                renderAll();
+                showToast('Kategori Mobil Diperbarui', `${v.plate} sekarang kategori ${vehicleUsageLabel(v)}.`, 'success');
+            });
+        }
+
         function handleAddVehicle(event) {
             event.preventDefault();
             const unitNo = parseInt(document.getElementById('veh-unitno').value) || null;
             const plate = document.getElementById('veh-plate').value.trim().toUpperCase();
             const model = document.getElementById('veh-model').value.trim();
             const category = document.getElementById('veh-category').value;
+            const usageCategory = document.getElementById('veh-usage-category')?.value || 'OPERATIONAL';
             const odometer = parseInt(document.getElementById('veh-odometer').value) || 0;
 
+            if (!unitNo || !plate || !model) {
+                showToast('Data Belum Lengkap', 'Nomor unit, plat, dan model kendaraan wajib diisi.', 'warning');
+                return;
+            }
             if (window.vehicles.some(v => v.plate === plate)) {
                 showToast("Plat Duplikat", "Plat nomor armada sudah terdaftar.", "error");
+                return;
+            }
+            if (window.vehicles.some(v => Number(v.unitNo) === Number(unitNo))) {
+                showToast("Nomor Unit Duplikat", `Nomor unit ${unitNo} sudah terdaftar.`, "error");
                 return;
             }
 
@@ -2510,6 +2788,7 @@
                 plate,
                 model,
                 category,
+                usageCategory,
                 odometer,
                 status: 'IN_GARAGE',
                 operational: true,
@@ -2633,6 +2912,14 @@
             const category = document.getElementById('drv-category').value;
             const sim = document.getElementById('drv-sim').value;
             const phone = document.getElementById('drv-phone').value.trim();
+            if (!name) {
+                showToast('Nama Wajib', 'Nama driver harus diisi.', 'warning');
+                return;
+            }
+            if (window.drivers.some(d => String(d.name).trim().toLowerCase() === name.toLowerCase())) {
+                showToast('Driver Duplikat', `${name} sudah terdaftar.`, 'warning');
+                return;
+            }
 
             const newDrv = {
                 id: `D-${Date.now()}`,
@@ -2731,6 +3018,10 @@
 
             const card = window.etolls.find(e => e.id === id);
             if (card) {
+                if (card.status === 'BORROWED') {
+                    showToast('Kartu Sedang Dipakai', 'Kembalikan kartu sebelum mengubah data kartu.', 'warning');
+                    return;
+                }
                 card.name = name;
                 card.bank = bank;
                 card.balance = balance;
@@ -2758,6 +3049,22 @@
             showToast("Kartu Dihapus", `${card.name} telah dihapus dari sistem.`, "info");
         }
 
+
+        // E-Toll ownership guard: satu driver hanya boleh memegang satu kartu aktif.
+        function normalizeEtollHolderName(value) {
+            return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+        }
+
+        function findEtollHeldByDriver(holderName, excludeCardId = null) {
+            const key = normalizeEtollHolderName(holderName);
+            if (!key) return null;
+            return (window.etolls || []).find(card =>
+                card && card.id !== excludeCardId &&
+                card.status === 'BORROWED' &&
+                normalizeEtollHolderName(card.holderName) === key
+            ) || null;
+        }
+
         function openBorrowEtollModal(etollId) {
             closeModal('modal-stat-detail');
             const card = window.etolls.find(e => e.id === etollId);
@@ -2769,7 +3076,8 @@
 
             const selectEl = document.getElementById('borrow-driver-select');
             selectEl.innerHTML = '<option value="">-- Pilih Driver Master --</option>' +
-                window.drivers.filter(d => d.active !== false).map(d => `<option value="${d.name}">${d.name} (${d.sim})</option>`).join('');
+                window.drivers.filter(d => d.active !== false && !findEtollHeldByDriver(d.name))
+                    .map(d => `<option value="${d.name}">${d.name} (${d.sim})</option>`).join('');
 
             openModal('modal-borrow-etoll');
         }
@@ -2788,6 +3096,15 @@
 
             const card = window.etolls.find(e => e.id === id);
             if (card) {
+                const existingDriverCard = findEtollHeldByDriver(holder);
+                if (existingDriverCard) {
+                    showToast('Driver Sudah Memegang E-Toll', `${holder} sudah menggunakan kartu ${existingDriverCard.name}. Kartu tersebut harus dikembalikan atau dioper terlebih dahulu sebelum meminjam kartu lain.`, 'warning');
+                    return;
+                }
+                if (card.active === false || card.status === 'BORROWED') {
+                    showToast('Kartu Tidak Tersedia', 'Kartu harus aktif dan berada di pool sebelum diserahkan.', 'warning');
+                    return;
+                }
                 card.status = 'BORROWED';
                 card.holderName = holder;
                 
@@ -2837,9 +3154,17 @@
 
             const card = window.etolls.find(e => e.id === id);
             if (card) {
-                const oldBal = card.balance || 0;
-                const newBal = newBalVal !== '' ? Math.max(0, parseInt(newBalVal) || 0) : oldBal;
-                const spent = Math.max(0, oldBal - newBal);
+                if (card.status !== 'BORROWED') {
+                    showToast('Kartu Tidak Sedang Dipinjam', 'Tidak ada pengembalian yang perlu dicatat untuk kartu ini.', 'warning');
+                    return;
+                }
+                const oldBal = Number(card.balance) || 0;
+                const newBal = newBalVal !== '' ? Math.max(0, Number(newBalVal) || 0) : oldBal;
+                if (newBal > oldBal) {
+                    showToast('Saldo Tidak Valid', 'Saldo saat dikembalikan tidak boleh lebih besar dari saldo saat diserahkan. Gunakan proses top-up terpisah untuk menambah saldo.', 'warning');
+                    return;
+                }
+                const spent = oldBal - newBal;
                 const oldHolder = card.holderName || 'Driver';
 
                 card.status = 'AVAILABLE';
@@ -2896,7 +3221,8 @@
 
             const drvSelect = document.getElementById('swap-select-new-driver');
             drvSelect.innerHTML = '<option value="">-- Pilih Driver Baru --</option>' +
-                window.drivers.filter(d => d.active !== false && d.name !== card.holderName).map(d => `<option value="${d.name}">${d.name} (${d.sim})</option>`).join('');
+                window.drivers.filter(d => d.active !== false && d.name !== card.holderName && !findEtollHeldByDriver(d.name, card.id))
+                    .map(d => `<option value="${d.name}">${d.name} (${d.sim})</option>`).join('');
 
             const cardSelect = document.getElementById('swap-select-new-card');
             const poolCards = window.etolls.filter(e => e.status === 'AVAILABLE' && e.active !== false && e.id !== card.id);
@@ -2946,8 +3272,12 @@
 
             const oldHolder = card.holderName || 'Driver';
             const oldBal = card.balance || 0;
-            const intermediateBal = currentBalInput !== '' ? Math.max(0, parseInt(currentBalInput) || 0) : oldBal;
-            const spent = Math.max(0, oldBal - intermediateBal);
+            const intermediateBal = currentBalInput !== '' ? Math.max(0, Number(currentBalInput) || 0) : oldBal;
+            if (intermediateBal > oldBal) {
+                showToast('Saldo Tidak Valid', 'Saldo saat tukar tidak boleh lebih besar dari saldo sebelumnya.', 'warning');
+                return;
+            }
+            const spent = oldBal - intermediateBal;
 
             if (swapMode === 'off_swap') {
                 const offCardId = document.getElementById('swap-select-off-card').value;
@@ -2956,11 +3286,19 @@
                     return;
                 }
                 const reserveCard = window.etolls.find(e => e.id === offCardId);
-                if (!reserveCard) return;
+                if (!reserveCard || reserveCard.active !== false || reserveCard.status !== 'AVAILABLE') {
+                    showToast('Kartu Cadangan Tidak Valid', 'Kartu cadangan harus OFF dan tersedia di pool.', 'warning');
+                    return;
+                }
+                if (card.active === false) {
+                    showToast('Kartu Sudah OFF', 'Kartu yang dipilih sudah nonaktif.', 'warning');
+                    return;
+                }
 
+                const wasBorrowed = card.status === 'BORROWED';
                 reserveCard.active = true;
 
-                if (card.status === 'BORROWED') {
+                if (wasBorrowed) {
                     reserveCard.status = 'BORROWED';
                     reserveCard.holderName = oldHolder;
                     card.holderName = null;
@@ -2975,7 +3313,7 @@
                     etollId: card.id,
                     cardName: `${card.name} [OFF] ⇄ ${reserveCard.name} [ON]`,
                     action: 'SWAP',
-                    holderName: card.status === 'BORROWED' ? oldHolder : 'Pool Garasi',
+                    holderName: wasBorrowed ? oldHolder : 'Pool Garasi',
                     balanceStart: oldBal,
                     balanceEnd: intermediateBal,
                     amountSpent: spent,
@@ -2994,12 +3332,22 @@
                 }
 
             } else if (swapMode === 'driver') {
+                if (card.status !== 'BORROWED') {
+                    showToast('Kartu Belum Dipinjam', 'Mode oper driver hanya dapat digunakan untuk kartu yang sedang dibawa.', 'warning');
+                    return;
+                }
                 const selectVal = document.getElementById('swap-select-new-driver').value;
                 const customVal = document.getElementById('swap-custom-new-driver').value.trim();
                 const newHolder = customVal || selectVal;
 
                 if (!newHolder) {
                     showToast("Pilih Driver Baru", "Tentukan driver pengganti.", "warning");
+                    return;
+                }
+
+                const existingDriverCard = findEtollHeldByDriver(newHolder, card.id);
+                if (existingDriverCard) {
+                    showToast('Driver Sudah Memegang E-Toll', `${newHolder} sudah menggunakan kartu ${existingDriverCard.name}. Kartu tersebut harus dikembalikan atau dioper terlebih dahulu.`, 'warning');
                     return;
                 }
 
@@ -3036,7 +3384,14 @@
                     return;
                 }
                 const newCard = window.etolls.find(e => e.id === targetCardId);
-                if (!newCard) return;
+                if (!newCard || newCard.status !== 'AVAILABLE' || newCard.active === false || newCard.id === card.id) {
+                    showToast('Kartu Pengganti Tidak Valid', 'Pilih kartu pengganti yang aktif dan tersedia di pool.', 'warning');
+                    return;
+                }
+                if (card.status !== 'BORROWED') {
+                    showToast('Kartu Belum Dipinjam', 'Pertukaran kartu untuk perjalanan hanya berlaku pada kartu yang sedang dibawa.', 'warning');
+                    return;
+                }
 
                 card.status = 'AVAILABLE';
                 card.holderName = null;
@@ -3075,6 +3430,55 @@
             renderAll();
         }
 
+        function buildEtollRecapRows() {
+            const logs = Array.isArray(window.etollLogs) ? [...window.etollLogs] : [];
+            // Urutkan kronologis agar penyerahan dan pengembalian dapat dipasangkan.
+            logs.sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
+
+            const openBorrows = new Map();
+            const rows = [];
+
+            logs.forEach(log => {
+                const action = String(log.action || '').toUpperCase();
+                const key = String(log.etollId || log.cardName || '');
+
+                if (action === 'BORROW') {
+                    const item = { borrow: log, return: null };
+                    if (!openBorrows.has(key)) openBorrows.set(key, []);
+                    openBorrows.get(key).push(item);
+                    rows.push(item);
+                    return;
+                }
+
+                if (action === 'RETURN') {
+                    const queue = openBorrows.get(key) || [];
+                    // Cari penyerahan yang paling cocok: driver sama bila tersedia.
+                    let idx = -1;
+                    for (let j = 0; j < queue.length; j++) {
+                        if (String(queue[j].borrow.holderName || '') === String(log.holderName || '')) {
+                            idx = j;
+                            break;
+                        }
+                    }
+                    if (idx < 0 && queue.length) idx = 0;
+
+                    if (idx >= 0) {
+                        queue[idx].return = log;
+                        queue.splice(idx, 1);
+                    } else {
+                        // Data lama yang tidak punya penyerahan pasangan tetap ditampilkan.
+                        rows.push({ borrow: null, return: log });
+                    }
+                    return;
+                }
+
+                // SWAP / aktivitas lain tetap menjadi satu baris tersendiri.
+                rows.push({ borrow: null, return: null, activity: log });
+            });
+
+            return rows.reverse();
+        }
+
         function renderEtollRecapTable() {
             const tbody = document.getElementById('etoll-recap-table-body');
             const cardFilter = document.getElementById('etoll-recap-filter-card');
@@ -3092,12 +3496,20 @@
                 });
             }
 
-            let filtered = window.etollLogs.filter(log => {
-                const matchSearch = log.cardName.toLowerCase().includes(searchVal) ||
-                                    log.holderName.toLowerCase().includes(searchVal) ||
-                                    (log.notes && log.notes.toLowerCase().includes(searchVal));
-                const matchCard = !cardFilter || cardFilter.value === 'ALL' || log.etollId === cardFilter.value;
-                const matchAction = !actionFilter || actionFilter.value === 'ALL' || log.action === actionFilter.value;
+            const allRows = buildEtollRecapRows();
+            const actionValue = actionFilter?.value || 'ALL';
+
+            const filtered = allRows.filter(row => {
+                const logs = [row.borrow, row.return, row.activity].filter(Boolean);
+                const cardIds = logs.map(l => String(l.etollId || ''));
+                const names = logs.map(l => String(l.cardName || '')).join(' ');
+                const holders = logs.map(l => String(l.holderName || '')).join(' ');
+                const notes = logs.map(l => String(l.notes || '')).join(' ');
+                const actions = logs.map(l => String(l.action || '').toUpperCase());
+
+                const matchSearch = !searchVal || `${names} ${holders} ${notes}`.toLowerCase().includes(searchVal);
+                const matchCard = !cardFilter || cardFilter.value === 'ALL' || cardIds.includes(cardFilter.value);
+                const matchAction = actionValue === 'ALL' || actions.includes(actionValue);
                 return matchSearch && matchCard && matchAction;
             });
 
@@ -3110,34 +3522,115 @@
 
             tbody.innerHTML = '';
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400">Belum ada catatan mutasi E-Toll.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-slate-400">Belum ada catatan mutasi E-Toll.</td></tr>`;
                 return;
             }
 
-            filtered.forEach(log => {
-                const isBorrow = log.action === 'BORROW';
-                const isReturn = log.action === 'RETURN';
+            const esc = value => String(value ?? '-').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+            const money = value => `Rp ${(Number(value) || 0).toLocaleString('id-ID')}`;
+
+            filtered.forEach(row => {
+                const borrow = row.borrow;
+                const ret = row.return;
+                const activity = row.activity;
+                const primary = borrow || ret || activity;
+                const isLifecycle = !!(borrow || ret);
+                const spent = ret ? (Number(ret.amountSpent) || 0) : (Number(primary?.amountSpent) || 0);
+                const start = borrow ? (Number(borrow.balanceStart) || 0) : (Number(primary?.balanceStart) || 0);
+                const end = ret ? (Number(ret.balanceEnd) || 0) : (primary?.balanceEnd != null ? (Number(primary.balanceEnd) || 0) : null);
+                const cardName = ret && !borrow ? ret.cardName : (borrow?.cardName || primary?.cardName || '-');
+                const holder = borrow && ret
+                    ? `${esc(borrow.holderName || '-')} <span class="text-slate-500 mx-1">→</span> ${esc(ret.holderName || borrow.holderName || '-')}`
+                    : esc(primary?.holderName || '-');
+                const timeCell = borrow && ret
+                    ? `<div class="space-y-1"><div><span class="text-teal-300 font-semibold">Serah:</span> ${formatDateTime(borrow.timestamp)}</div><div><span class="text-emerald-300 font-semibold">Kembali:</span> ${formatDateTime(ret.timestamp)}</div></div>`
+                    : `<div>${formatDateTime(primary?.timestamp)}</div>`;
+                const activityCell = isLifecycle
+                    ? `<div class="space-y-1"><span class="px-2 py-0.5 rounded-full bg-teal-950 border border-teal-700 text-teal-300 text-[10px] font-bold">Penyerahan</span>${ret ? `<span class="ml-1 px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-700 text-emerald-300 text-[10px] font-bold">Pengembalian</span>` : `<span class="ml-1 text-[10px] text-amber-300">Masih dibawa</span>`}</div>`
+                    : `<span class="px-2 py-0.5 rounded-full bg-blue-950 border border-blue-700 text-blue-300 text-[10px] font-bold">${esc(activity?.action || 'Aktivitas')}</span>`;
+                const note = borrow && ret
+                    ? `${esc(ret.notes || '')}`
+                    : esc(primary?.notes || '-');
 
                 const tr = document.createElement('tr');
-                tr.className = "hover:bg-dark-cardHover transition";
+                tr.className = "hover:bg-dark-cardHover transition align-top";
                 tr.innerHTML = `
-                    <td class="p-3 font-mono text-slate-300 text-[11px]">${formatDateTime(log.timestamp)}</td>
-                    <td class="p-3 font-bold text-white">${log.cardName}</td>
-                    <td class="p-3">
-                        ${isBorrow ? '<span class="px-2 py-0.5 rounded-full bg-teal-950 border border-teal-700 text-teal-300 text-[10px] font-bold">Penyerahan</span>' :
-                          (isReturn ? '<span class="px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-700 text-emerald-300 text-[10px] font-bold">Kembali</span>' :
-                          '<span class="px-2 py-0.5 rounded-full bg-blue-950 border border-blue-700 text-blue-300 text-[10px] font-bold">Tukar / Oper</span>')}
+                    <td class="p-3 font-mono text-slate-300 text-[11px]">${timeCell}</td>
+                    <td class="p-3 font-bold text-white">${esc(cardName)}</td>
+                    <td class="p-3">${activityCell}</td>
+                    <td class="p-3 font-semibold text-slate-200">${holder}</td>
+                    <td class="p-3 font-mono text-slate-300">${money(start)}</td>
+                    <td class="p-3 font-mono text-slate-300">${end !== null ? money(end) : '<span class="text-amber-300">Belum kembali</span>'}</td>
+                    <td class="p-3 font-mono font-bold ${spent > 0 ? 'text-rose-400' : 'text-slate-500'}">${spent > 0 ? '-'+money(spent) : '-'}</td>
+                    <td class="p-3 text-slate-400 text-[11px]">${note}</td>
+                    <td class="p-3 text-center admin-col ${isAdminLoggedIn ? '' : 'hidden'}">
+                        <button onclick="requireAdminAction(() => deleteEtollRecapRow('${esc(borrow?.id || '')}','${esc(ret?.id || '')}','${esc(activity?.id || '')}'))" title="Hapus Mutasi (Admin)" class="w-7 h-7 rounded-lg border border-rose-900/60 text-rose-400 hover:bg-rose-950 inline-flex items-center justify-center">
+                            <i class="fa-solid fa-trash text-xs"></i>
+                        </button>
                     </td>
-                    <td class="p-3 font-semibold text-slate-200">${log.holderName}</td>
-                    <td class="p-3 font-mono text-slate-300">Rp ${(Number(log.balanceStart) || 0).toLocaleString('id-ID')}</td>
-                    <td class="p-3 font-mono text-slate-300">${log.balanceEnd !== null ? 'Rp ' + (Number(log.balanceEnd) || 0).toLocaleString('id-ID') : '-'}</td>
-                    <td class="p-3 font-mono font-bold ${log.amountSpent > 0 ? 'text-rose-400' : 'text-slate-500'}">
-                        ${log.amountSpent > 0 ? '-Rp ' + Number(log.amountSpent).toLocaleString('id-ID') : '-'}
-                    </td>
-                    <td class="p-3 text-slate-400 text-[11px]">${log.notes || '-'}</td>
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        function deleteEtollRecapRow(borrowId, returnId, activityId) {
+            if (!isAdminLoggedIn) {
+                openAdminAuthModal(() => deleteEtollRecapRow(borrowId, returnId, activityId));
+                return;
+            }
+
+            const ids = [borrowId, returnId, activityId].filter(Boolean);
+            if (!ids.length) {
+                showToast("Data Tidak Ditemukan", "Mutasi E-Toll tidak memiliki ID yang dapat dihapus.", "warning");
+                return;
+            }
+
+            const selected = window.etollLogs.filter(l => ids.includes(String(l.id)));
+            if (!selected.length) {
+                showToast("Data Tidak Ditemukan", "Catatan mutasi E-Toll sudah tidak tersedia.", "warning");
+                return;
+            }
+
+            const main = selected[0];
+            const desc = selected.map(l => `${String(l.action || '').toUpperCase()} - ${l.cardName || '-'} - ${l.holderName || '-'}`).join('\n');
+            if (!confirm(`Hapus mutasi E-Toll ini?\n\n${desc}\n\nJika baris berisi Penyerahan + Pengembalian, keduanya akan dihapus sekaligus.\nTindakan ini tidak dapat dibatalkan.`)) return;
+
+            window.etollLogs = window.etollLogs.filter(l => !ids.includes(String(l.id)));
+
+            // Kembalikan status kartu secara aman dari log yang tersisa.
+            const affectedCardIds = [...new Set(selected.map(l => l.etollId).filter(Boolean))];
+            affectedCardIds.forEach(cardId => {
+                const card = window.etolls.find(e => e.id === cardId);
+                if (!card) return;
+                const cardLogs = window.etollLogs
+                    .filter(l => l.etollId === cardId)
+                    .sort((a,b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
+                const lastBorrow = [...cardLogs].reverse().find(l => String(l.action).toUpperCase() === 'BORROW');
+                const lastReturn = [...cardLogs].reverse().find(l => String(l.action).toUpperCase() === 'RETURN');
+                const lastSwap = [...cardLogs].reverse().find(l => String(l.action).toUpperCase() === 'SWAP');
+                const last = cardLogs[cardLogs.length - 1];
+
+                // Jangan mengubah kartu OFF/ON hanya karena penghapusan log; pulihkan hanya kepemilikan yang jelas.
+                if (last && String(last.action).toUpperCase() === 'BORROW' && (!lastReturn || new Date(last.timestamp) > new Date(lastReturn.timestamp))) {
+                    card.status = 'BORROWED';
+                    card.holderName = last.holderName || null;
+                    if (last.balanceStart != null) card.balance = Number(last.balanceStart) || 0;
+                } else if (last && String(last.action).toUpperCase() === 'RETURN') {
+                    card.status = 'AVAILABLE';
+                    card.holderName = null;
+                    if (last.balanceEnd != null) card.balance = Number(last.balanceEnd) || 0;
+                } else if (!last) {
+                    card.status = card.status === 'BORROWED' && selected.some(l => String(l.action).toUpperCase() === 'BORROW') ? 'AVAILABLE' : card.status;
+                    if (card.status === 'AVAILABLE') card.holderName = null;
+                } else if (lastSwap && card.status === 'BORROWED' && lastSwap.holderName) {
+                    const holderText = String(lastSwap.holderName);
+                    card.holderName = holderText.includes('➔') ? holderText.split('➔').pop().trim() : holderText;
+                }
+            });
+
+            saveToStorage();
+            renderAll();
+            showToast("Mutasi Dihapus", "Rekap mutasi E-Toll berhasil dihapus oleh Admin.", "success");
         }
 
         function exportEtollLogsToCSV() {
@@ -3250,22 +3743,81 @@
                     body.appendChild(card);
                 });
             } else if (activeStatType === 'drivers') {
-                let list = window.drivers;
-                if (filterText) list = list.filter(d => d.name.toLowerCase().includes(filterText));
+                // “Driver Bertugas” = driver yang benar-benar memiliki log ACTIVE.
+                // Jangan tampilkan seluruh master driver karena itu membuat angka
+                // dan isi kotak terlihat tidak sesuai.
+                const seenDrivers = new Set();
+                const busyDrivers = [];
+                window.logs.filter(l => l && l.status === 'ACTIVE').forEach(log => {
+                    const key = log.driverId ? `id:${log.driverId}` : `name:${String(log.driverName || '').trim().toLowerCase()}`;
+                    if (!key || key === 'name:' || seenDrivers.has(key)) return;
+                    seenDrivers.add(key);
+                    const master = log.driverId ? window.drivers.find(d => d.id === log.driverId) :
+                        window.drivers.find(d => String(d.name || '').trim().toLowerCase() === String(log.driverName || '').trim().toLowerCase());
+                    busyDrivers.push({ log, driver: master });
+                });
+
+                let list = busyDrivers;
+                if (filterText) {
+                    list = list.filter(item => {
+                        const d = item.driver || {};
+                        const l = item.log || {};
+                        return String(d.name || l.driverName || '').toLowerCase().includes(filterText) ||
+                               String(l.plate || '').toLowerCase().includes(filterText) ||
+                               String(l.destination || '').toLowerCase().includes(filterText);
+                    });
+                }
                 count = list.length;
 
-                list.forEach(d => {
-                    const isExecutive = d.category === 'EXECUTIVE';
+                list.forEach(({log, driver}) => {
+                    const d = driver || {};
+                    const isExecutive = d.category === 'EXECUTIVE' || log.driverDept === 'Driver Pimpinan';
                     const card = document.createElement('div');
-                    card.className = "p-3 bg-dark-card rounded-2xl border border-dark-border flex items-center justify-between";
+                    card.className = "p-3 bg-dark-card rounded-2xl border border-indigo-800/40 flex items-center justify-between gap-3";
                     card.innerHTML = `
-                        <div>
-                            <div class="flex items-center space-x-1.5">
-                                <strong class="text-white">${d.name}</strong>
+                        <div class="min-w-0">
+                            <div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                                <strong class="text-white">${d.name || log.driverName || '-'}</strong>
                                 <span class="px-1.5 py-0.2 rounded text-[9px] font-bold ${isExecutive ? 'bg-purple-950 text-purple-300 border border-purple-800/60' : 'bg-cyan-950 text-cyan-300 border border-cyan-800/60'}">${isExecutive ? 'Pimpinan' : 'Operasional'}</span>
+                                <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-950 text-amber-300 border border-amber-800/60">BERTUGAS</span>
                             </div>
-                            <p class="text-[11px] text-slate-400">${d.sim} | ${d.phone || '-'}</p>
+                            <p class="text-[11px] text-slate-400 mt-0.5">${log.plate || '-'} · ${log.destination || 'Tujuan belum diisi'}</p>
+                            <p class="text-[10px] text-slate-500">Keluar ${formatTimeOnly(log.timeOut)} · ${log.purpose || '-'}</p>
                         </div>
+                    `;
+                    body.appendChild(card);
+                });
+            } else if (activeStatType === 'out') {
+                // “Sedang Keluar” = kendaraan pada log ACTIVE, satu kendaraan satu baris.
+                const seenVehicles = new Set();
+                let list = [];
+                window.logs.filter(l => l && l.status === 'ACTIVE').forEach(log => {
+                    const key = log.vehicleId ? `id:${log.vehicleId}` : `plate:${String(log.plate || '').trim().toUpperCase()}`;
+                    if (!key || key === 'plate:' || seenVehicles.has(key)) return;
+                    seenVehicles.add(key);
+                    list.push(log);
+                });
+                if (filterText) {
+                    list = list.filter(l => [l.plate, l.model, l.driverName, l.destination, l.purpose]
+                        .some(v => String(v || '').toLowerCase().includes(filterText)));
+                }
+                count = list.length;
+
+                list.forEach(log => {
+                    const card = document.createElement('div');
+                    card.className = "p-3 bg-dark-card rounded-2xl border border-amber-800/40 flex items-center justify-between gap-3";
+                    card.innerHTML = `
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <strong class="font-mono text-white">${log.plate || '-'}</strong>
+                                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-950 text-amber-300 border border-amber-800/60">KELUAR</span>
+                            </div>
+                            <p class="text-xs text-slate-300 mt-0.5">${log.model || 'Armada'} · Driver: ${log.driverName || '-'}</p>
+                            <p class="text-[11px] text-slate-400">${log.destination || '-'} · Keluar ${formatTimeOnly(log.timeOut)}</p>
+                        </div>
+                        <button onclick="openQuickCheckin('${log.id}')" class="shrink-0 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs">
+                            Masuk
+                        </button>
                     `;
                     body.appendChild(card);
                 });
@@ -3552,6 +4104,9 @@
             if (window.FirebaseBridge) {
                 window.FirebaseBridge.unsubscribers.forEach(unsub => unsub && unsub());
                 window.FirebaseBridge.db = null;
+                window.FirebaseBridge.auth = null;
+                window.FirebaseBridge.app = null;
+                window.FirebaseBridge.configProjectId = null;
                 window.FirebaseBridge.currentUser = null;
                 window.FirebaseBridge.updateStatusUI(false, "Mode Penyimpanan: Lokal (Offline Standalone)");
             }
@@ -3583,6 +4138,10 @@
             renderLogsTable();
             renderFleetTable();
             renderDriversGrid();
+            // Pastikan kolom Admin yang dibuat ulang oleh renderer mengikuti status login terbaru.
+            document.querySelectorAll('.admin-col').forEach(el => {
+                el.classList.toggle('hidden', !isAdminLoggedIn);
+            });
             renderEtollRecapTable();
             updateAdminBadgeUI();
             if (window.updateGlobalConnectionIndicator) window.updateGlobalConnectionIndicator();
