@@ -1267,6 +1267,43 @@
         </div>
     </div>
 
+    <!-- MODAL EDIT LOGBOOK (ADMIN) -->
+    <div id="modal-edit-logbook" class="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 hidden">
+        <div class="bg-dark-surface w-full max-w-2xl rounded-3xl shadow-2xl border border-dark-border overflow-hidden max-h-[92vh] flex flex-col">
+            <div class="bg-gradient-to-r from-cyan-700 to-blue-600 px-5 sm:px-6 py-4 text-white flex items-center justify-between">
+                <div>
+                    <h3 class="font-extrabold text-base"><i class="fa-solid fa-pen-to-square mr-2"></i>Edit Logbook Gerbang</h3>
+                    <p class="text-[11px] text-cyan-100">Fitur khusus Mode Admin</p>
+                </div>
+                <button onclick="closeModal('modal-edit-logbook')" class="text-white/80 hover:text-white text-xl font-bold"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-edit-logbook" onsubmit="handleEditLogbookSubmit(event)" class="p-5 sm:p-6 space-y-4 overflow-y-auto text-xs">
+                <input type="hidden" id="edit-logbook-id">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div><label class="block font-semibold text-slate-200 mb-1">Kendaraan</label><input id="edit-logbook-vehicle" readonly class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-slate-900/70 text-cyan-300 font-semibold"></div>
+                    <div><label class="block font-semibold text-slate-200 mb-1">Status</label><input id="edit-logbook-status" readonly class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-slate-900/70 text-slate-300"></div>
+                    <div><label class="block font-semibold text-slate-200 mb-1">Nama Driver <span class="text-rose-400">*</span></label><input id="edit-logbook-driver" required class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100"></div>
+                    <div><label class="block font-semibold text-slate-200 mb-1">Bagian / Kategori Driver</label><input id="edit-logbook-dept" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100"></div>
+                    <div><label class="block font-semibold text-slate-200 mb-1">Jam Keluar</label><input type="datetime-local" id="edit-logbook-timeout" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100"></div>
+                    <div><label class="block font-semibold text-slate-200 mb-1">Jam Masuk</label><input type="datetime-local" id="edit-logbook-timein" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100"></div>
+                    <div><label class="block font-semibold text-slate-200 mb-1">KM Awal</label><input type="number" min="0" id="edit-logbook-kmstart" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100 font-mono"></div>
+                    <div><label class="block font-semibold text-slate-200 mb-1">KM Akhir</label><input type="number" min="0" id="edit-logbook-kmend" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100 font-mono"></div>
+                    <div><label class="block font-semibold text-slate-200 mb-1">BBM Awal</label><input id="edit-logbook-fuelstart" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100"></div>
+                    <div><label class="block font-semibold text-slate-200 mb-1">BBM Akhir</label><input id="edit-logbook-fuelend" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100"></div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div><label class="block font-semibold text-slate-200 mb-1">Tujuan</label><input id="edit-logbook-destination" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100"></div>
+                    <div><label class="block font-semibold text-slate-200 mb-1">Keperluan / Keterangan</label><input id="edit-logbook-purpose" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100"></div>
+                </div>
+                <div><label class="block font-semibold text-slate-200 mb-1">Catatan</label><textarea id="edit-logbook-notes" rows="3" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100"></textarea></div>
+                <div class="pt-3 flex items-center justify-end gap-2 border-t border-dark-border">
+                    <button type="button" onclick="closeModal('modal-edit-logbook')" class="px-4 py-2.5 rounded-xl border border-dark-border text-slate-300 font-semibold hover:bg-dark-card">Batal</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold"><i class="fa-solid fa-floppy-disk mr-1"></i>Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- PRINTABLE SLIP / TIKET MODAL -->
     <div id="modal-ticket" class="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 hidden">
         <div class="bg-dark-surface w-full max-w-md rounded-3xl shadow-2xl border border-dark-border overflow-hidden">
@@ -1985,6 +2022,7 @@
                 v.status === 'IN_GARAGE' &&
                 v.operational !== false &&
                 v.active !== false &&
+                normalizeVehicleUsageCategory(v) === 'OPERATIONAL' &&
                 !activeVehicleKeys.has(`id:${v.id}`) &&
                 !activeVehicleKeys.has(`plate:${String(v.plate || '').trim().toUpperCase()}`)
             ).length;
@@ -2580,7 +2618,10 @@
                             </button>
                         ` : ''}
                     </td>
-                    <td class="p-3 text-center admin-col ${isAdminLoggedIn ? '' : 'hidden'}">
+                    <td class="p-3 text-center admin-col ${isAdminLoggedIn ? '' : 'hidden'} whitespace-nowrap">
+                        <button onclick="requireAdminAction(() => openEditLogbookModal('${log.id}'))" title="Edit Logbook (Admin)" class="w-7 h-7 rounded-lg border border-cyan-900/60 text-cyan-400 hover:bg-cyan-950 inline-flex items-center justify-center mr-1">
+                            <i class="fa-solid fa-pen-to-square text-xs"></i>
+                        </button>
                         <button onclick="requireAdminAction(() => deleteLogbookEntry('${log.id}'))" title="Hapus Logbook (Admin)" class="w-7 h-7 rounded-lg border border-rose-900/60 text-rose-400 hover:bg-rose-950 inline-flex items-center justify-center">
                             <i class="fa-solid fa-trash text-xs"></i>
                         </button>
@@ -2588,6 +2629,103 @@
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        function toDateTimeLocalValue(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            if (Number.isNaN(d.getTime())) return '';
+            const pad = n => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+
+        function openEditLogbookModal(logId) {
+            if (!isAdminLoggedIn) {
+                openAdminAuthModal(() => openEditLogbookModal(logId));
+                return;
+            }
+            const log = window.logs.find(l => l.id === logId);
+            if (!log) {
+                showToast('Data Tidak Ditemukan', 'Catatan logbook tidak tersedia.', 'warning');
+                return;
+            }
+            document.getElementById('edit-logbook-id').value = log.id;
+            document.getElementById('edit-logbook-vehicle').value = `${log.plate || '-'} - ${log.model || '-'}`;
+            document.getElementById('edit-logbook-status').value = log.status === 'ACTIVE' ? 'Bertugas / Sedang Keluar' : 'Selesai';
+            document.getElementById('edit-logbook-driver').value = log.driverName || '';
+            document.getElementById('edit-logbook-dept').value = log.driverDept || '';
+            document.getElementById('edit-logbook-timeout').value = toDateTimeLocalValue(log.timeOut);
+            document.getElementById('edit-logbook-timein').value = toDateTimeLocalValue(log.timeIn);
+            document.getElementById('edit-logbook-kmstart').value = log.kmStart ?? '';
+            document.getElementById('edit-logbook-kmend').value = log.kmEnd ?? '';
+            document.getElementById('edit-logbook-fuelstart').value = log.fuelStart || '';
+            document.getElementById('edit-logbook-fuelend').value = log.fuelEnd || '';
+            document.getElementById('edit-logbook-destination').value = log.destination || '';
+            document.getElementById('edit-logbook-purpose').value = log.purpose || '';
+            document.getElementById('edit-logbook-notes').value = log.notes || '';
+            openModal('modal-edit-logbook');
+        }
+
+        function handleEditLogbookSubmit(event) {
+            event.preventDefault();
+            if (!isAdminLoggedIn) {
+                showToast('Akses Ditolak', 'Edit logbook hanya dapat dilakukan oleh Admin.', 'error');
+                return;
+            }
+            const logId = document.getElementById('edit-logbook-id').value;
+            const log = window.logs.find(l => l.id === logId);
+            if (!log) {
+                showToast('Data Tidak Ditemukan', 'Catatan logbook tidak tersedia.', 'warning');
+                return;
+            }
+            const driverName = document.getElementById('edit-logbook-driver').value.trim();
+            const timeOutLocal = document.getElementById('edit-logbook-timeout').value;
+            const timeInLocal = document.getElementById('edit-logbook-timein').value;
+            const kmStartRaw = document.getElementById('edit-logbook-kmstart').value;
+            const kmEndRaw = document.getElementById('edit-logbook-kmend').value;
+            const kmStart = kmStartRaw === '' ? null : Number(kmStartRaw);
+            const kmEnd = kmEndRaw === '' ? null : Number(kmEndRaw);
+            if (!driverName) { showToast('Driver Wajib', 'Nama driver tidak boleh kosong.', 'warning'); return; }
+            if (!timeOutLocal) { showToast('Jam Keluar Wajib', 'Jam keluar harus diisi.', 'warning'); return; }
+            if (kmStart !== null && (!Number.isFinite(kmStart) || kmStart < 0)) { showToast('KM Awal Tidak Valid', 'KM awal harus 0 atau lebih.', 'warning'); return; }
+            if (kmEnd !== null && (!Number.isFinite(kmEnd) || kmEnd < 0)) { showToast('KM Akhir Tidak Valid', 'KM akhir harus 0 atau lebih.', 'warning'); return; }
+            if (kmStart !== null && kmEnd !== null && kmEnd < kmStart) { showToast('KM Mundur', 'KM akhir tidak boleh lebih kecil dari KM awal.', 'warning'); return; }
+            if (timeInLocal && new Date(timeInLocal).getTime() < new Date(timeOutLocal).getTime()) { showToast('Waktu Tidak Valid', 'Jam masuk tidak boleh lebih awal dari jam keluar.', 'warning'); return; }
+
+            // Jangan membuat driver terdaftar aktif pada dua perjalanan sekaligus.
+            if (log.status === 'ACTIVE') {
+                const registered = window.drivers.find(d => d.id === log.driverId);
+                if (registered) {
+                    const duplicate = window.logs.some(l => l.id !== log.id && l.status === 'ACTIVE' && l.driverId === log.driverId);
+                    if (duplicate) { showToast('Driver Dobel', `${driverName} sudah tercatat bertugas pada kendaraan lain.`, 'warning'); return; }
+                }
+            }
+
+            log.driverName = driverName;
+            log.driverDept = document.getElementById('edit-logbook-dept').value.trim();
+            log.timeOut = new Date(timeOutLocal).toISOString();
+            log.timeIn = timeInLocal ? new Date(timeInLocal).toISOString() : null;
+            log.kmStart = kmStart;
+            log.kmEnd = kmEnd;
+            log.distance = kmStart !== null && kmEnd !== null ? kmEnd - kmStart : null;
+            log.fuelStart = document.getElementById('edit-logbook-fuelstart').value.trim();
+            log.fuelEnd = document.getElementById('edit-logbook-fuelend').value.trim();
+            log.destination = document.getElementById('edit-logbook-destination').value.trim() || '-';
+            log.purpose = document.getElementById('edit-logbook-purpose').value.trim() || '-';
+            log.notes = document.getElementById('edit-logbook-notes').value.trim();
+
+            // Status mengikuti field status yang sudah ada; edit tidak mengubah status perjalanan.
+            const vehicle = window.vehicles.find(v => v.id === log.vehicleId);
+            if (vehicle) {
+                const vehicleLogs = window.logs.filter(l => l.vehicleId === log.vehicleId && l.status === 'COMPLETED' && l.kmEnd !== null).sort((a,b) => new Date(b.timeIn || b.timeOut) - new Date(a.timeIn || a.timeOut));
+                const latest = vehicleLogs[0];
+                if (log.status === 'COMPLETED' && latest && latest.id === log.id && log.kmEnd !== null) vehicle.odometer = log.kmEnd;
+                if (log.status === 'ACTIVE') { vehicle.status = 'ON_TRIP'; if (log.kmStart !== null) vehicle.odometer = log.kmStart; }
+            }
+            saveToStorage();
+            closeModal('modal-edit-logbook');
+            renderAll();
+            showToast('Logbook Diperbarui', 'Perubahan logbook berhasil disimpan oleh Admin.', 'success');
         }
 
         function deleteLogbookEntry(logId) {
@@ -3723,7 +3861,13 @@
             let count = 0;
             if (activeStatType === 'total' || activeStatType === 'garage') {
                 let list = window.vehicles;
-                if (activeStatType === 'garage') list = list.filter(v => v.status === 'IN_GARAGE' && v.operational !== false && v.active !== false);
+                if (activeStatType === 'garage') list = list.filter(v =>
+                    v.status === 'IN_GARAGE' &&
+                    v.operational !== false &&
+                    v.active !== false &&
+                    normalizeVehicleUsageCategory(v) === 'OPERATIONAL' &&
+                    !window.logs.some(l => l && l.status === 'ACTIVE' && (l.vehicleId === v.id || String(l.plate || '').trim().toUpperCase() === String(v.plate || '').trim().toUpperCase()))
+                );
                 if (filterText) list = list.filter(v => v.plate.toLowerCase().includes(filterText) || v.model.toLowerCase().includes(filterText));
                 count = list.length;
 
