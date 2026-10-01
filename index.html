@@ -105,6 +105,128 @@
             .mobile-tabs .tab-btn { min-width: 70px; padding-left: 7px !important; padding-right: 7px !important; }
             .mobile-tabs .tab-btn span { font-size: 9px !important; }
         }
+        /* ===== MOBILE LARGE / EASY OPERATION MODE ===== */
+        @media (max-width: 640px) {
+            html { font-size: 17px !important; }
+            body { font-size: 1rem !important; padding-bottom: 104px !important; }
+
+            /* Header: larger, fewer accidental taps */
+            header .h-16 { height: 72px !important; }
+            header .max-w-7xl { padding-left: 10px !important; padding-right: 10px !important; }
+            header .w-9 { width: 44px !important; height: 44px !important; }
+            header .w-9 i { font-size: 1.15rem !important; }
+            header .font-extrabold { font-size: 1.05rem !important; }
+            #connection-status-badge,
+            #btn-admin-auth,
+            #btn-change-pin,
+            #btn-cloud-config,
+            #btn-telegram-config {
+                min-height: 46px !important;
+                padding: 9px 12px !important;
+                border-radius: 14px !important;
+                font-size: 0.82rem !important;
+            }
+            #connection-status-badge span:last-child { display: inline !important; }
+
+            /* Main spacing and readable sections */
+            main { padding: 16px 12px 22px !important; gap: 22px !important; }
+            main > .grid { gap: 10px !important; }
+            main > .grid > div {
+                min-height: 126px !important;
+                padding: 16px !important;
+                border-radius: 19px !important;
+            }
+            main > .grid > div h3 { font-size: 1.45rem !important; }
+            main > .grid > div span,
+            main > .grid > div p { font-size: 0.82rem !important; }
+            main > .grid > div .w-8 { width: 38px !important; height: 38px !important; }
+
+            /* Navigation: readable chips, not tiny labels */
+            .mobile-tabs {
+                top: 72px !important;
+                padding: 6px !important;
+                gap: 6px !important;
+                border-radius: 18px !important;
+            }
+            .mobile-tabs .tab-btn {
+                min-width: 112px !important;
+                min-height: 54px !important;
+                padding: 9px 13px !important;
+                font-size: 0.82rem !important;
+                border-radius: 15px !important;
+                gap: 6px !important;
+            }
+            .mobile-tabs .tab-btn i { font-size: 17px !important; }
+            .mobile-tabs .tab-btn span { font-size: 0.82rem !important; }
+
+            /* Section headings */
+            .tab-content h2 { font-size: 1.12rem !important; }
+            .tab-content h3 { font-size: 1rem !important; }
+            .tab-content .text-xs { font-size: 0.78rem !important; }
+            .tab-content .text-\[11px\] { font-size: 0.75rem !important; }
+
+            /* Every interactive control gets a proper touch target */
+            button, a, select, input:not([type="hidden"]), textarea {
+                min-height: 48px !important;
+            }
+            select, input:not([type="hidden"]), textarea {
+                font-size: 1rem !important;
+                padding: 11px 13px !important;
+                border-radius: 14px !important;
+            }
+            button { font-size: 0.9rem; }
+
+            /* Modals: easier to read and operate with one hand */
+            .modal-content,
+            [id^="modal-"] > div {
+                max-width: calc(100vw - 20px) !important;
+                max-height: calc(100dvh - 24px) !important;
+                border-radius: 22px !important;
+            }
+            .modal-content { padding: 18px !important; }
+            .modal-content label { font-size: 0.9rem !important; }
+            .modal-content .text-xs { font-size: 0.78rem !important; }
+
+            /* Fleet/status tables: bigger text, comfortable row height */
+            table { min-width: 820px !important; font-size: 0.82rem !important; }
+            th, td { padding: 13px 11px !important; }
+            table button, table select { min-height: 44px !important; }
+
+            /* Cards / lists: avoid tiny action buttons */
+            .tab-content .rounded-3xl,
+            .tab-content .rounded-2xl { border-radius: 19px !important; }
+            .tab-content .p-3,
+            .tab-content .p-3\.5 { padding: 14px !important; }
+
+            /* Bottom navigation: large, obvious actions */
+            body > div.sm\:hidden.fixed.bottom-0 {
+                padding: 8px 7px calc(10px + env(safe-area-inset-bottom)) !important;
+            }
+            body > div.sm\:hidden.fixed.bottom-0 .grid { gap: 5px !important; }
+            .mobile-dock-btn,
+            body > div.sm\:hidden.fixed.bottom-0 button {
+                min-height: 64px !important;
+                padding: 8px 4px !important;
+                border-radius: 15px !important;
+                font-size: 0.72rem !important;
+            }
+            .mobile-dock-btn i,
+            body > div.sm\:hidden.fixed.bottom-0 button i { font-size: 1.15rem !important; }
+
+            /* Make search/filter bars stack clearly instead of becoming cramped */
+            .mobile-stack { flex-direction: column !important; align-items: stretch !important; }
+            .mobile-stack > * { width: 100% !important; }
+        }
+
+        @media (max-width: 380px) {
+            html { font-size: 16px !important; }
+            main { padding-left: 9px !important; padding-right: 9px !important; }
+            main > .grid > div { min-height: 118px !important; padding: 14px !important; }
+            .mobile-tabs .tab-btn { min-width: 104px !important; }
+            .mobile-dock-btn,
+            body > div.sm\:hidden.fixed.bottom-0 button { min-height: 60px !important; }
+        }
+
         @media print {
             body * { visibility: hidden !important; }
             #printable-ticket, #printable-ticket * {
@@ -250,18 +372,18 @@
                 <p class="text-[11px] sm:text-xs text-slate-400 mt-0.5">Di luar garasi</p>
             </div>
 
-            <div onclick="openStatDetail('drivers')" class="bg-dark-surface/90 p-3.5 sm:p-4 rounded-2xl border border-dark-border hover:border-indigo-500/60 shadow-lg shadow-black/20 hover:-translate-y-0.5 transition cursor-pointer group backdrop-blur-sm">
+            <div onclick="openStatDetail('ready')" class="bg-dark-surface/90 p-3.5 sm:p-4 rounded-2xl border border-dark-border hover:border-indigo-500/60 shadow-lg shadow-black/20 hover:-translate-y-0.5 transition cursor-pointer group backdrop-blur-sm">
                 <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold text-slate-400 group-hover:text-indigo-400 transition">Driver Bertugas</span>
+                    <span class="text-xs font-semibold text-slate-400 group-hover:text-indigo-400 transition">Kendaraan Ready Garasi</span>
                     <div class="w-8 h-8 rounded-lg bg-indigo-950/70 border border-indigo-800/50 text-indigo-400 flex items-center justify-center text-sm group-hover:bg-indigo-500 group-hover:text-black transition">
-                        <i class="fa-solid fa-id-badge"></i>
+                        <i class="fa-solid fa-square-parking"></i>
                     </div>
                 </div>
                 <div class="mt-2 flex items-baseline justify-between">
                     <h3 id="stat-active-drivers" class="text-xl sm:text-2xl font-black text-indigo-400 font-mono">0</h3>
                     <span class="text-[11px] text-indigo-400 font-bold opacity-80 group-hover:opacity-100 transition">Lihat &rarr;</span>
                 </div>
-                <p id="stat-drivers-sub" class="text-[11px] sm:text-xs text-slate-400 mt-0.5">Dari 0 driver</p>
+                <p id="stat-drivers-sub" class="text-[11px] sm:text-xs text-slate-400 mt-0.5">Operasional ON & tidak keluar</p>
             </div>
 
             <!-- Card 5: KARTU E-TOLL (MENCOLOK DENGAN GRADASI MERAH) -->
@@ -333,6 +455,19 @@
                     </div>
 
                     <div class="flex flex-wrap items-center gap-2">
+                        <div class="flex items-center gap-2 w-full lg:w-auto">
+                            <div class="relative flex-1 lg:w-64">
+                                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs pointer-events-none"></i>
+                                <input id="fleet-status-search" type="search" value="" oninput="handleFleetStatusSearch(this.value)"
+                                    placeholder="Cari plat, unit, model, driver..."
+                                    autocomplete="off"
+                                    class="w-full text-xs pl-8 pr-8 py-2 rounded-xl border border-dark-border bg-dark-card font-medium text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
+                                <button id="fleet-status-search-clear" type="button" onclick="handleFleetStatusSearch('')"
+                                    class="hidden absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 text-[10px]" title="Hapus pencarian">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        </div>
                         <div id="category-filter-pills" class="flex flex-wrap items-center gap-1.5 overflow-x-auto py-1"></div>
                         <select id="vehicle-sort-select" onchange="handleSortVehicles(this.value)" class="text-xs px-3 py-1.5 rounded-xl border border-dark-border bg-dark-card font-medium text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/40">
                             <option value="frequent" selected>Sort: Sering Dipakai</option>
@@ -458,12 +593,10 @@
                                 <th class="p-3">No. Unit</th>
                                 <th class="p-3">Plat Nomor</th>
                                 <th class="p-3">Model Kendaraan</th>
-                                <th class="p-3">Jenis</th>
                                 <th class="p-3">Kategori Mobil</th>
                                 <th class="p-3">Odometer</th>
                                 <th class="p-3">Status Operasional</th>
                                 <th class="p-3">Posisi</th>
-                                <th class="p-3 text-center admin-col hidden">Aksi</th>
                             </tr>
                         </thead>
                         <tbody id="fleet-table-body" class="divide-y divide-dark-border text-slate-300"></tbody>
@@ -807,7 +940,7 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block font-semibold text-slate-200 mb-1">Bank / Tipe</label>
-                        <select id="edit-etoll-bank" class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-100 focus:ring-2 focus:ring-indigo-500/40">
+                        <select id="edit-etoll-bank" disabled class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-400 opacity-80">
                             <option value="Mandiri">Mandiri</option>
                             <option value="BCA">BCA</option>
                             <option value="BRI">BRI</option>
@@ -822,7 +955,7 @@
                 </div>
                 <div>
                     <label class="block font-semibold text-slate-200 mb-1">Nomor Fisik Kartu</label>
-                    <input type="text" id="edit-etoll-cardno" class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-100 font-mono focus:ring-2 focus:ring-indigo-500/40">
+                    <input type="text" id="edit-etoll-cardno" readonly class="w-full px-3 py-2 rounded-xl border border-dark-border bg-slate-950/60 text-slate-400 font-mono">
                 </div>
                 <div class="pt-2 flex justify-end space-x-2">
                     <button type="button" onclick="closeModal('modal-edit-etoll'); openStatDetail('etoll');" class="px-4 py-2 rounded-xl border border-dark-border text-slate-300">Batal</button>
@@ -992,8 +1125,8 @@
                             <option value="MPV">MPV</option>
                             <option value="Sedan">Sedan</option>
                             <option value="Bus">Bus</option>
-                            <option value="HiAce / Minibus">HiAce / Minibus</option>
-                            <option value="Pick Up / Box">Pick Up / Box</option>
+                            <option value="Hiace">HiAce / Minibus</option>
+                            <option value="PickUP">Pick Up / Box</option>
                         </select>
                     </div>
                     <div>
@@ -1011,6 +1144,49 @@
                 <div class="pt-2 flex justify-end space-x-2">
                     <button type="button" onclick="closeModal('modal-add-vehicle')" class="px-4 py-2 rounded-xl border border-dark-border text-slate-300">Batal</button>
                     <button type="submit" class="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold">Simpan Armada</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL EDIT PENGATURAN DRIVER (ADMIN) -->
+    <div id="modal-edit-driver" class="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 hidden">
+        <div class="bg-dark-surface w-full max-w-md rounded-3xl shadow-2xl border border-dark-border overflow-hidden">
+            <div class="bg-indigo-600 px-5 sm:px-6 py-4 text-white flex items-center justify-between">
+                <div>
+                    <h3 class="font-extrabold text-base"><i class="fa-solid fa-user-pen mr-2"></i>Edit Pengaturan Driver</h3>
+                    <p class="text-[10px] text-white/80 mt-0.5">Nama driver tetap mengikuti Master Index 1.</p>
+                </div>
+                <button onclick="closeModal('modal-edit-driver')" class="text-white/80 hover:text-white text-xl font-bold"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-edit-driver" onsubmit="handleEditDriver(event)" class="p-5 sm:p-6 space-y-4 text-xs">
+                <input type="hidden" id="edit-driver-key">
+                <div>
+                    <label class="block font-semibold text-slate-200 mb-1">Nama Driver</label>
+                    <input type="text" id="edit-driver-name" readonly class="w-full px-3 py-2 rounded-xl border border-dark-border bg-slate-950/60 text-slate-300 font-semibold">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-200 mb-1">Kategori</label>
+                        <select id="edit-driver-category" class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-100">
+                            <option value="OPERATIONAL">Driver Operasional</option>
+                            <option value="EXECUTIVE">Driver Pimpinan</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-200 mb-1">Status</label>
+                        <select id="edit-driver-active" class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-100">
+                            <option value="ON">ON (Aktif)</option>
+                            <option value="OFF">OFF (Cuti/Izin)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="p-3 rounded-xl bg-cyan-950/30 border border-cyan-800/40 text-[11px] text-cyan-200">
+                    <i class="fa-solid fa-circle-info mr-1"></i> Pengaturan ini independen dari Index 1 dan disimpan di Firebase GarasiKu agar berlaku di semua perangkat.
+                </div>
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('modal-edit-driver')" class="px-4 py-2 rounded-xl border border-dark-border text-slate-300">Batal</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold">Simpan Pengaturan</button>
                 </div>
             </form>
         </div>
@@ -1355,7 +1531,7 @@
             <form id="form-firebase-config" onsubmit="saveFirebaseSettings(event)" class="p-5 sm:p-6 space-y-4 text-xs overflow-y-auto">
                 <div class="p-3 bg-dark-card rounded-xl border border-dark-border text-slate-300 space-y-1.5">
                     <span class="font-semibold text-emerald-400 block"><i class="fa-solid fa-circle-info mr-1"></i>Status Database:</span>
-                    <p id="firebase-current-status" class="text-slate-200">Mode Penyimpanan: Lokal (Offline Standalone)</p>
+                    <p id="firebase-current-status" class="text-slate-200">Mode Penyimpanan: Firebase Cloud</p>
                 </div>
                 <div>
                     <label class="block font-semibold text-slate-200 mb-1">Firebase Web Config (Format JSON)</label>
@@ -1398,6 +1574,11 @@
             messagingSenderId: "340693292191",
             appId: "1:340693292191:web:a7ee1efbea7e03021a3eaa"
         };
+
+        // State operasional E-Toll milik GarasiKu disimpan di Firestore.
+        // Master identitas kartu tetap berasal dari RekapToll (RTDB).
+        window.cloudEtollState = {};
+        window.cloudAppSettings = {};
 
         window.FirebaseBridge = {
             app: null,
@@ -1449,6 +1630,7 @@
                     this.lastSyncTime = new Date();
                     this.updateStatusUI(true, `Terhubung (${config.projectId})`);
                     this.startRealtimeSync();
+                    if (window.EtollMasterBridge && typeof window.EtollMasterBridge.sync === 'function') window.EtollMasterBridge.sync();
                     if (window.updateGlobalConnectionIndicator) window.updateGlobalConnectionIndicator();
                     return true;
                 } catch (error) {
@@ -1505,12 +1687,29 @@
                 if (!this.db) return false;
                 try {
                     const syncDoc = doc(this.db, 'garasiku_fleet', 'shared_state');
+                    const etollState = {};
+                    (window.etolls || []).forEach(card => {
+                        const key = String(card.sourceCardId || card.cardNo || card.id || '').trim();
+                        if (!key) return;
+                        etollState[key] = {
+                            active: card.active !== false,
+                            status: card.status === 'BORROWED' ? 'BORROWED' : 'AVAILABLE',
+                            holderName: card.status === 'BORROWED' ? (card.holderName || null) : null,
+                            balance: Number.isFinite(Number(card.balance)) ? Number(card.balance) : 0,
+                            nopol: String(card.nopol || ''),
+                            color: String(card.color || '')
+                        };
+                    });
                     await setDoc(syncDoc, {
-                        vehicles: window.vehicles || [],
-                        drivers: window.drivers || [],
-                        // etolls sengaja tidak disimpan di Firestore GarasiKu; master berasal dari RekapToll.
+                        schemaVersion: 3,
+                        // Master kendaraan/driver TIDAK disalin ke Firestore.
+                        // Identitas kendaraan + ODO + driver selalu berasal dari Index 1.
+                        vehicleSettings: collectVehicleSettings(),
+                        driverSettings: collectDriverSettings(),
                         etollLogs: window.etollLogs || [],
                         logs: window.logs || [],
+                        // Identitas kartu berasal dari RekapToll; field berikut hanya overlay operasional GarasiKu.
+                        etollState,
                         adminPin: window.adminPin || "1234",
                         telegramConfig: window.telegramConfig || {
                             botToken: '',
@@ -1518,6 +1717,11 @@
                             notifyCheckout: true,
                             notifyCheckin: true,
                             notifyEtoll: true
+                        },
+                        appSettings: {
+                            selectedCategoryFilter: typeof selectedCategoryFilter !== 'undefined' ? selectedCategoryFilter : 'Semua',
+                            selectedSortMode: typeof selectedSortMode !== 'undefined' ? selectedSortMode : 'frequent',
+                            fleetSearchTerm: typeof fleetSearchTerm !== 'undefined' ? fleetSearchTerm : ''
                         },
                         updatedAt: new Date().toISOString()
                     }, { merge: true });
@@ -1534,7 +1738,10 @@
             }
         };
 
-        window.addEventListener('DOMContentLoaded', () => window.FirebaseBridge.initialize(), { once: true });
+        window.addEventListener('DOMContentLoaded', () => {
+            window.FirebaseBridge.initialize();
+            if (window.Index1MasterBridge) window.Index1MasterBridge.start();
+        }, { once: true });
     </script>
 
     <!-- CORE LOGIC JAVASCRIPT -->
@@ -1597,6 +1804,147 @@
             { id: "ET-05", name: "Mandiri e-Money Cadangan #05", bank: "Mandiri", balance: 100000, cardNo: "6032-9812-4411-0005", status: "AVAILABLE", holderName: null, active: false }
         ];
 
+        // ============================================================
+        // MASTER INDEX 1: KENDARAAN + DRIVER
+        // Index 1 adalah sumber tunggal identitas kendaraan, ODO, dan
+        // nama driver. Firebase GarasiKu hanya menyimpan overlay setting.
+        // ============================================================
+        window.driverSettings = {};
+        window.vehicleSettings = {};
+
+        function normalizeDriverKey(name) {
+            return String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+        }
+        function normalizePlateKey(plate) {
+            return String(plate || '').trim().toUpperCase().replace(/\s+/g, '');
+        }
+        function canonicalVehicleCategory(value) {
+            const raw = String(value || '').trim().toLowerCase();
+            if (raw === 'mpv') return 'MPV';
+            if (raw === 'sedan') return 'Sedan';
+            if (raw === 'bus') return 'Bus';
+            if (raw.includes('hiace')) return 'Hiace';
+            if (raw.includes('pick up') || raw.includes('pickup') || raw.includes('pick-up') || raw.includes('box')) return 'PickUP';
+            return value ? String(value).trim() : 'MPV';
+        }
+        function applyDriverSettingsToMasterDrivers() {
+            const seen = new Map();
+            (window.vehicles || []).forEach(v => {
+                const name = String(v.driver || '').trim().replace(/\s+/g, ' ');
+                if (!name || /^undefined$/i.test(name) || /^null$/i.test(name)) return;
+                const key = normalizeDriverKey(name);
+                if (!seen.has(key)) seen.set(key, name);
+            });
+            window.drivers = Array.from(seen.entries()).map(([key, name], idx) => {
+                const setting = window.driverSettings?.[key] || {};
+                return {
+                    id: `IDX1-${btoa(unescape(encodeURIComponent(key))).replace(/[^a-z0-9]/gi,'').slice(0,18)}-${idx}`,
+                    masterKey: key,
+                    source: 'INDEX1',
+                    name,
+                    category: setting.category === 'EXECUTIVE' ? 'EXECUTIVE' : 'OPERATIONAL',
+                    active: setting.active !== false,
+                    status: 'AVAILABLE',
+                    sim: '',
+                    phone: ''
+                };
+            });
+        }
+        function applyVehicleSettingsToMaster() {
+            (window.vehicles || []).forEach(v => {
+                const key = normalizePlateKey(v.plate || v.id);
+                const setting = window.vehicleSettings?.[key] || {};
+                v.category = canonicalVehicleCategory(v.category);
+                v.odometer = Number(v.currentKm ?? v.odometer ?? 0) || 0;
+                v.active = setting.active !== false;
+                v.operational = setting.operational !== false;
+                v.usageCategory = setting.usageCategory === 'PIMPINAN' ? 'PIMPINAN' : (setting.usageCategory === 'OPERATIONAL' ? 'OPERATIONAL' : (v.usageCategory === 'PIMPINAN' ? 'PIMPINAN' : 'OPERATIONAL'));
+                v.status = v.status || 'IN_GARAGE';
+            });
+        }
+        function collectVehicleSettings() {
+            const out = {};
+            (window.vehicles || []).forEach(v => {
+                const key = normalizePlateKey(v.plate || v.id);
+                if (!key) return;
+                out[key] = {
+                    active: v.active !== false,
+                    operational: v.operational !== false,
+                    usageCategory: normalizeVehicleUsageCategory(v)
+                };
+            });
+            return out;
+        }
+        function collectDriverSettings() {
+            const out = {};
+            (window.drivers || []).forEach(d => {
+                const key = d.masterKey || normalizeDriverKey(d.name);
+                if (!key) return;
+                out[key] = {
+                    active: d.active !== false,
+                    category: d.category === 'EXECUTIVE' ? 'EXECUTIVE' : 'OPERATIONAL'
+                };
+            });
+            return out;
+        }
+
+        window.Index1MasterBridge = {
+            baseUrl: 'https://uns-fleet-management-default-rtdb.asia-southeast1.firebasedatabase.app',
+            path: 'artifacts/uns-fleet-service/public/data/vehicles',
+            timer: null,
+            syncing: false,
+            lastSuccess: null,
+            async sync() {
+                if (this.syncing) return;
+                this.syncing = true;
+                try {
+                    const res = await fetch(`${this.baseUrl}/${this.path}.json?ts=${Date.now()}`, {cache:'no-store'});
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const data = await res.json();
+                    const arr = data && typeof data === 'object' ? Object.entries(data).map(([key,val]) => ({...(val || {}), _fbKey:key})) : [];
+                    window.vehicles = arr.map((v, i) => ({
+                        ...v,
+                        id: v.id || v._fbKey || `IDX1-${i+1}`,
+                        plate: String(v.plate || v.id || v._fbKey || '').toUpperCase().trim(),
+                        model: String(v.model || 'Mobil Dinas').trim(),
+                        driver: String(v.driver || '').trim(),
+                        category: canonicalVehicleCategory(v.category),
+                        odometer: Number(v.currentKm ?? v.odometer ?? 0) || 0,
+                        currentKm: Number(v.currentKm ?? v.odometer ?? 0) || 0,
+                        status: v.status || 'IN_GARAGE'
+                    }));
+                    applyVehicleSettingsToMaster();
+                    applyDriverSettingsToMasterDrivers();
+                    this.lastSuccess = new Date();
+                    if (typeof renderAll === 'function') renderAll();
+                } catch (e) {
+                    console.warn('Sinkron Master Index 1 gagal:', e.message);
+                } finally {
+                    this.syncing = false;
+                }
+            },
+            async syncOdometersToIndex1() {
+                const list = Array.isArray(window.vehicles) ? window.vehicles : [];
+                await Promise.all(list.map(async v => {
+                    const key = v._fbKey || v.id || normalizePlateKey(v.plate);
+                    if (!key) return;
+                    const km = Number(v.odometer ?? v.currentKm ?? 0) || 0;
+                    const masterKm = Number(v.currentKm ?? 0) || 0;
+                    if (km === masterKm) return;
+                    try {
+                        await fetch(`${this.baseUrl}/${this.path}/${encodeURIComponent(key)}.json`, {
+                            method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({currentKm:km})
+                        });
+                    } catch (e) { console.warn('Gagal update ODO Index 1:', v.plate, e.message); }
+                }));
+            },
+            start() {
+                this.sync();
+                clearInterval(this.timer);
+                this.timer = setInterval(() => this.sync(), 5000);
+            }
+        };
+
         // Global State & Settings
         function loadLocalJson(key, fallback) {
             try {
@@ -1611,7 +1959,11 @@
         }
 
         window.vehicles = loadLocalJson('garasiku_vehicles', INITIAL_VEHICLES);
-        window.drivers = loadLocalJson('garasiku_drivers', INITIAL_DRIVERS);
+        window.driverSettings = loadLocalJson('garasiku_driver_settings', {});
+        window.vehicleSettings = loadLocalJson('garasiku_vehicle_settings', {});
+        window.drivers = [];
+        applyVehicleSettingsToMaster();
+        applyDriverSettingsToMasterDrivers();
         window.etolls = loadLocalJson('garasiku_etolls', INITIAL_ETOLL);
 
         // ============================================================
@@ -1649,6 +2001,7 @@
                     const previous = Array.isArray(window.etolls) ? window.etolls : [];
                     const bySourceId = new Map(previous.map(c => [String(c.sourceCardId || c.id || ''), c]));
                     const byNumber = new Map(previous.map(c => [this.normalizeNumber(c.cardNo), c]));
+                    const cloudState = window.cloudEtollState || {};
 
                     const masterCards = data
                         .filter(c => c && (c.number || c.id))
@@ -1656,7 +2009,9 @@
                             const sourceId = String(sourceCard.id || `source-${index + 1}`);
                             const cleanNumber = this.normalizeNumber(sourceCard.number);
                             const old = bySourceId.get(sourceId) || byNumber.get(cleanNumber) || {};
-                            const oldStatus = old.status === 'BORROWED' ? 'BORROWED' : 'AVAILABLE';
+                            const cloud = cloudState[sourceId] || cloudState[cleanNumber] || {};
+                            const merged = Object.assign({}, old, cloud);
+                            const oldStatus = merged.status === 'BORROWED' ? 'BORROWED' : 'AVAILABLE';
 
                             return {
                                 id: old.id || `ET-SRC-${sourceId}`,
@@ -1665,23 +2020,23 @@
                                 // Nama kartu di GarasiKu selalu mengikuti 4 digit terakhir nomor kartu.
                                 // Tidak lagi mengambil label/nama driver dari RekapToll.
                                 name: cleanNumber ? cleanNumber.slice(-4) : String(old.name || `Kartu E-Toll ${index + 1}`),
-                                nopol: String(sourceCard.nopol || old.nopol || ''),
-                                bank: String(sourceCard.bank || old.bank || 'Lainnya'),
-                                cardNo: String(sourceCard.number || old.cardNo || ''),
-                                // RekapToll tidak menyimpan saldo kartu pada master cards.
-                                // Saldo operasional GarasiKu dipertahankan selama kartu masih ada.
-                                balance: Number.isFinite(Number(old.balance)) ? Number(old.balance) : 0,
+                                nopol: String(sourceCard.nopol || merged.nopol || ''),
+                                bank: String(sourceCard.bank || merged.bank || 'Lainnya'),
+                                cardNo: String(sourceCard.number || merged.cardNo || ''),
+                                // Saldo/status/holder/ON-OFF adalah data operasional GarasiKu dan diambil dari Firebase.
+                                balance: Number.isFinite(Number(merged.balance)) ? Number(merged.balance) : 0,
                                 status: oldStatus,
-                                holderName: oldStatus === 'BORROWED' ? (old.holderName || null) : null,
-                                active: old.active !== false,
-                                color: sourceCard.color || old.color || ''
+                                holderName: oldStatus === 'BORROWED' ? (merged.holderName || null) : null,
+                                active: merged.active !== false,
+                                color: sourceCard.color || merged.color || ''
                             };
                         });
 
                     window.etolls = masterCards;
                     this.lastSuccess = new Date();
-                    localStorage.setItem('garasiku_etolls', JSON.stringify(window.etolls));
-
+                    try { localStorage.setItem('garasiku_etolls', JSON.stringify(window.etolls)); } catch (e) {}
+                    // Perubahan operasional kartu disimpan ke Firebase melalui saveToStorage().
+                    // Sinkronisasi master RekapToll tidak melakukan push periodik agar tidak membuat loop snapshot.
                     if (typeof renderAll === 'function') renderAll();
                     if (typeof openStatDetail === 'function' && activeStatType === 'etoll' && !document.getElementById('modal-stat-detail')?.classList.contains('hidden')) {
                         renderStatModalContent(document.getElementById('stat-modal-search')?.value?.toLowerCase().trim() || '');
@@ -1716,6 +2071,7 @@
         let pendingAdminCallback = null;
         let selectedCategoryFilter = "Semua";
         let selectedSortMode = "frequent";
+        let fleetSearchTerm = "";
         let activeStatType = "total";
         let driverInputMode = "registered";
         let swapMode = "off_swap";
@@ -1723,24 +2079,27 @@
         let localWriteAt = 0;
 
         function saveToStorage() {
+            // localStorage hanya cache/offline. Firebase adalah penyimpanan utama multi-device.
             try {
                 localStorage.setItem('garasiku_vehicles', JSON.stringify(window.vehicles));
-                localStorage.setItem('garasiku_drivers', JSON.stringify(window.drivers));
+                localStorage.setItem('garasiku_driver_settings', JSON.stringify(collectDriverSettings()));
+                localStorage.setItem('garasiku_vehicle_settings', JSON.stringify(collectVehicleSettings()));
                 localStorage.setItem('garasiku_etolls', JSON.stringify(window.etolls));
                 localStorage.setItem('garasiku_etoll_logs', JSON.stringify(window.etollLogs));
                 localStorage.setItem('garasiku_logs', JSON.stringify(window.logs));
                 localStorage.setItem('garasiku_admin_pin', window.adminPin);
                 localStorage.setItem('garasiku_telegram', JSON.stringify(window.telegramConfig));
             } catch (error) {
-                console.error('Gagal menyimpan data lokal:', error);
-                showToast('Penyimpanan Gagal', 'Data lokal tidak dapat disimpan. Periksa ruang penyimpanan browser.', 'error');
-                return;
+                console.warn('Cache lokal tidak dapat diperbarui:', error);
             }
             localWriteAt = Date.now();
             clearTimeout(cloudSaveTimer);
             cloudSaveTimer = setTimeout(() => {
                 if (window.FirebaseBridge && window.FirebaseBridge.pushStateToCloud) {
                     window.FirebaseBridge.pushStateToCloud();
+                }
+                if (window.Index1MasterBridge && window.Index1MasterBridge.syncOdometersToIndex1) {
+                    window.Index1MasterBridge.syncOdometersToIndex1();
                 }
             }, 200);
         }
@@ -1749,11 +2108,26 @@
             if (!cloudData) return;
             const cloudTime = cloudData.updatedAt ? Date.parse(cloudData.updatedAt) : 0;
             if (cloudTime && localWriteAt && cloudTime < localWriteAt) return;
-            if (cloudData.vehicles && Array.isArray(cloudData.vehicles)) window.vehicles = cloudData.vehicles;
-            if (cloudData.drivers && Array.isArray(cloudData.drivers)) window.drivers = cloudData.drivers;
-            // Master kartu E-Toll berasal dari aplikasi RekapToll (RTDB etoll-3366c), bukan Firestore GarasiKu.
+            if (cloudData.vehicleSettings && typeof cloudData.vehicleSettings === 'object') {
+                window.vehicleSettings = cloudData.vehicleSettings;
+                applyVehicleSettingsToMaster();
+            }
+            if (cloudData.driverSettings && typeof cloudData.driverSettings === 'object') {
+                window.driverSettings = cloudData.driverSettings;
+                applyDriverSettingsToMasterDrivers();
+            }
+            // Master identitas kartu tetap RekapToll; overlay operasional berasal dari Firebase GarasiKu.
+            if (cloudData.etollState && typeof cloudData.etollState === 'object') {
+                window.cloudEtollState = cloudData.etollState;
+            }
             if (cloudData.etollLogs && Array.isArray(cloudData.etollLogs)) window.etollLogs = cloudData.etollLogs;
             if (cloudData.logs && Array.isArray(cloudData.logs)) window.logs = cloudData.logs;
+            if (cloudData.appSettings && typeof cloudData.appSettings === 'object') {
+                window.cloudAppSettings = cloudData.appSettings;
+                if (typeof cloudData.appSettings.selectedCategoryFilter === 'string') selectedCategoryFilter = cloudData.appSettings.selectedCategoryFilter;
+                if (typeof cloudData.appSettings.selectedSortMode === 'string') selectedSortMode = cloudData.appSettings.selectedSortMode;
+                if (typeof cloudData.appSettings.fleetSearchTerm === 'string') fleetSearchTerm = cloudData.appSettings.fleetSearchTerm;
+            }
 
             // Sinkronkan kredensial/config global agar device baru langsung siap.
             if (typeof cloudData.adminPin === 'string' && cloudData.adminPin.trim()) {
@@ -1810,7 +2184,7 @@
 
                 if (detailNet) detailNet.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span><span class="text-rose-400 font-bold">Terputus</span>`;
                 if (detailDb) detailDb.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span><span class="text-amber-400 font-bold">Lokal Offline</span>`;
-                if (detailTip) detailTip.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1 text-amber-400"></i><span>Internet terputus. Data disimpan aman di perangkat ini dan akan tersinkron otomatis saat online kembali.</span>`;
+                if (detailTip) detailTip.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1 text-amber-400"></i><span>Internet terputus. Cache lokal digunakan sementara dan akan disinkronkan ke Firebase saat online kembali.</span>`;
             } else if (isCloudConnected) {
                 if (dot) dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse ring-2 ring-emerald-400/40";
                 if (icon) icon.className = "fa-solid fa-cloud text-emerald-400 text-xs";
@@ -1858,7 +2232,7 @@
                     } else if (!navigator.onLine) {
                         showToast("Offline", "Koneksi internet tidak terdeteksi.", "error");
                     } else {
-                        showToast("Mode Lokal", "Database cloud belum tersambung.", "warning");
+                        showToast("Mode Lokal", "Firebase Cloud belum tersambung.", "warning");
                     }
                 });
             } else {
@@ -1956,10 +2330,10 @@
                 if (btnChangePin) btnChangePin.classList.remove('hidden');
                 if (btnCloud) btnCloud.classList.remove('hidden');
                 if (btnTg) btnTg.classList.remove('hidden');
-                if (btnAddVeh) btnAddVeh.classList.remove('hidden');
-                if (btnAddDrv) btnAddDrv.classList.remove('hidden');
+                if (btnAddVeh) btnAddVeh.classList.add('hidden');
+                if (btnAddDrv) btnAddDrv.classList.add('hidden');
                 if (btnCloudModal) btnCloudModal.classList.remove('hidden');
-                if (btnStatAddEtoll) btnStatAddEtoll.classList.remove('hidden');
+                if (btnStatAddEtoll) btnStatAddEtoll.classList.add('hidden');
                 document.querySelectorAll('.admin-col').forEach(el => el.classList.remove('hidden'));
             } else {
                 if (badgeIcon) badgeIcon.className = "fa-solid fa-user-shield text-slate-400 text-xs";
@@ -2085,6 +2459,13 @@
         }
 
         // Stats Counter
+        function isVehicleReadyGarage(v) {
+            if (!v || v.active === false || v.operational === false) return false;
+            if (normalizeVehicleUsageCategory(v) !== 'OPERATIONAL') return false;
+            if (v.status !== 'IN_GARAGE') return false;
+            return !window.logs.some(l => l && l.status === 'ACTIVE' && (l.vehicleId === v.id || String(l.plate || '').trim().toUpperCase() === String(v.plate || '').trim().toUpperCase()));
+        }
+
         function updateDashboardStats() {
             const activeLogs = window.logs.filter(l => l && l.status === 'ACTIVE');
 
@@ -2105,17 +2486,9 @@
 
             const activeVehicles = window.vehicles.filter(v => v.active !== false);
             const totalVehicles = window.vehicles.length;
-            const inGarage = window.vehicles.filter(v =>
-                v.status === 'IN_GARAGE' &&
-                v.operational !== false &&
-                v.active !== false &&
-                normalizeVehicleUsageCategory(v) === 'OPERATIONAL' &&
-                !activeVehicleKeys.has(`id:${v.id}`) &&
-                !activeVehicleKeys.has(`plate:${String(v.plate || '').trim().toUpperCase()}`)
-            ).length;
+            const inGarage = window.vehicles.filter(isVehicleReadyGarage).length;
             const onTrip = activeVehicleKeys.size;
-            const activeDrivers = activeDriverKeys.size;
-            const activeDriverMaster = window.drivers.filter(d => d.active !== false).length;
+            const readyGarage = inGarage;
 
             const totalEtoll = window.etolls.length;
             const readyEtoll = window.etolls.filter(e => e.status === 'AVAILABLE' && e.active !== false).length;
@@ -2124,8 +2497,8 @@
             document.getElementById('stat-total-vehicles').innerText = `${activeVehicles.length} / ${totalVehicles}`;
             document.getElementById('stat-in-garage').innerText = inGarage;
             document.getElementById('stat-on-trip').innerText = onTrip;
-            document.getElementById('stat-active-drivers').innerText = activeDrivers;
-            document.getElementById('stat-drivers-sub').innerText = `Dari ${activeDriverMaster} Driver ON`;
+            document.getElementById('stat-active-drivers').innerText = readyGarage;
+            document.getElementById('stat-drivers-sub').innerText = 'Operasional ON & tidak keluar';
 
             document.getElementById('stat-etoll-ratio').innerText = `${readyEtoll} / ${totalEtoll}`;
             document.getElementById('stat-etoll-sub').innerText = `Total: Rp ${totalBalance.toLocaleString('id-ID')}`;
@@ -2144,10 +2517,11 @@
             if (!container) return;
             container.innerHTML = '';
 
-            const categories = ["Semua", "MPV", "Sedan", "Bus", "HiAce / Minibus", "Pick Up / Box"];
+            const categories = ["Semua", "MPV", "Sedan", "Bus", "Hiace", "PickUP"];
+            const visibleVehicles = window.vehicles.filter(v => v.active !== false);
 
             categories.forEach(cat => {
-                const count = cat === "Semua" ? window.vehicles.length : window.vehicles.filter(v => v.category === cat).length;
+                const count = cat === "Semua" ? visibleVehicles.length : visibleVehicles.filter(v => String(v.category || '').trim().toLowerCase() === cat.toLowerCase()).length;
                 if (count === 0 && cat !== "Semua") return;
 
                 const isActive = selectedCategoryFilter === cat;
@@ -2168,9 +2542,21 @@
             });
         }
 
+        function handleFleetStatusSearch(value) {
+            fleetSearchTerm = String(value || '').trim();
+            const input = document.getElementById('fleet-status-search');
+            const clear = document.getElementById('fleet-status-search-clear');
+            if (input && input.value !== fleetSearchTerm) input.value = fleetSearchTerm;
+            if (clear) clear.classList.toggle('hidden', !fleetSearchTerm);
+            renderMonitoringBay();
+            // Simpan preferensi pencarian ke Firebase agar antar perangkat mengikuti setting terakhir.
+            saveToStorage();
+        }
+
         function handleSortVehicles(val) {
             selectedSortMode = val;
             renderMonitoringBay();
+            saveToStorage();
         }
 
         function normalizeVehicleUsageCategory(v) {
@@ -2189,6 +2575,10 @@
 
             const grid = document.getElementById('monitoring-vehicles-grid');
             if (!grid) return;
+            const searchInput = document.getElementById('fleet-status-search');
+            const searchClear = document.getElementById('fleet-status-search-clear');
+            if (searchInput && searchInput.value !== fleetSearchTerm) searchInput.value = fleetSearchTerm;
+            if (searchClear) searchClear.classList.toggle('hidden', !fleetSearchTerm);
             grid.innerHTML = '';
 
             // Armada yang sedang ACTIVE/ON_TRIP ditampilkan khusus di panel
@@ -2204,13 +2594,27 @@
                     .map(l => String(l.plate).trim().toUpperCase())
             );
 
+            // Status Seluruh Armada hanya menampilkan kendaraan ON/aktif.
+            // Kendaraan OFF tetap tersimpan di master, tetapi disembunyikan dari monitoring.
             let list = [...window.vehicles].filter(v =>
+                v.active !== false &&
                 !activeVehicleIds.has(v.id) &&
                 !activeVehiclePlates.has(String(v.plate || '').trim().toUpperCase())
             );
 
             if (selectedCategoryFilter !== "Semua") {
-                list = list.filter(v => v.category === selectedCategoryFilter);
+                list = list.filter(v => String(v.category || '').trim().toLowerCase() === selectedCategoryFilter.toLowerCase());
+            }
+
+            if (fleetSearchTerm) {
+                const q = fleetSearchTerm.toLowerCase();
+                list = list.filter(v => {
+                    const haystack = [
+                        v.unitNo, v.plate, v.model, v.driver, v.category,
+                        vehicleUsageLabel(v), v.status, v.odometer
+                    ].map(x => String(x ?? '')).join(' ').toLowerCase();
+                    return haystack.includes(q);
+                });
             }
 
             if (selectedSortMode === 'frequent') {
@@ -2237,6 +2641,16 @@
                 list.sort((a, b) => (a.odometer || 0) - (b.odometer || 0));
             } else if (selectedSortMode === 'km-desc') {
                 list.sort((a, b) => (b.odometer || 0) - (a.odometer || 0));
+            }
+
+            if (list.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full p-6 rounded-2xl border border-dashed border-dark-border bg-dark-card/50 text-center">
+                        <i class="fa-solid fa-car-side text-2xl text-slate-600"></i>
+                        <p class="mt-2 text-sm font-semibold text-slate-300">Tidak ada kendaraan yang sesuai</p>
+                        <p class="text-xs text-slate-500 mt-1">Kendaraan OFF memang disembunyikan dari Status Seluruh Armada.</p>
+                    </div>`;
+                return;
             }
 
             list.forEach(v => {
@@ -2363,9 +2777,12 @@
             vehSelect.innerHTML = '<option value="">-- Pilih Kendaraan Tersedia --</option>' +
                 readyVehicles.map(v => `<option value="${v.id}">[No. ${v.unitNo || '-'}] ${v.plate} - ${v.model} (${v.category || 'Armada'})</option>`).join('');
 
-            const readyDrivers = window.drivers.filter(d => d.active !== false);
+            const readyDrivers = window.drivers.filter(d => d.active !== false).sort((a,b) => {
+                const ca = a.category === 'EXECUTIVE' ? 1 : 0, cb = b.category === 'EXECUTIVE' ? 1 : 0;
+                return ca - cb || a.name.localeCompare(b.name, 'id');
+            });
             drvSelect.innerHTML = '<option value="">-- Pilih Driver Dari Master --</option>' +
-                readyDrivers.map(d => `<option value="${d.id}">${d.name} (${d.sim}) - ${d.category === 'EXECUTIVE' ? 'Pimpinan' : 'Operasional'}</option>`).join('');
+                readyDrivers.map(d => `<option value="${d.id}">${d.name} - ${d.category === 'EXECUTIVE' ? 'Pimpinan' : 'Operasional'}</option>`).join('');
 
             document.getElementById('checkout-km-start').value = '';
             document.getElementById('checkout-destination').value = '';
@@ -2904,7 +3321,6 @@
                     <td class="p-3 font-mono font-bold text-cyan-400">#${v.unitNo || '-'}</td>
                     <td class="p-3 font-mono font-bold text-white">${v.plate}</td>
                     <td class="p-3 font-semibold text-slate-200">${v.model}</td>
-                    <td class="p-3"><span class="px-2 py-0.5 rounded-md bg-dark-card border border-dark-border text-cyan-300 text-[10px] font-semibold">${v.category || 'Armada'}</span></td>
                     <td class="p-3">
                         ${isAdminLoggedIn ? `
                             <select onchange="changeVehicleUsageCategory('${v.id}', this.value)" class="px-2 py-1 rounded-lg bg-dark-card border border-dark-border text-[10px] font-semibold ${normalizeVehicleUsageCategory(v) === 'PIMPINAN' ? 'text-violet-300' : 'text-emerald-300'}">
@@ -2938,14 +3354,22 @@
                             `<span class="px-2 py-0.5 rounded-md bg-dark-card border border-dark-border text-slate-300 text-[10px]">Di Garasi</span>` :
                             `<span class="px-2 py-0.5 rounded-md bg-amber-950 border border-amber-700 text-amber-300 text-[10px]">Keluar</span>`}
                     </td>
-                    <td class="p-3 text-center space-x-1 admin-col ${isAdminLoggedIn ? '' : 'hidden'}">
-                        <button onclick="requireAdminAction(() => deleteVehicle('${v.id}'))" class="w-7 h-7 rounded-lg border border-dark-border text-slate-400 hover:text-rose-400 hover:bg-rose-950 inline-flex items-center justify-center">
-                            <i class="fa-solid fa-trash text-xs"></i>
-                        </button>
-                    </td>
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        function persistVehicleOverlay(v, patch = {}) {
+            if (!v) return;
+            const key = normalizePlateKey(v.plate || v.id);
+            if (!key) return;
+            const current = window.vehicleSettings?.[key] || {};
+            window.vehicleSettings[key] = {
+                active: patch.active !== undefined ? patch.active !== false : (current.active !== false),
+                operational: patch.operational !== undefined ? patch.operational !== false : (current.operational !== false),
+                usageCategory: patch.usageCategory === 'PIMPINAN' ? 'PIMPINAN' : (patch.usageCategory === 'OPERATIONAL' ? 'OPERATIONAL' : (current.usageCategory === 'PIMPINAN' ? 'PIMPINAN' : 'OPERATIONAL'))
+            };
+            applyVehicleSettingsToMaster();
         }
 
         function toggleVehicleActive(id) {
@@ -2956,7 +3380,8 @@
                 return;
             }
             requireAdminAction(() => {
-                v.active = v.active === false ? true : false;
+                const next = v.active === false;
+                persistVehicleOverlay(v, { active: next });
                 saveToStorage();
                 renderAll();
                 showToast("Status Diperbarui", `${v.plate} berstatus ${v.active ? 'ON (Aktif)' : 'OFF (Nonaktif)'}.`, "info");
@@ -2967,7 +3392,8 @@
             const v = window.vehicles.find(item => item.id === id);
             if (!v) return;
             requireAdminAction(() => {
-                v.operational = v.operational === false ? true : false;
+                const next = v.operational === false;
+                persistVehicleOverlay(v, { operational: next });
                 saveToStorage();
                 renderAll();
                 showToast("Kondisi Diperbarui", `${v.plate} kini: ${v.operational ? 'Siap Jalan' : 'Dalam Perbaikan'}.`, "info");
@@ -2978,7 +3404,8 @@
             const v = window.vehicles.find(item => item.id === id);
             if (!v) return;
             requireAdminAction(() => {
-                v.usageCategory = value === 'PIMPINAN' ? 'PIMPINAN' : 'OPERATIONAL';
+                const category = value === 'PIMPINAN' ? 'PIMPINAN' : 'OPERATIONAL';
+                persistVehicleOverlay(v, { usageCategory: category });
                 saveToStorage();
                 renderAll();
                 showToast('Kategori Mobil Diperbarui', `${v.plate} sekarang kategori ${vehicleUsageLabel(v)}.`, 'success');
@@ -2986,59 +3413,13 @@
         }
 
         function handleAddVehicle(event) {
-            event.preventDefault();
-            const unitNo = parseInt(document.getElementById('veh-unitno').value) || null;
-            const plate = document.getElementById('veh-plate').value.trim().toUpperCase();
-            const model = document.getElementById('veh-model').value.trim();
-            const category = document.getElementById('veh-category').value;
-            const usageCategory = document.getElementById('veh-usage-category')?.value || 'OPERATIONAL';
-            const odometer = parseInt(document.getElementById('veh-odometer').value) || 0;
-
-            if (!unitNo || !plate || !model) {
-                showToast('Data Belum Lengkap', 'Nomor unit, plat, dan model kendaraan wajib diisi.', 'warning');
-                return;
-            }
-            if (window.vehicles.some(v => v.plate === plate)) {
-                showToast("Plat Duplikat", "Plat nomor armada sudah terdaftar.", "error");
-                return;
-            }
-            if (window.vehicles.some(v => Number(v.unitNo) === Number(unitNo))) {
-                showToast("Nomor Unit Duplikat", `Nomor unit ${unitNo} sudah terdaftar.`, "error");
-                return;
-            }
-
-            const newVeh = {
-                id: `V-${Date.now()}`,
-                unitNo,
-                plate,
-                model,
-                category,
-                usageCategory,
-                odometer,
-                status: 'IN_GARAGE',
-                operational: true,
-                active: true
-            };
-
-            window.vehicles.push(newVeh);
-            saveToStorage();
+            if (event) event.preventDefault();
             closeModal('modal-add-vehicle');
-            document.getElementById('form-add-vehicle').reset();
-            renderAll();
-            showToast("Armada Ditambahkan", `${plate} (${model}) berhasil disimpan.`, "success");
+            showToast('Master Armada Index 1', 'Tambah kendaraan dilakukan di Index 1. GarasiKu hanya mengelola pengaturan operasional.', 'info');
         }
 
         function deleteVehicle(id) {
-            const v = window.vehicles.find(item => item.id === id);
-            if (!v) return;
-            if (v.status === 'ON_TRIP') {
-                showToast("Gagal Menghapus", "Armada sedang digunakan di luar.", "error");
-                return;
-            }
-            window.vehicles = window.vehicles.filter(item => item.id !== id);
-            saveToStorage();
-            renderAll();
-            showToast("Armada Dihapus", `${v.plate} telah dihapus.`, "info");
+            showToast('Master Armada Index 1', 'Hapus kendaraan dilakukan di Index 1. GarasiKu tidak menghapus master armada.', 'info');
         }
 
         // Driver Master Cards
@@ -3072,7 +3453,7 @@
                     <div>
                         <div class="flex items-center justify-between">
                             <h4 class="font-bold text-sm text-white">${d.name}</h4>
-                            <span class="px-2 py-0.5 rounded-md bg-indigo-950 border border-indigo-800/60 text-indigo-300 text-[10px] font-bold">${d.sim}</span>
+                            <span class="px-2 py-0.5 rounded-md bg-slate-950 border border-slate-800 text-slate-400 text-[10px] font-bold"><i class="fa-solid fa-database mr-1"></i>Index 1</span>
                         </div>
                         <div class="mt-1 flex items-center space-x-1.5">
                             <span class="px-2 py-0.5 rounded-md text-[10px] font-bold ${isExecutive ? 'bg-purple-950 text-purple-300 border border-purple-800/60' : 'bg-cyan-950 text-cyan-300 border border-cyan-800/60'}">
@@ -3080,7 +3461,7 @@
                                 ${isExecutive ? 'Driver Pimpinan' : 'Driver Operasional'}
                             </span>
                         </div>
-                        <p class="text-xs text-slate-400 mt-2"><i class="fa-solid fa-phone mr-1.5 text-slate-500"></i>${d.phone || '-'}</p>
+                        <p class="text-xs text-slate-400 mt-2"><i class="fa-solid fa-link mr-1.5 text-slate-500"></i>Nama mengikuti data kendaraan Index 1</p>
                         <div class="mt-2.5">
                             ${activeTrip ? `
                                 <div class="p-2 rounded-xl bg-amber-950/40 border border-amber-800/40 text-amber-300 text-[11px] font-semibold">
@@ -3106,8 +3487,8 @@
                         </div>
                     </div>
                     <div class="mt-4 pt-2.5 border-t border-dark-border flex items-center justify-end space-x-2 admin-col ${isAdminLoggedIn ? '' : 'hidden'}">
-                        <button onclick="requireAdminAction(() => deleteDriver('${d.id}'))" class="w-7 h-7 rounded-lg border border-dark-border text-slate-400 hover:text-rose-400 hover:bg-rose-950 inline-flex items-center justify-center">
-                            <i class="fa-solid fa-trash text-xs"></i>
+                        <button onclick="openEditDriverModal('${d.id}')" class="px-3 py-1.5 rounded-lg border border-indigo-800/60 bg-indigo-950/40 text-indigo-300 hover:bg-indigo-900/50 text-[10px] font-bold inline-flex items-center gap-1.5">
+                            <i class="fa-solid fa-pen"></i>Edit Pengaturan
                         </button>
                     </div>
                 `;
@@ -3132,45 +3513,41 @@
         }
 
         function handleAddDriver(event) {
-            event.preventDefault();
-            const name = document.getElementById('drv-name').value.trim();
-            const category = document.getElementById('drv-category').value;
-            const sim = document.getElementById('drv-sim').value;
-            const phone = document.getElementById('drv-phone').value.trim();
-            if (!name) {
-                showToast('Nama Wajib', 'Nama driver harus diisi.', 'warning');
-                return;
-            }
-            if (window.drivers.some(d => String(d.name).trim().toLowerCase() === name.toLowerCase())) {
-                showToast('Driver Duplikat', `${name} sudah terdaftar.`, 'warning');
-                return;
-            }
-
-            const newDrv = {
-                id: `D-${Date.now()}`,
-                name,
-                category: category || "OPERATIONAL",
-                sim,
-                phone,
-                status: 'AVAILABLE',
-                active: true
-            };
-
-            window.drivers.push(newDrv);
-            saveToStorage();
+            if (event) event.preventDefault();
             closeModal('modal-add-driver');
-            document.getElementById('form-add-driver').reset();
-            renderAll();
-            showToast("Driver Ditambahkan", `${name} berhasil didaftarkan.`, "success");
+            showToast('Master Driver Index 1', 'Tambah driver dilakukan di Index 1 melalui data pengemudi kendaraan.', 'info');
         }
 
         function deleteDriver(id) {
+            showToast('Master Driver Index 1', 'Hapus driver dilakukan di Index 1. Pengaturan ON/OFF dan kategori saja yang dikelola di sini.', 'info');
+        }
+
+        function openEditDriverModal(id) {
+            if (!isAdminLoggedIn) { openAdminAuthModal(() => openEditDriverModal(id)); return; }
             const d = window.drivers.find(item => item.id === id);
             if (!d) return;
-            window.drivers = window.drivers.filter(item => item.id !== id);
+            document.getElementById('edit-driver-key').value = d.masterKey || normalizeDriverKey(d.name);
+            document.getElementById('edit-driver-name').value = d.name;
+            document.getElementById('edit-driver-category').value = d.category === 'EXECUTIVE' ? 'EXECUTIVE' : 'OPERATIONAL';
+            document.getElementById('edit-driver-active').value = d.active === false ? 'OFF' : 'ON';
+            openModal('modal-edit-driver');
+        }
+
+        function handleEditDriver(event) {
+            event.preventDefault();
+            if (!isAdminLoggedIn) return;
+            const key = document.getElementById('edit-driver-key').value;
+            const d = window.drivers.find(item => (item.masterKey || normalizeDriverKey(item.name)) === key);
+            if (!d) return;
+            window.driverSettings[key] = {
+                active: document.getElementById('edit-driver-active').value === 'ON',
+                category: document.getElementById('edit-driver-category').value === 'EXECUTIVE' ? 'EXECUTIVE' : 'OPERATIONAL'
+            };
+            applyDriverSettingsToMasterDrivers();
             saveToStorage();
+            closeModal('modal-edit-driver');
             renderAll();
-            showToast("Driver Dihapus", `${d.name} telah dihapus.`, "info");
+            showToast('Pengaturan Driver Disimpan', `${d.name} diperbarui dan tersimpan di Firebase.`, 'success');
         }
 
         // ==========================================
@@ -3216,9 +3593,7 @@
         function handleEditEtoll(event) {
             event.preventDefault();
             const id = document.getElementById('edit-etoll-id').value;
-            const bank = document.getElementById('edit-etoll-bank').value;
             const balance = parseInt(document.getElementById('edit-etoll-balance').value) || 0;
-            const cardNo = document.getElementById('edit-etoll-cardno').value.trim();
 
             const card = window.etolls.find(e => e.id === id);
             if (card) {
@@ -3227,11 +3602,9 @@
                     return;
                 }
                 // Nama kartu tidak diedit manual; selalu mengikuti 4 digit terakhir nomor kartu.
-                const normalizedCardNo = String(cardNo || '').replace(/\D/g, '');
+                const normalizedCardNo = String(card.cardNo || '').replace(/\D/g, '');
                 card.name = normalizedCardNo.length >= 4 ? normalizedCardNo.slice(-4) : (card.name || '');
-                card.bank = bank;
                 card.balance = balance;
-                card.cardNo = cardNo;
 
                 saveToStorage();
                 closeModal('modal-edit-etoll');
@@ -3275,7 +3648,8 @@
             const selectEl = document.getElementById('borrow-driver-select');
             selectEl.innerHTML = '<option value="">-- Pilih Driver Master --</option>' +
                 window.drivers.filter(d => d.active !== false && !findEtollHeldByDriver(d.name))
-                    .map(d => `<option value="${d.name}">${d.name} (${d.sim})</option>`).join('');
+                    .sort((a,b) => (a.category === 'EXECUTIVE' ? 1 : 0) - (b.category === 'EXECUTIVE' ? 1 : 0) || a.name.localeCompare(b.name, 'id'))
+                    .map(d => `<option value="${d.name}">${d.name} - ${d.category === 'EXECUTIVE' ? 'Pimpinan' : 'Operasional'}</option>`).join('');
 
             openModal('modal-borrow-etoll');
         }
@@ -3420,7 +3794,8 @@
             const drvSelect = document.getElementById('swap-select-new-driver');
             drvSelect.innerHTML = '<option value="">-- Pilih Driver Baru --</option>' +
                 window.drivers.filter(d => d.active !== false && d.name !== card.holderName && !findEtollHeldByDriver(d.name, card.id))
-                    .map(d => `<option value="${d.name}">${d.name} (${d.sim})</option>`).join('');
+                    .sort((a,b) => (a.category === 'EXECUTIVE' ? 1 : 0) - (b.category === 'EXECUTIVE' ? 1 : 0) || a.name.localeCompare(b.name, 'id'))
+                    .map(d => `<option value="${d.name}">${d.name} - ${d.category === 'EXECUTIVE' ? 'Pimpinan' : 'Operasional'}</option>`).join('');
 
             const cardSelect = document.getElementById('swap-select-new-card');
             const poolCards = window.etolls.filter(e => e.status === 'AVAILABLE' && e.active !== false && e.id !== card.id);
@@ -3898,7 +4273,7 @@
             if (type === 'total') title.innerText = "Daftar Seluruh Armada";
             else if (type === 'garage') title.innerText = "Armada Siap di Garasi";
             else if (type === 'out') title.innerText = "Armada Sedang di Luar";
-            else if (type === 'drivers') title.innerText = "Status Pengemudi";
+            else if (type === 'ready') title.innerText = "Kendaraan Ready Garasi";
             else if (type === 'etoll') title.innerText = "Inventaris Kartu E-Toll";
 
             renderStatModalContent('');
@@ -3917,14 +4292,9 @@
 
             let count = 0;
             if (activeStatType === 'total' || activeStatType === 'garage') {
-                let list = window.vehicles;
-                if (activeStatType === 'garage') list = list.filter(v =>
-                    v.status === 'IN_GARAGE' &&
-                    v.operational !== false &&
-                    v.active !== false &&
-                    normalizeVehicleUsageCategory(v) === 'OPERATIONAL' &&
-                    !window.logs.some(l => l && l.status === 'ACTIVE' && (l.vehicleId === v.id || String(l.plate || '').trim().toUpperCase() === String(v.plate || '').trim().toUpperCase()))
-                );
+                let list = window.vehicles.filter(v => v.active !== false);
+                if (activeStatType === 'garage') list = list.filter(isVehicleReadyGarage);
+                if (activeStatType === 'ready') list = list.filter(isVehicleReadyGarage);
                 if (filterText) list = list.filter(v => v.plate.toLowerCase().includes(filterText) || v.model.toLowerCase().includes(filterText));
                 count = list.length;
 
@@ -3943,48 +4313,30 @@
                     `;
                     body.appendChild(card);
                 });
-            } else if (activeStatType === 'drivers') {
-                // “Driver Bertugas” = driver yang benar-benar memiliki log ACTIVE.
-                // Jangan tampilkan seluruh master driver karena itu membuat angka
-                // dan isi kotak terlihat tidak sesuai.
-                const seenDrivers = new Set();
-                const busyDrivers = [];
-                window.logs.filter(l => l && l.status === 'ACTIVE').forEach(log => {
-                    const key = log.driverId ? `id:${log.driverId}` : `name:${String(log.driverName || '').trim().toLowerCase()}`;
-                    if (!key || key === 'name:' || seenDrivers.has(key)) return;
-                    seenDrivers.add(key);
-                    const master = log.driverId ? window.drivers.find(d => d.id === log.driverId) :
-                        window.drivers.find(d => String(d.name || '').trim().toLowerCase() === String(log.driverName || '').trim().toLowerCase());
-                    busyDrivers.push({ log, driver: master });
-                });
-
-                let list = busyDrivers;
+            } else if (activeStatType === 'ready') {
+                let list = window.vehicles.filter(isVehicleReadyGarage);
                 if (filterText) {
-                    list = list.filter(item => {
-                        const d = item.driver || {};
-                        const l = item.log || {};
-                        return String(d.name || l.driverName || '').toLowerCase().includes(filterText) ||
-                               String(l.plate || '').toLowerCase().includes(filterText) ||
-                               String(l.destination || '').toLowerCase().includes(filterText);
-                    });
+                    list = list.filter(v => [v.plate, v.model, v.driver, v.category, v.unitNo]
+                        .some(x => String(x || '').toLowerCase().includes(filterText)));
                 }
                 count = list.length;
-
-                list.forEach(({log, driver}) => {
-                    const d = driver || {};
-                    const isExecutive = d.category === 'EXECUTIVE' || log.driverDept === 'Driver Pimpinan';
+                list.sort((a,b) => (Number(a.unitNo) || 999) - (Number(b.unitNo) || 999));
+                list.forEach(v => {
                     const card = document.createElement('div');
                     card.className = "p-3 bg-dark-card rounded-2xl border border-indigo-800/40 flex items-center justify-between gap-3";
                     card.innerHTML = `
                         <div class="min-w-0">
-                            <div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
-                                <strong class="text-white">${d.name || log.driverName || '-'}</strong>
-                                <span class="px-1.5 py-0.2 rounded text-[9px] font-bold ${isExecutive ? 'bg-purple-950 text-purple-300 border border-purple-800/60' : 'bg-cyan-950 text-cyan-300 border border-cyan-800/60'}">${isExecutive ? 'Pimpinan' : 'Operasional'}</span>
-                                <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-950 text-amber-300 border border-amber-800/60">BERTUGAS</span>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <strong class="font-mono text-white">${v.plate || '-'}</strong>
+                                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800/60">READY</span>
+                                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-800/60">${canonicalVehicleCategory(v.category)}</span>
                             </div>
-                            <p class="text-[11px] text-slate-400 mt-0.5">${log.plate || '-'} · ${log.destination || 'Tujuan belum diisi'}</p>
-                            <p class="text-[10px] text-slate-500">Keluar ${formatTimeOnly(log.timeOut)} · ${log.purpose || '-'}</p>
+                            <p class="text-xs text-slate-300 mt-0.5">${v.model || 'Armada'} · Driver: ${v.driver || '-'}</p>
+                            <p class="text-[11px] text-slate-400 font-mono">KM: ${(Number(v.odometer) || 0).toLocaleString('id-ID')} · ${vehicleUsageLabel(v)}</p>
                         </div>
+                        <button onclick="openQuickCheckout('${v.id}')" class="shrink-0 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs">
+                            Tugaskan
+                        </button>
                     `;
                     body.appendChild(card);
                 });
@@ -4310,10 +4662,10 @@
                 window.FirebaseBridge.app = null;
                 window.FirebaseBridge.configProjectId = null;
                 window.FirebaseBridge.currentUser = null;
-                window.FirebaseBridge.updateStatusUI(false, "Mode Penyimpanan: Lokal (Offline Standalone)");
+                window.FirebaseBridge.updateStatusUI(false, "Mode Penyimpanan: Firebase Cloud");
             }
             closeModal('modal-firebase-config');
-            showToast("Mode Lokal Aktif", "Data kini tersimpan secara offline di browser ini.", "info");
+            showToast("Cloud Diputus", "Firebase diputus. Cache lokal hanya digunakan sementara; sambungkan kembali untuk sinkronisasi multi-device.", "warning");
         }
 
         function saveFirebaseSettings(event) {
