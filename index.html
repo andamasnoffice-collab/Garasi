@@ -733,10 +733,10 @@
                         <i class="fa-solid fa-receipt"></i>
                         <span>Rekap Mutasi</span>
                     </button>
-                    <button id="btn-stat-add-etoll" onclick="requireAdminAction(() => { closeModal('modal-stat-detail'); openModal('modal-add-etoll'); })" class="hidden px-3 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold items-center space-x-1 shadow-sm">
-                        <i class="fa-solid fa-plus"></i>
-                        <span>+ Tambah</span>
-                    </button>
+                    <span id="etoll-master-source-badge" class="hidden px-3 py-1.5 rounded-xl bg-rose-950/70 border border-rose-800/60 text-rose-300 text-[10px] font-bold items-center space-x-1">
+                        <i class="fa-solid fa-database"></i>
+                        <span>Master: RekapToll</span>
+                    </span>
                 </div>
             </div>
             <div id="stat-modal-body" class="p-4 sm:p-6 overflow-y-auto space-y-3 flex-1 text-xs"></div>
@@ -802,7 +802,7 @@
                 <input type="hidden" id="edit-etoll-id">
                 <div>
                     <label class="block font-semibold text-slate-200 mb-1">Nama / Label Kartu <span class="text-rose-400">*</span></label>
-                    <input type="text" id="edit-etoll-name" required class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-100 focus:ring-2 focus:ring-indigo-500/40">
+                    <input type="text" id="edit-etoll-name" required readonly class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-100 focus:ring-2 focus:ring-indigo-500/40">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
@@ -1508,7 +1508,7 @@
                     await setDoc(syncDoc, {
                         vehicles: window.vehicles || [],
                         drivers: window.drivers || [],
-                        etolls: window.etolls || [],
+                        // etolls sengaja tidak disimpan di Firestore GarasiKu; master berasal dari RekapToll.
                         etollLogs: window.etollLogs || [],
                         logs: window.logs || [],
                         adminPin: window.adminPin || "1234",
@@ -1613,6 +1613,93 @@
         window.vehicles = loadLocalJson('garasiku_vehicles', INITIAL_VEHICLES);
         window.drivers = loadLocalJson('garasiku_drivers', INITIAL_DRIVERS);
         window.etolls = loadLocalJson('garasiku_etolls', INITIAL_ETOLL);
+
+        // ============================================================
+        // MASTER KARTU E-TOLL: REKAPTOLL (SUMBER TUNGGAL)
+        // Tambah/hapus kartu dilakukan di aplikasi RekapToll.
+        // GarasiKu hanya membaca master kartu tersebut dan mempertahankan
+        // status operasional lokal (ON/OFF, holder, saldo) bila kartu masih ada.
+        // ============================================================
+        window.EtollMasterBridge = {
+            sourceProjectId: 'etoll-3366c',
+            sourcePath: 'cards',
+            intervalMs: 10000,
+            timer: null,
+            syncing: false,
+            lastSuccess: null,
+
+            normalizeNumber(value) {
+                return String(value || '').replace(/\D/g, '');
+            },
+
+            async sync() {
+                if (this.syncing) return;
+                this.syncing = true;
+                const baseUrl = `https://${this.sourceProjectId}-default-rtdb.asia-southeast1.firebasedatabase.app`;
+                try {
+                    const response = await fetch(`${baseUrl}/${this.sourcePath}.json?ts=${Date.now()}`, {
+                        cache: 'no-store'
+                    });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const data = await response.json();
+                    if (!Array.isArray(data)) {
+                        throw new Error('Format master kartu RekapToll bukan array.');
+                    }
+
+                    const previous = Array.isArray(window.etolls) ? window.etolls : [];
+                    const bySourceId = new Map(previous.map(c => [String(c.sourceCardId || c.id || ''), c]));
+                    const byNumber = new Map(previous.map(c => [this.normalizeNumber(c.cardNo), c]));
+
+                    const masterCards = data
+                        .filter(c => c && (c.number || c.id))
+                        .map((sourceCard, index) => {
+                            const sourceId = String(sourceCard.id || `source-${index + 1}`);
+                            const cleanNumber = this.normalizeNumber(sourceCard.number);
+                            const old = bySourceId.get(sourceId) || byNumber.get(cleanNumber) || {};
+                            const oldStatus = old.status === 'BORROWED' ? 'BORROWED' : 'AVAILABLE';
+
+                            return {
+                                id: old.id || `ET-SRC-${sourceId}`,
+                                sourceCardId: sourceId,
+                                source: 'REKAPTOLL',
+                                // Nama kartu di GarasiKu selalu mengikuti 4 digit terakhir nomor kartu.
+                                // Tidak lagi mengambil label/nama driver dari RekapToll.
+                                name: cleanNumber ? cleanNumber.slice(-4) : String(old.name || `Kartu E-Toll ${index + 1}`),
+                                nopol: String(sourceCard.nopol || old.nopol || ''),
+                                bank: String(sourceCard.bank || old.bank || 'Lainnya'),
+                                cardNo: String(sourceCard.number || old.cardNo || ''),
+                                // RekapToll tidak menyimpan saldo kartu pada master cards.
+                                // Saldo operasional GarasiKu dipertahankan selama kartu masih ada.
+                                balance: Number.isFinite(Number(old.balance)) ? Number(old.balance) : 0,
+                                status: oldStatus,
+                                holderName: oldStatus === 'BORROWED' ? (old.holderName || null) : null,
+                                active: old.active !== false,
+                                color: sourceCard.color || old.color || ''
+                            };
+                        });
+
+                    window.etolls = masterCards;
+                    this.lastSuccess = new Date();
+                    localStorage.setItem('garasiku_etolls', JSON.stringify(window.etolls));
+
+                    if (typeof renderAll === 'function') renderAll();
+                    if (typeof openStatDetail === 'function' && activeStatType === 'etoll' && !document.getElementById('modal-stat-detail')?.classList.contains('hidden')) {
+                        renderStatModalContent(document.getElementById('stat-modal-search')?.value?.toLowerCase().trim() || '');
+                    }
+                } catch (error) {
+                    console.warn('Sinkron master kartu E-Toll RekapToll gagal:', error.message);
+                    // Jika sumber sedang offline, gunakan cache terakhir agar operasional tidak hilang.
+                } finally {
+                    this.syncing = false;
+                }
+            },
+
+            start() {
+                this.sync();
+                clearInterval(this.timer);
+                this.timer = setInterval(() => this.sync(), this.intervalMs);
+            }
+        };
         window.etollLogs = loadLocalJson('garasiku_etoll_logs', []);
         window.logs = loadLocalJson('garasiku_logs', []);
         window.adminPin = localStorage.getItem('garasiku_admin_pin') || "1234";
@@ -1664,7 +1751,7 @@
             if (cloudTime && localWriteAt && cloudTime < localWriteAt) return;
             if (cloudData.vehicles && Array.isArray(cloudData.vehicles)) window.vehicles = cloudData.vehicles;
             if (cloudData.drivers && Array.isArray(cloudData.drivers)) window.drivers = cloudData.drivers;
-            if (cloudData.etolls && Array.isArray(cloudData.etolls)) window.etolls = cloudData.etolls;
+            // Master kartu E-Toll berasal dari aplikasi RekapToll (RTDB etoll-3366c), bukan Firestore GarasiKu.
             if (cloudData.etollLogs && Array.isArray(cloudData.etollLogs)) window.etollLogs = cloudData.etollLogs;
             if (cloudData.logs && Array.isArray(cloudData.logs)) window.logs = cloudData.logs;
 
@@ -3107,29 +3194,9 @@
 
         function handleAddEtoll(event) {
             event.preventDefault();
-            const name = document.getElementById('etoll-name').value.trim();
-            const bank = document.getElementById('etoll-bank').value;
-            const balance = parseInt(document.getElementById('etoll-balance').value) || 0;
-            const cardNo = document.getElementById('etoll-cardno').value.trim();
-
-            const newCard = {
-                id: `ET-${Date.now()}`,
-                name,
-                bank,
-                balance,
-                cardNo,
-                status: 'AVAILABLE',
-                holderName: null,
-                active: true
-            };
-
-            window.etolls.push(newCard);
-            saveToStorage();
             closeModal('modal-add-etoll');
-            document.getElementById('form-add-etoll').reset();
             openStatDetail('etoll');
-            renderAll();
-            showToast("Kartu Ditambahkan", `${name} berhasil disimpan.`, "success");
+            showToast("Master E-Toll Terpusat", "Tambah kartu dilakukan di aplikasi RekapToll. GarasiKu hanya membaca database kartu tersebut.", "info");
         }
 
         function openEditEtollModal(etollId) {
@@ -3149,7 +3216,6 @@
         function handleEditEtoll(event) {
             event.preventDefault();
             const id = document.getElementById('edit-etoll-id').value;
-            const name = document.getElementById('edit-etoll-name').value.trim();
             const bank = document.getElementById('edit-etoll-bank').value;
             const balance = parseInt(document.getElementById('edit-etoll-balance').value) || 0;
             const cardNo = document.getElementById('edit-etoll-cardno').value.trim();
@@ -3160,7 +3226,9 @@
                     showToast('Kartu Sedang Dipakai', 'Kembalikan kartu sebelum mengubah data kartu.', 'warning');
                     return;
                 }
-                card.name = name;
+                // Nama kartu tidak diedit manual; selalu mengikuti 4 digit terakhir nomor kartu.
+                const normalizedCardNo = String(cardNo || '').replace(/\D/g, '');
+                card.name = normalizedCardNo.length >= 4 ? normalizedCardNo.slice(-4) : (card.name || '');
                 card.bank = bank;
                 card.balance = balance;
                 card.cardNo = cardNo;
@@ -3176,15 +3244,7 @@
         function deleteEtoll(id) {
             const card = window.etolls.find(e => e.id === id);
             if (!card) return;
-            if (card.status === 'BORROWED') {
-                showToast("Gagal Menghapus", `Kartu ini sedang dibawa oleh ${card.holderName}. Harap kembalikan terlebih dahulu.`, "error");
-                return;
-            }
-            window.etolls = window.etolls.filter(e => e.id !== id);
-            saveToStorage();
-            renderAll();
-            openStatDetail('etoll');
-            showToast("Kartu Dihapus", `${card.name} telah dihapus dari sistem.`, "info");
+            showToast("Master E-Toll Terpusat", "Hapus kartu dilakukan di aplikasi RekapToll. Setelah dihapus di sana, kartu otomatis hilang dari GarasiKu.", "info");
         }
 
 
@@ -3828,11 +3888,8 @@
             if (extraActions) {
                 if (type === 'etoll') {
                     extraActions.classList.remove('hidden');
-                    const btnAdd = document.getElementById('btn-stat-add-etoll');
-                    if (btnAdd) {
-                        if (isAdminLoggedIn) btnAdd.classList.remove('hidden');
-                        else btnAdd.classList.add('hidden');
-                    }
+                    const sourceBadge = document.getElementById('etoll-master-source-badge');
+                    if (sourceBadge) sourceBadge.classList.remove('hidden');
                 } else {
                     extraActions.classList.add('hidden');
                 }
@@ -3984,6 +4041,10 @@
 
                 list.forEach(card => {
                     const isBorrowed = card.status === 'BORROWED';
+                    const cardDigits = String(card.cardNo || '').replace(/\D/g, '');
+                    // Tampilan master: identitas kartu = 4 digit terakhir nomor kartu, bukan nama pemegang.
+                    const cardDisplayName = cardDigits.length >= 4 ? cardDigits.slice(-4) : (card.name || '-');
+                    card.name = cardDisplayName;
                     const isOff = card.active === false;
 
                     const el = document.createElement('div');
@@ -4033,12 +4094,9 @@
                                 }">
                                     ${isOff ? 'Nyalakan (ON)' : 'OFF'}
                                 </button>
-                                <button onclick="openEditEtollModal('${card.id}')" title="Edit Kartu (Admin)" class="w-8 h-8 rounded-xl border border-dark-border hover:bg-indigo-950 text-slate-400 hover:text-indigo-400 flex items-center justify-center transition">
-                                    <i class="fa-solid fa-pen-to-square text-xs"></i>
-                                </button>
-                                <button onclick="deleteEtoll('${card.id}')" title="Hapus Kartu (Admin)" class="w-8 h-8 rounded-xl border border-dark-border hover:bg-rose-950 text-slate-400 hover:text-rose-400 flex items-center justify-center transition">
-                                    <i class="fa-solid fa-trash text-xs"></i>
-                                </button>
+                                <span class="px-2 py-1.5 rounded-xl border border-slate-700 bg-slate-950/60 text-[10px] font-bold text-slate-500" title="Nama, bank, nomor, tambah, dan hapus mengikuti aplikasi RekapToll">
+                                    <i class="fa-solid fa-link mr-1"></i>Master RekapToll
+                                </span>
                             ` : ''}
                         </div>
                     `;
@@ -4297,5 +4355,12 @@
             updateGlobalConnectionIndicator();
         });
     </script>
+    <script>
+        // Mulai sinkronisasi master kartu E-Toll dari aplikasi RekapToll setelah seluruh fungsi GarasiKu siap.
+        window.addEventListener('load', () => {
+            if (window.EtollMasterBridge) window.EtollMasterBridge.start();
+        }, { once: true });
+    </script>
+
 </body>
 </html>
