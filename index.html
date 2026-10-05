@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>GarasiKu - Sistem Gerbang & Logbook Armada</title>
+    <!-- FIX32: restored from FIX30; server-confirmed gate writes without read-back quota cost. -->
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome Free CDN -->
@@ -1154,9 +1155,13 @@
                             <i class="fa-solid fa-book-open text-cyan-400"></i>
                             <span>Riwayat Catatan Gerbang Keluar & Masuk</span>
                         </h2>
-                        <p class="text-xs text-slate-400">Filter berdasarkan rentang waktu dan status perjalanan</p>
+                        <p class="text-xs text-slate-400">Riwayat normal: 2 bulan terakhir · arsip lama dibaca hanya saat tombol Arsip digunakan</p>
                     </div>
-                    <div class="flex items-center space-x-2">
+                    <div class="flex items-center space-x-2 flex-wrap justify-end">
+                        <button type="button" onclick="openArchiveModal('gate')" class="px-3 py-2 rounded-xl border border-cyan-900/60 bg-cyan-950/40 hover:bg-cyan-900/50 text-cyan-300 text-xs font-semibold flex items-center space-x-1.5 transition">
+                            <i class="fa-solid fa-box-archive"></i>
+                            <span>Arsip &gt; 2 Bulan</span>
+                        </button>
                         <button onclick="exportLogsToCSV()" class="px-3 py-2 rounded-xl border border-emerald-900/60 bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-400 text-xs font-semibold flex items-center space-x-1.5 transition">
                             <i class="fa-solid fa-file-excel text-emerald-400"></i>
                             <span>Ekspor CSV</span>
@@ -1271,7 +1276,7 @@
                             <i class="fa-solid fa-users text-indigo-400"></i>
                             <span>Daftar Pengemudi / Driver</span>
                         </h2>
-                        <p class="text-xs text-slate-400">Manajemen status driver aktif, nomor kontak, dan penugasan</p>
+                        <p class="text-xs text-slate-400">Status ON/OFF dikelola independen di GarasiKu · identitas & penugasan dari AdminAuto</p>
                     </div>
                     <div class="flex items-center space-x-2">
                         <select id="driver-filter-category" onchange="renderDriversGrid()" class="px-3 py-1.5 rounded-xl border border-dark-border bg-dark-card text-xs text-slate-200">
@@ -1331,8 +1336,11 @@
                 </div>
 
                 <!-- Filter Controls -->
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div class="relative">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <button type="button" onclick="openArchiveModal('etoll')" class="px-3 py-2 rounded-xl border border-rose-900/60 bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 text-xs font-semibold flex items-center space-x-1.5 transition whitespace-nowrap">
+                            <i class="fa-solid fa-box-archive"></i><span>Arsip &gt; 2 Bulan</span>
+                        </button>
+<div class="relative">
                         <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
                         <input type="text" id="etoll-recap-search" oninput="renderEtollRecapTable()" placeholder="Cari nama driver atau kartu..." class="w-full pl-8 pr-3 py-1.5 rounded-xl border border-dark-border bg-dark-card text-xs text-slate-100 placeholder-slate-400 focus:ring-2 focus:ring-rose-500/40">
                     </div>
@@ -1802,7 +1810,7 @@
             <div class="bg-indigo-600 px-5 sm:px-6 py-4 text-white flex items-center justify-between">
                 <div>
                     <h3 class="font-extrabold text-base"><i class="fa-solid fa-user-pen mr-2"></i>Edit Pengaturan Driver</h3>
-                    <p class="text-[10px] text-white/80 mt-0.5">Data driver tersimpan di database Firebase khusus GarasiKu.</p>
+                    <p class="text-[10px] text-white/80 mt-0.5">Status operasional ON/OFF tersimpan di GarasiKu; identitas driver berasal dari AdminAuto.</p>
                 </div>
                 <button onclick="closeModal('modal-edit-driver')" class="text-white/80 hover:text-white text-xl font-bold"><i class="fa-solid fa-xmark"></i></button>
             </div>
@@ -1833,7 +1841,7 @@
                     <input type="text" id="edit-driver-phone" class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-100">
                 </div>
                 <div class="p-3 rounded-xl bg-cyan-950/30 border border-cyan-800/40 text-[11px] text-cyan-200">
-                    <i class="fa-solid fa-circle-info mr-1"></i> Master driver berdiri sendiri dan disimpan di Firebase GarasiKu agar berlaku di semua perangkat.
+                    <i class="fa-solid fa-circle-info mr-1"></i> ON/OFF ini independen dari AdminAuto. Driver OFF tidak boleh ditugaskan/checkout di GarasiKu, meskipun master AdminAuto masih aktif.
                 </div>
                 <div class="pt-2 flex justify-end gap-2">
                     <button type="button" onclick="closeModal('modal-edit-driver')" class="px-4 py-2 rounded-xl border border-dark-border text-slate-300">Batal</button>
@@ -2237,7 +2245,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div class="p-4 rounded-2xl border border-cyan-900/60 bg-cyan-950/20">
                         <div class="flex items-start justify-between gap-3">
-                            <div><h4 class="font-bold text-white">Master Kendaraan</h4><p class="text-[11px] text-slate-400 mt-1">vehicleSettings pada Firestore. Master kendaraan sumber Index 1 tidak dihapus.</p></div>
+                            <div><h4 class="font-bold text-white">Master Kendaraan</h4><p class="text-[11px] text-slate-400 mt-1">Master kendaraan dibaca langsung dari AdminAuto /data_v2/vehicles. GarasiKu tidak menggandakan master.</p></div>
                             <i class="fa-solid fa-car text-cyan-400"></i>
                         </div>
                         <button type="button" onclick="deleteFirebaseMasterSection('vehicleSettings')" class="mt-3 w-full py-2 rounded-xl bg-rose-950/70 hover:bg-rose-900 border border-rose-800/60 text-rose-300 font-bold">Hapus Pengaturan Kendaraan di Firebase</button>
@@ -2245,10 +2253,10 @@
 
                     <div class="p-4 rounded-2xl border border-indigo-900/60 bg-indigo-950/20">
                         <div class="flex items-start justify-between gap-3">
-                            <div><h4 class="font-bold text-white">Master Driver</h4><p class="text-[11px] text-slate-400 mt-1">koleksi Firebase khusus garasiku_drivers. Tidak bergantung pada database kendaraan.</p></div>
+                            <div><h4 class="font-bold text-white">Master Driver</h4><p class="text-[11px] text-slate-400 mt-1">Master driver dibaca langsung dari AdminAuto /data_v2/drivers. GarasiKu tidak menggandakan master.</p></div>
                             <i class="fa-solid fa-user-tie text-indigo-400"></i>
                         </div>
-                        <button type="button" onclick="deleteFirebaseMasterSection('driverSettings')" class="mt-3 w-full py-2 rounded-xl bg-rose-950/70 hover:bg-rose-900 border border-rose-800/60 text-rose-300 font-bold">Hapus Pengaturan Driver di Firebase</button>
+                        <button type="button" onclick="deleteFirebaseMasterSection('driverSettings')" class="mt-3 w-full py-2 rounded-xl bg-rose-950/70 hover:bg-rose-900 border border-rose-800/60 text-rose-300 font-bold">Hapus Status Driver GarasiKu</button>
                     </div>
 
                     <div class="p-4 rounded-2xl border border-amber-900/60 bg-amber-950/20">
@@ -2261,7 +2269,7 @@
 
                     <div class="p-4 rounded-2xl border border-rose-900/60 bg-rose-950/20">
                         <div class="flex items-start justify-between gap-3">
-                            <div><h4 class="font-bold text-white">E-Toll</h4><p class="text-[11px] text-slate-400 mt-1">etollState dan etollLogs pada shared_state.</p></div>
+                            <div><h4 class="font-bold text-white">E-Toll</h4><p class="text-[11px] text-slate-400 mt-1">etollState pada shared_state + riwayat terpisah di collection etoll_logs. Tampilan normal membaca 2 bulan terakhir; data lama tetap tersimpan dan dapat dibaca melalui tombol Arsip.</p></div>
                             <i class="fa-solid fa-credit-card text-rose-400"></i>
                         </div>
                         <button type="button" onclick="deleteFirebaseMasterSection('etoll')" class="mt-3 w-full py-2 rounded-xl bg-rose-950/70 hover:bg-rose-900 border border-rose-800/60 text-rose-300 font-bold">Hapus Data E-Toll Firebase</button>
@@ -2305,7 +2313,16 @@
     <script type="module">
         import { initializeApp, getApps, getApp, deleteApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, initializeAuth, inMemoryPersistence, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { initializeFirestore, getFirestore, collection, doc, setDoc, getDoc, getDocs, writeBatch, deleteDoc, deleteField } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeFirestore, getFirestore, collection, doc, setDoc, getDoc, getDocs, writeBatch, deleteDoc, deleteField, query, where, orderBy, waitForPendingWrites } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Expose only the Firebase app/auth helpers needed by the AdminAuto
+        // reader bridge, which lives in a classic (non-module) script below.
+        // This avoids module-scope ReferenceError while keeping the SDK imports
+        // themselves inside the module.
+        window.__GarasiKuFirebaseSDK = Object.freeze({
+            initializeApp, getApps, getApp, deleteApp,
+            getAuth, initializeAuth, inMemoryPersistence, signInAnonymously
+        });
 
         const DEFAULT_FIREBASE_CONFIG = window.GARASIKU_FIREBASE_CONFIG || {
             apiKey: "AIzaSyCQbUoc6mVPDz3hAjTiRawAvN2WTNYyNkM",
@@ -2363,6 +2380,13 @@
             gateWriteQueue: Promise.resolve(),
             gateLogsReady: false,
             gateMigrationRunning: false,
+            etollLegacyMigrationRunning: false,
+            gateCacheKey: 'garasiku_gate_logs_cache_v2_2m',
+            gateCacheTtlMs: 5 * 60 * 1000,
+            gateReadMonths: 2,
+            etollCacheKey: 'garasiku_etoll_logs_cache_v1_2m',
+            etollCacheTtlMs: 5 * 60 * 1000,
+            etollReadMonths: 2,
             cloudPayloadHash: localStorage.getItem('garasiku_cloud_payload_hash') || '',
 
             hashCloudPayload(payload) {
@@ -2390,9 +2414,12 @@
                     };
                 });
                 return {
-                    schemaVersion: 6,
+                    schemaVersion: 8,
                     vehicleSettings: collectVehicleSettings(),
-                    etollLogs: window.etollLogs || [],
+                    // Status ON/OFF driver adalah overlay operasional GarasiKu, bukan master AdminAuto.
+                    driverSettings: collectDriverSettings(),
+                    // Riwayat E-Toll disimpan per dokumen di collection etoll_logs.
+                    // shared_state hanya menyimpan state operasional kartu.
                     etollState,
                     adminPin: window.adminPin || '1234',
                     telegramConfig: window.telegramConfig || {
@@ -2405,78 +2432,28 @@
                 };
             },
 
-            driverCollection() {
-                if (!this.db) return null;
-                return collection(this.db, 'garasiku_drivers');
-            },
+            // Driver master tidak lagi disimpan di Firestore GarasiKu.
+            // Sumber tunggal: AdminAuto RTDB /data_v2/drivers.
+            driverCollection() { return null; },
 
             async syncDriverMaster() {
-                if (!this.db || !this.currentUser) return false;
-                try {
-                    const snap = await getDocs(this.driverCollection());
-                    // Jangan pernah mengosongkan daftar driver hanya karena read sesaat gagal.
-                    // Hanya ganti cache setelah Firestore benar-benar mengembalikan snapshot.
-                    const next = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    window.firebaseDrivers = next;
-                    applyDriverSettingsToMasterDrivers();
-                    return true;
-                } catch (e) {
-                    console.error('Gagal membaca master driver Firebase:', e);
-                    // Pertahankan data terakhir yang valid di layar.
-                    if (!Array.isArray(window.firebaseDrivers)) window.firebaseDrivers = [];
-                    applyDriverSettingsToMasterDrivers();
-                    return false;
-                }
+                if (window.AdminAutoMasterBridge?.sync) return window.AdminAutoMasterBridge.sync();
+                return false;
             },
 
-            async saveDriverMaster(driver) {
-                if (!this.db || !this.currentUser) throw new Error('Firebase/Auth belum siap.');
-                const name = String(driver?.name || '').trim().replace(/\s+/g, ' ');
-                if (!name) throw new Error('Nama driver wajib diisi.');
-                const key = normalizeDriverKey(driver.id || name);
-                const docId = String(driver.id || key).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 120) || key;
-                const payload = {
-                    name,
-                    category: driver.category === 'EXECUTIVE' ? 'EXECUTIVE' : 'OPERATIONAL',
-                    cp: String(driver.cp || driver.phone || '').trim(),
-                    phone: String(driver.cp || driver.phone || '').trim(),
-                    active: driver.active !== false,
-                    status: driver.status || 'AVAILABLE',
-                    updatedAt: new Date().toISOString()
-                };
-                await setDoc(doc(this.driverCollection(), docId), payload, { merge: true });
-                const existing = Array.isArray(window.firebaseDrivers) ? window.firebaseDrivers.filter(d => d.id !== docId) : [];
-                window.firebaseDrivers = [...existing, { id: docId, ...payload }];
-                applyDriverSettingsToMasterDrivers();
-                return true;
+            async saveDriverMaster() {
+                throw new Error('Master driver dikelola di AdminAuto. GarasiKu hanya membaca master tersebut.');
+            },
+
+            async deleteDriverMaster() {
+                throw new Error('Master driver dikelola di AdminAuto. GarasiKu hanya membaca master tersebut.');
             },
 
             async deleteDriverMasterCollection() {
-                if (!this.db || !this.currentUser) throw new Error('Firebase/Auth belum siap.');
-                const snap = await getDocs(this.driverCollection());
-                const docs = snap.docs;
-                for (let i = 0; i < docs.length; i += 450) {
-                    const batch = writeBatch(this.db);
-                    docs.slice(i, i + 450).forEach(d => batch.delete(d.ref));
-                    const chunk = docs.slice(i, i + 450);
-                    if (chunk.length) await batch.commit();
-                }
-                window.firebaseDrivers = [];
-                applyDriverSettingsToMasterDrivers();
-                return true;
+                throw new Error('Master driver dikelola di AdminAuto. GarasiKu hanya membaca master tersebut.');
             },
 
-            async deleteDriverMaster(id) {
-                if (!this.db || !this.currentUser) throw new Error('Firebase/Auth belum siap.');
-                const docId = String(id || '').trim();
-                if (!docId) return false;
-                await deleteDoc(doc(this.driverCollection(), docId));
-                window.firebaseDrivers = (window.firebaseDrivers || []).filter(d => d.id !== docId);
-                applyDriverSettingsToMasterDrivers();
-                return true;
-            },
-
-            async initialize(customConfig = null) {
+            async initialize(customConfig = null, options = {}) {
                 try {
                     // Cloud Firebase baru adalah mode utama GarasiKu.
                     // Flag mode lokal lama tidak boleh menghentikan initialize().
@@ -2573,12 +2550,12 @@
                     this.gateLogsReady = false;
                     this.updateStatusUI(false, `Menghubungkan (${config.projectId})...`);
                     const syncResult = await Promise.race([
-                        this.startRealtimeSync(),
+                        this.startRealtimeSync({ force: options.force === true }),
                         new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout setelah 15 detik. Periksa Rules/Anonymous Auth dan koneksi internet.')), 15000))
                     ]);
                     if (!syncResult) return false;
                     if (window.EtollMasterBridge && typeof window.EtollMasterBridge.sync === 'function') {
-                        await window.EtollMasterBridge.sync();
+                        await window.EtollMasterBridge.sync(options.force === true);
                     }
                     if (window.updateGlobalConnectionIndicator) window.updateGlobalConnectionIndicator();
                     return true;
@@ -2625,24 +2602,190 @@
             removePendingGateLog() {},
             mergePendingGateLogs(cloudLogs) { return cloudLogs; },
 
+            saveGateLogsCache(logs) {
+                try {
+                    sessionStorage.setItem(this.gateCacheKey, JSON.stringify({
+                        savedAt: Date.now(),
+                        logs: Array.isArray(logs) ? logs : []
+                    }));
+                } catch (e) {}
+            },
+
+            readGateLogsCache(force = false) {
+                if (force) return null;
+                try {
+                    const raw = sessionStorage.getItem(this.gateCacheKey);
+                    if (!raw) return null;
+                    const parsed = JSON.parse(raw);
+                    if (!parsed || !Array.isArray(parsed.logs)) return null;
+                    if (Date.now() - Number(parsed.savedAt || 0) > this.gateCacheTtlMs) return null;
+                    return parsed.logs;
+                } catch (e) { return null; }
+            },
+
+            invalidateGateLogsCache() {
+                try { sessionStorage.removeItem(this.gateCacheKey); } catch (e) {}
+            },
+
+            // Membaca gate log hanya 2 bulan terakhir + log ACTIVE yang lebih lama
+            // (untuk mencegah kendaraan yang masih di luar garasi hilang dari state).
+            async readRecentGateLogs() {
+                if (!this.db) return [];
+                const col = this.gateLogsCollection();
+                const cutoff = new Date();
+                cutoff.setMonth(cutoff.getMonth() - this.gateReadMonths);
+                const cutoffIso = cutoff.toISOString();
+                const recentQ = query(col, where('timeOut', '>=', cutoffIso));
+                const activeQ = query(col, where('status', '==', 'ACTIVE'));
+                const [recentSnap, activeSnap] = await Promise.all([
+                    getDocs(recentQ, { source: 'server' }),
+                    getDocs(activeQ, { source: 'server' })
+                ]);
+                console.info('[GarasiKu][CLOUD READ OK]', {
+                    recentCount: recentSnap.size,
+                    activeCount: activeSnap.size,
+                    cutoff: cutoffIso
+                });
+                const byId = new Map();
+                recentSnap.docs.forEach(d => byId.set(d.id, { id: d.id, ...d.data() }));
+                activeSnap.docs.forEach(d => byId.set(d.id, { id: d.id, ...d.data() }));
+                return [...byId.values()].sort((a, b) => new Date(b.timeOut || b.timeIn || 0) - new Date(a.timeOut || a.timeIn || 0));
+            },
+
+            etollLogsCollection() {
+                if (!this.db) return null;
+                return collection(this.db, 'etoll_logs');
+            },
+
+            async readRecentEtollLogs(force = false) {
+                if (!this.db) return [];
+                if (!force) {
+                    try {
+                        const raw = sessionStorage.getItem(this.etollCacheKey);
+                        const parsed = raw ? JSON.parse(raw) : null;
+                        if (parsed && Array.isArray(parsed.logs) && Date.now() - Number(parsed.savedAt || 0) <= this.etollCacheTtlMs) return parsed.logs;
+                    } catch (e) {}
+                }
+                const col = this.etollLogsCollection();
+                if (!col) return [];
+                const cutoff = new Date();
+                cutoff.setMonth(cutoff.getMonth() - this.etollReadMonths);
+                const snap = await getDocs(query(col, where('timestamp', '>=', cutoff.toISOString()), orderBy('timestamp', 'desc')));
+                const logs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                try { sessionStorage.setItem(this.etollCacheKey, JSON.stringify({ savedAt: Date.now(), logs })); } catch (e) {}
+                return logs;
+            },
+
+            async loadGateLogArchive(year, month) {
+                if (!this.db) return [];
+                const start = new Date(Number(year), Number(month) - 1, 1);
+                const end = new Date(Number(year), Number(month), 1);
+                const snap = await getDocs(query(this.gateLogsCollection(), where('timeOut', '>=', start.toISOString()), where('timeOut', '<', end.toISOString()), orderBy('timeOut', 'desc')));
+                const current = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                let legacy = [];
+                try {
+                    const sharedSnap = await getDoc(doc(this.db, 'garasiku_fleet', 'shared_state'));
+                    const arr = sharedSnap.exists() && Array.isArray(sharedSnap.data()?.logs) ? sharedSnap.data().logs : [];
+                    legacy = arr.filter(log => { const ts = Date.parse(log?.timeOut || log?.timeIn || ''); return log && Number.isFinite(ts) && ts >= start.getTime() && ts < end.getTime(); });
+                } catch (e) { console.warn('Baca legacy Logbook arsip gagal:', e); }
+                const byId = new Map();
+                legacy.forEach(log => byId.set(String(log.id || `${log.timeOut || ''}_${log.plate || ''}`), log));
+                current.forEach(log => byId.set(String(log.id), log));
+                return [...byId.values()].sort((a,b) => new Date(b.timeOut || b.timeIn || 0) - new Date(a.timeOut || a.timeIn || 0));
+            },
+
+            async loadEtollLogArchive(year, month) {
+                if (!this.db) return [];
+                const start = new Date(Number(year), Number(month) - 1, 1);
+                const end = new Date(Number(year), Number(month), 1);
+                const snap = await getDocs(query(this.etollLogsCollection(), where('timestamp', '>=', start.toISOString()), where('timestamp', '<', end.toISOString()), orderBy('timestamp', 'desc')));
+                const current = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                let legacy = [];
+                try {
+                    const sharedSnap = await getDoc(doc(this.db, 'garasiku_fleet', 'shared_state'));
+                    const arr = sharedSnap.exists() && Array.isArray(sharedSnap.data()?.etollLogs) ? sharedSnap.data().etollLogs : [];
+                    legacy = arr.filter(log => { const ts = Date.parse(log?.timestamp || ''); return log && Number.isFinite(ts) && ts >= start.getTime() && ts < end.getTime(); });
+                } catch (e) { console.warn('Baca legacy E-Toll arsip gagal:', e); }
+                const byId = new Map();
+                legacy.forEach(log => byId.set(String(log.id || `${log.timestamp || ''}_${log.etollId || ''}`), log));
+                current.forEach(log => byId.set(String(log.id), log));
+                return [...byId.values()].sort((a,b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+            },
+
+            async saveEtollLog(log) {
+                if (!this.db || !this.currentUser || !log || !log.id) return false;
+                const col = this.etollLogsCollection();
+                if (!col) return false;
+                try {
+                    await setDoc(doc(col, String(log.id)), { ...log }, { merge: false });
+                    try { sessionStorage.removeItem(this.etollCacheKey); } catch (e) {}
+                    return true;
+                } catch (e) {
+                    console.error('Gagal menyimpan log E-Toll:', e);
+                    return false;
+                }
+            },
+
+            async deleteEtollLog(logId) {
+                if (!this.db || !this.currentUser || !logId) return false;
+                const col = this.etollLogsCollection();
+                if (!col) return false;
+                try {
+                    await deleteDoc(doc(col, String(logId)));
+                    try { sessionStorage.removeItem(this.etollCacheKey); } catch (e) {}
+                    return true;
+                } catch (e) {
+                    console.error('Gagal menghapus log E-Toll:', e);
+                    return false;
+                }
+            },
+
+            async migrateLegacyEtollLogsIfNeeded(legacyLogs) {
+                if (!this.db || !Array.isArray(legacyLogs) || !legacyLogs.length) return true;
+                if (this.etollLegacyMigrationRunning) return false;
+                this.etollLegacyMigrationRunning = true;
+                const col = this.etollLogsCollection();
+                const valid = legacyLogs.filter(l => l && l.id);
+                for (let i = 0; i < valid.length; i += 450) {
+                    const chunk = valid.slice(i, i + 450);
+                    const batch = writeBatch(this.db);
+                    chunk.forEach(log => batch.set(doc(col, String(log.id)), log, { merge: false }));
+                    if (chunk.length) await batch.commit();
+                }
+                try {
+                    const sharedRef = doc(this.db, 'garasiku_fleet', 'shared_state');
+                    await setDoc(sharedRef, { etollLogs: deleteField(), etollLogsMigratedAt: new Date().toISOString(), etollLogsSchemaVersion: 1 }, { merge: true });
+                    return true;
+                } finally {
+                    this.etollLegacyMigrationRunning = false;
+                }
+            },
+
             // MODE HEMAT BANDWIDTH:
-            // Tidak memakai listener realtime. Cloud hanya dibaca saat buka,
-            // refresh browser, atau initialize() dipanggil manual.
-            async startRealtimeSync() {
+            // Tidak memakai listener realtime. Normal read hanya 3 bulan terakhir.
+            async startRealtimeSync(options = {}) {
                 if (!this.db || !this.currentUser) return false;
                 try {
                     const sharedRef = doc(this.db, 'garasiku_fleet', 'shared_state');
                     const gateCol = this.gateLogsCollection();
 
-                    // Tepat 3 READ saat startup/refresh: shared_state + gate_logs + master driver.
-                    // Ketiganya dijalankan paralel; master driver tidak membaca database kendaraan.
-                    const [sharedSnap, gateSnap, driverSnap] = await Promise.all([
-                        getDoc(sharedRef),
-                        getDocs(gateCol),
-                        getDocs(this.driverCollection())
-                    ]);
-                    window.firebaseDrivers = driverSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    applyDriverSettingsToMasterDrivers();
+                    // Master Armada + Driver sekarang dibaca dari AdminAuto RTDB.
+                    // Firestore GarasiKu tetap hanya untuk data GarasiKu sendiri.
+                    // NORMAL READ dibatasi 3 bulan terakhir. Data yang lebih lama tetap
+                    // berada di Firebase dan hanya dibaca lewat fungsi arsip/administrasi.
+                    // FIX36: refresh manual harus membaca gate log dari server,
+                    // bukan session cache, agar status keluar/masuk tidak pernah
+                    // kembali ke keadaan lama karena cache browser. Cache tetap
+                    // disimpan untuk kompatibilitas, tetapi tidak menjadi sumber
+                    // kebenaran pada startup/refresh.
+                    const cachedGateLogs = null;
+                    const sharedPromise = getDoc(sharedRef, { source: 'server' });
+                    // Gate log selalu dibaca dari Firestore saat buka/refresh.
+                    // Ini hanya 2 query terarah (recent + ACTIVE), bukan listener realtime,
+                    // sehingga tetap hemat tetapi tidak pernah memakai status kendaraan lama.
+                    const gatePromise = this.readRecentGateLogs();
+                    const etollPromise = this.readRecentEtollLogs(options.force === true);
+                    const [sharedSnap, gateSnap, recentEtollLogs] = await Promise.all([sharedPromise, gatePromise, etollPromise]);
 
                     this.isConnected = true;
                     this.gateLogsReady = true;
@@ -2654,7 +2797,6 @@
                         this.cloudPayloadHash = this.hashCloudPayload({
                             schemaVersion: data.schemaVersion,
                             vehicleSettings: data.vehicleSettings || {},
-                            etollLogs: Array.isArray(data.etollLogs) ? data.etollLogs : [],
                             etollState: data.etollState || {},
                             adminPin: data.adminPin || '1234',
                             telegramConfig: data.telegramConfig || {},
@@ -2669,30 +2811,84 @@
                         try { localStorage.removeItem('garasiku_cloud_payload_hash'); } catch (e) {}
                     }
 
-                    if (gateSnap.empty && sharedSnap.exists()) {
-                        const legacyData = sharedSnap.data();
-                        if (Array.isArray(legacyData?.logs) && legacyData.logs.length) {
-                            await this.migrateLegacyLogsIfNeeded(legacyData);
-                            window.logs = legacyData.logs.filter(Boolean);
-                        } else {
-                            window.logs = [];
+                    // Riwayat E-Toll normal hanya 2 bulan terakhir.
+                    window.etollLogs = Array.isArray(recentEtollLogs) ? recentEtollLogs : [];
+                    try { localStorage.setItem('garasiku_etoll_logs', JSON.stringify((window.etollLogs || []).filter(l => !l?.timestamp || Date.parse(l.timestamp) >= (() => { const d = new Date(); d.setMonth(d.getMonth() - 2); return d.getTime(); })()))); } catch (e) {}
+
+                    // Migrasi sekali dari format lama shared_state.etollLogs ke collection
+                    // terpisah. Startup tidak menunggu ribuan write migrasi; UI tetap hanya
+                    // menampilkan 2 bulan terakhir dari data legacy sampai migrasi selesai.
+                    if (sharedSnap.exists() && Array.isArray(sharedSnap.data()?.etollLogs) && sharedSnap.data().etollLogs.length) {
+                        const legacyEtoll = sharedSnap.data().etollLogs;
+                        const cutoff = new Date();
+                        cutoff.setMonth(cutoff.getMonth() - this.etollReadMonths);
+                        const cutoffMs = cutoff.getTime();
+                        const byId = new Map((window.etollLogs || []).map(l => [String(l.id), l]));
+                        legacyEtoll.filter(l => {
+                            const ts = Date.parse(l?.timestamp || '');
+                            return l && Number.isFinite(ts) && ts >= cutoffMs;
+                        }).forEach(l => byId.set(String(l.id || `${l.timestamp || ''}_${l.etollId || ''}`), l));
+                        window.etollLogs = [...byId.values()].sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+                        try { localStorage.setItem('garasiku_etoll_logs', JSON.stringify((window.etollLogs || []).filter(l => !l?.timestamp || Date.parse(l.timestamp) >= (() => { const d = new Date(); d.setMonth(d.getMonth() - 2); return d.getTime(); })()))); } catch (e) {}
+                    }
+
+                    // FIX37: readRecentGateLogs() mengembalikan ARRAY data log, bukan QuerySnapshot.
+                    // FIX36 masih memperlakukannya sebagai Snapshot (.empty/.docs), sehingga
+                    // setiap refresh window.logs jatuh ke [] walaupun dokumen sebenarnya sudah
+                    // tersimpan di Firestore. Ini adalah penyebab utama status kendaraan kembali
+                    // normal setelah refresh.
+                    if (Array.isArray(gateSnap)) {
+                        window.logs = gateSnap.map(log => ({ ...log, id: String(log.id) }));
+                        // Legacy shared_state.logs hanya digabung sebagai fallback/kompatibilitas.
+                        // Sumber utama tetap collection gate_logs dari Firestore.
+                        if (sharedSnap.exists() && Array.isArray(sharedSnap.data()?.logs)) {
+                            const cutoff = new Date();
+                            cutoff.setMonth(cutoff.getMonth() - this.gateReadMonths);
+                            const byId = new Map(window.logs.map(l => [String(l.id), l]));
+                            sharedSnap.data().logs.forEach(l => {
+                                const ts = Date.parse(l?.timeOut || l?.timeIn || '');
+                                if (l && (String(l.status || '').toUpperCase() === 'ACTIVE' || (Number.isFinite(ts) && ts >= cutoff.getTime()))) {
+                                    byId.set(String(l.id || `${l.timeOut || ''}_${l.plate || ''}`), l);
+                                }
+                            });
+                            window.logs = [...byId.values()];
                         }
+                        window.logs.sort((a, b) => new Date(b.timeOut || b.timeIn || 0) - new Date(a.timeOut || a.timeIn || 0));
+                        this.saveGateLogsCache(window.logs);
+                        // FIX30: legacy shared_state.logs tetap dibaca walaupun gate_logs sudah berisi data baru.
+                        // Versi sebelumnya mengabaikan data lama jika ada minimal satu dokumen baru.
+                        if (sharedSnap.exists() && Array.isArray(sharedSnap.data()?.logs)) {
+                            const cutoff = new Date();
+                            cutoff.setMonth(cutoff.getMonth() - this.gateReadMonths);
+                            const byId = new Map(window.logs.map(l => [String(l.id), l]));
+                            sharedSnap.data().logs.forEach(l => {
+                                const ts = Date.parse(l?.timeOut || l?.timeIn || '');
+                                if (l && (String(l.status || '').toUpperCase() === 'ACTIVE' || (Number.isFinite(ts) && ts >= cutoff.getTime()))) {
+                                    byId.set(String(l.id || `${l.timeOut || ''}_${l.plate || ''}`), l);
+                                }
+                            });
+                            window.logs = [...byId.values()];
+                        }
+                        window.logs.sort((a, b) => new Date(b.timeOut || b.timeIn || 0) - new Date(a.timeOut || a.timeIn || 0));
+                        this.saveGateLogsCache(window.logs);
                     } else {
-                        window.logs = gateSnap.docs
-                            .map(d => ({ id: d.id, ...d.data() }))
-                            .sort((a, b) => new Date(b.timeOut || b.timeIn || 0) - new Date(a.timeOut || a.timeIn || 0));
+                        // Fallback defensif: Firebase tidak boleh membuat renderer gagal hanya
+                        // karena snapshot gate tidak tersedia/berbentuk tidak sesuai.
+                        window.logs = [];
                     }
 
                     reconcileVehicleOperationalState();
                     if (typeof renderAll === 'function') renderAll();
-                    this.updateStatusUI(true, 'Firebase • terhubung, baca sekali saat buka/refresh');
+                    this.updateStatusUI(true, 'Firebase • terhubung; gate log dibaca langsung dari Firestore; log normal 3 bulan terakhir');
                     if (window.updateGlobalConnectionIndicator) window.updateGlobalConnectionIndicator();
                     return true;
                 } catch (error) {
                     console.error('Firebase one-shot sync error:', error);
                     this.isConnected = false;
                     const code = error?.code ? ` [${error.code}]` : '';
-                    this.updateStatusUI(false, `Firebase READ${code}: ${error?.message || 'gagal membaca data'}`);
+                    const detail = error?.message || 'gagal membaca data';
+                    console.error('Firebase READ detail/stack:', error?.stack || error);
+                    this.updateStatusUI(false, `Firebase READ${code}: ${detail}`);
                     if (window.updateGlobalConnectionIndicator) window.updateGlobalConnectionIndicator();
                     return false;
                 }
@@ -2743,10 +2939,40 @@
                 }
                 this.lastGateWriteError = '';
                 try {
-                    // Satu write langsung ke dokumen. Handler menunggu konfirmasi server
-                    // agar UI tidak menganggap transaksi berhasil ketika Rules menolak write.
+                    // FIX36: satu write dokumen lalu tunggu sampai Firestore benar-benar
+                    // mengakui pending write ke server. Tidak ada read-back tambahan,
+                    // sehingga tetap hemat kuota. Jika Rules/backend menolak, promise reject.
                     await setDoc(ref, { ...log }, { merge: false });
+                    await Promise.race([
+                        waitForPendingWrites(this.db),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout konfirmasi server setelah 12 detik.')), 12000))
+                    ]);
+                    // Verifikasi satu kali dari SERVER. Ini membedakan write yang benar-benar
+                    // tersimpan dari perubahan yang hanya terlihat di cache SDK/browser.
+                    const verify = await Promise.race([
+                        getDoc(ref, { source: 'server' }),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout membaca ulang dokumen dari server setelah write.')), 12000))
+                    ]);
+                    if (!verify.exists()) throw new Error('Dokumen gate_logs tidak ditemukan di server setelah write.');
+                    // FIX36: verifikasi eksplisit dari SERVER, bukan cache browser.
+                    // Jika refresh kemudian menghilangkan transaksi, masalahnya pasti
+                    // berada pada READ/Rules/path dan akan terlihat jelas pada status.
+                    console.info('[GarasiKu][CLOUD WRITE OK]', {
+                        collection: 'garasiku_fleet/shared_state/gate_logs',
+                        id: String(log.id),
+                        plate: log.plate || '',
+                        serverExists: verify.exists()
+                    });
                     this.lastGateWriteError = '';
+                    // FIX34: setelah server mengonfirmasi, update state aplikasi dari
+                    // dokumen yang BARU ditulis. Ini mencegah status kendaraan kembali
+                    // IN_GARAGE hanya karena renderer masih memakai array lama.
+                    window.logs = (Array.isArray(window.logs) ? window.logs : [])
+                        .filter(item => item && String(item.id) !== String(log.id));
+                    window.logs.unshift({ ...log });
+                    window.logs.sort((a, b) => new Date(b.timeOut || b.timeIn || 0) - new Date(a.timeOut || a.timeIn || 0));
+                    if (typeof reconcileVehicleOperationalState === 'function') reconcileVehicleOperationalState();
+                    this.saveGateLogsCache(window.logs);
                     this.isConnected = true;
                     this.lastSyncTime = new Date();
                     try { localStorage.setItem('garasiku_last_cloud_write', String(Date.now())); } catch (e) {}
@@ -2776,6 +3002,8 @@
                 }
                 try {
                     await deleteDoc(ref);
+                    window.logs = (Array.isArray(window.logs) ? window.logs : []).filter(l => l && String(l.id) !== String(logId));
+                    this.saveGateLogsCache(window.logs);
                     this.lastGateWriteError = '';
                     this.isConnected = true;
                     this.lastSyncTime = new Date();
@@ -2811,7 +3039,7 @@
                     driverSettings: ['driverSettings'],
                     appSettings: ['appSettings'],
                     security: ['adminPin', 'telegramConfig'],
-                    etoll: ['etollState', 'etollLogs']
+                    etoll: ['etollState']
                 };
                 const clearLocal = (fields) => {
                     try {
@@ -2825,10 +3053,8 @@
                     } catch (e) {}
                 };
 
-                if (section === 'all') {
-                    await this.deleteDriverMasterCollection();
-                }
-
+                // Master Driver AdminAuto TIDAK pernah dihapus dari GarasiKu.
+                // Section 'all' hanya menghapus data operasional yang dimiliki GarasiKu.
                 if (section === 'gate_logs' || section === 'all') {
                     const snap = await getDocs(this.gateLogsCollection());
                     const docs = snap.docs;
@@ -2837,21 +3063,22 @@
                         docs.slice(i, i + 450).forEach(d => batch.delete(d.ref));
                         if (docs.slice(i, i + 450).length) await batch.commit();
                     }
-                            window.logs = [];
+                    window.logs = [];
                 }
 
-                if (section === 'driverSettings') {
-                    await this.deleteDriverMasterCollection();
-                    try { localStorage.removeItem('garasiku_driver_settings'); } catch (e) {}
-                    this.lastSyncTime = new Date();
-                    this.isConnected = true;
-                    this.updateStatusUI(true, 'Master driver Firebase dihapus');
-                    return true;
+                if (section === 'etoll' || section === 'all') {
+                    const snap = await getDocs(this.etollLogsCollection());
+                    const docs = snap.docs;
+                    for (let i = 0; i < docs.length; i += 450) {
+                        const batch = writeBatch(this.db);
+                        docs.slice(i, i + 450).forEach(d => batch.delete(d.ref));
+                        if (docs.slice(i, i + 450).length) await batch.commit();
+                    }
                 }
 
                 let fields = [];
                 if (section === 'all') {
-                    fields = ['vehicleSettings','etollLogs','etollState','adminPin','telegramConfig','appSettings','logs'];
+                    fields = ['vehicleSettings','driverSettings','etollState','adminPin','telegramConfig','appSettings','logs'];
                 } else if (fieldMap[section]) {
                     fields = fieldMap[section];
                 }
@@ -2867,7 +3094,8 @@
                     clearLocal(fields);
                     if (fields.includes('vehicleSettings')) window.vehicleSettings = {};
                     if (fields.includes('driverSettings')) window.driverSettings = {};
-                    if (fields.includes('etollLogs')) window.etollLogs = [];
+                    if (fields.includes('etollState')) { window.cloudEtollState = {}; }
+                    if (section === 'etoll' || section === 'all') { window.etollLogs = []; try { sessionStorage.removeItem(this.etollCacheKey); } catch (e) {} }
                     if (fields.includes('appSettings')) {
                         selectedCategoryFilter = 'Semua';
                         selectedSortMode = 'frequent';
@@ -2935,9 +3163,16 @@
                 window.FirebaseBridge.pushStateToCloud().catch(err => console.warn('Retry Cloud saat online gagal:', err));
             }
         });
-        window.addEventListener('DOMContentLoaded', () => {
-            window.FirebaseBridge.initialize();
-            if (window.Index1MasterBridge) window.Index1MasterBridge.start();
+        window.addEventListener('DOMContentLoaded', async () => {
+            // FIX34: startup diselesaikan dulu sebelum render final. Sebelumnya AdminAuto
+            // dan Firestore berjalan paralel sehingga salah satu proses dapat merender state
+            // kendaraan lama tepat setelah proses lainnya menyimpan transaksi.
+            const tasks = [];
+            if (window.AdminAutoMasterBridge) tasks.push(window.AdminAutoMasterBridge.start().catch(err => { console.warn('AdminAuto master start gagal:', err); return false; }));
+            if (window.FirebaseBridge) tasks.push(window.FirebaseBridge.initialize().catch(err => { console.warn('GarasiKu Firebase init gagal:', err); return false; }));
+            await Promise.all(tasks);
+            if (typeof reconcileVehicleOperationalState === 'function') reconcileVehicleOperationalState();
+            if (typeof renderAll === 'function') renderAll();
         }, { once: true });
     </script>
 
@@ -3025,20 +3260,27 @@
             return value ? String(value).trim() : 'MPV';
         }
         function applyDriverSettingsToMasterDrivers() {
-            // Master driver sekarang 100% berasal dari koleksi Firebase garasiku_drivers.
-            // Database kendaraan/Index 1 tidak lagi menjadi sumber daftar driver.
-            window.drivers = Array.isArray(window.firebaseDrivers) ? window.firebaseDrivers.map(d => ({
-                id: String(d.id || d.key || normalizeDriverKey(d.name)),
-                masterKey: String(d.masterKey || normalizeDriverKey(d.name)),
-                source: 'FIREBASE_DRIVER_MASTER',
-                name: String(d.name || '').trim(),
-                category: d.category === 'EXECUTIVE' ? 'EXECUTIVE' : 'OPERATIONAL',
-                active: d.active !== false,
-                status: d.status || 'AVAILABLE',
-                phone: String(d.phone || d.cp || '').trim(),
-                cp: String(d.cp || d.phone || '').trim(),
-                sim: ''
-            })).filter(d => d.name) : [];
+            // AdminAuto = MASTER IDENTITAS driver.
+            // ON/OFF = STATUS OPERASIONAL LOKAL GARASIKU, tidak mengikuti field active/status AdminAuto.
+            const settings = (window.driverSettings && typeof window.driverSettings === 'object') ? window.driverSettings : {};
+            window.drivers = Array.isArray(window.firebaseDrivers) ? window.firebaseDrivers.map(d => {
+                const masterKey = String(d.masterKey || d._fbKey || d.key || normalizeDriverKey(d.name)).trim();
+                const setting = settings[masterKey] || settings[normalizeDriverKey(d.name)] || {};
+                return {
+                    id: String(d.id || d.key || masterKey),
+                    masterKey,
+                    source: 'FIREBASE_DRIVER_MASTER',
+                    name: String(d.name || '').trim(),
+                    category: d.category === 'EXECUTIVE' ? 'EXECUTIVE' : 'OPERATIONAL',
+                    // Jangan membaca d.active untuk status operasional GarasiKu.
+                    // Jika belum pernah diatur di GarasiKu, default ON.
+                    active: setting.active !== false,
+                    status: d.status || 'AVAILABLE',
+                    phone: String(d.phone || d.cp || '').trim(),
+                    cp: String(d.cp || d.phone || '').trim(),
+                    sim: ''
+                };
+            }).filter(d => d.name) : [];
         }
         function applyVehicleSettingsToMaster() {
 
@@ -3068,18 +3310,31 @@
         }
         function collectDriverSettings() {
             const out = {};
+            const current = (window.driverSettings && typeof window.driverSettings === 'object') ? window.driverSettings : {};
+            // Simpan hanya overlay operasional GarasiKu. Identitas/kategori/CP tetap milik AdminAuto.
+            Object.entries(current).forEach(([key, value]) => {
+                if (!key) return;
+                out[key] = {
+                    active: value?.active !== false
+                };
+            });
             (window.drivers || []).forEach(d => {
                 const key = d.masterKey || normalizeDriverKey(d.name);
                 if (!key) return;
                 out[key] = {
-                    id: d.id || key,
-                    name: d.name || '',
-                    active: d.active !== false,
-                    category: d.category === 'EXECUTIVE' ? 'EXECUTIVE' : 'OPERATIONAL',
-                    cp: d.cp || d.phone || ''
+                    active: d.active !== false
                 };
             });
             return out;
+        }
+
+        function persistDriverOperationalStatus(driver, active) {
+            if (!driver) return;
+            const key = String(driver.masterKey || normalizeDriverKey(driver.name) || driver.id || '').trim();
+            if (!key) return;
+            if (!window.driverSettings || typeof window.driverSettings !== 'object') window.driverSettings = {};
+            window.driverSettings[key] = { active: active !== false };
+            driver.active = active !== false;
         }
 
         function reconcileVehicleOperationalState() {
@@ -3112,65 +3367,210 @@
             });
         }
 
-        window.Index1MasterBridge = {
-            baseUrl: 'https://uns-fleet-management-default-rtdb.asia-southeast1.firebasedatabase.app',
-            path: 'artifacts/uns-fleet-service/public/data/vehicles',
-            timer: null,
+        // ============================================================
+        // MASTER ADMINAUTO: KENDARAAN + DRIVER
+        // Sumber tunggal identitas armada dan driver. Tidak disalin ke
+        // Firestore GarasiKu. Dibaca sekali saat buka/refresh.
+        // ============================================================
+        // ============================================================
+        // KONEKSI MASTER ADMINAUTO
+        // GarasiKu memakai project AdminAuto sebagai reader master.
+        // Karena project berbeda, REST tanpa auth dapat ditolak Rules.
+        // Jika ditolak, bridge melakukan Anonymous Auth ke project
+        // AdminAuto lalu membaca ulang dengan ID token. Tidak ada polling.
+        // ============================================================
+        const ADMINAUTO_FIREBASE_CONFIG = Object.freeze({
+            apiKey: "AIzaSyAi0Ucng_tl7jSC9gZtr0JItCBUtkt-vvU",
+            authDomain: "uns-fleet-service.firebaseapp.com",
+            databaseURL: "https://uns-fleet-service-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "uns-fleet-service",
+            storageBucket: "uns-fleet-service.firebasestorage.app",
+            messagingSenderId: "881806830475",
+            appId: "1:881806830475:web:8dcf991ec95ae93b625d8e"
+        });
+
+        let adminAutoApp = null;
+        let adminAutoAuth = null;
+        let adminAutoAuthPromise = null;
+
+        async function ensureAdminAutoReaderAuth(forceRefresh = false) {
+            if (adminAutoAuth?.currentUser && !forceRefresh) return adminAutoAuth.currentUser;
+            if (adminAutoAuthPromise) return adminAutoAuthPromise;
+
+            adminAutoAuthPromise = (async () => {
+                try {
+                    const existing = window.__GarasiKuFirebaseSDK.getApps().find(a => a.name === 'AdminAutoReader');
+                    adminAutoApp = existing || window.__GarasiKuFirebaseSDK.initializeApp(ADMINAUTO_FIREBASE_CONFIG, 'AdminAutoReader');
+                    try {
+                        adminAutoAuth = window.__GarasiKuFirebaseSDK.initializeAuth(adminAutoApp, { persistence: window.__GarasiKuFirebaseSDK.inMemoryPersistence });
+                    } catch (e) {
+                        adminAutoAuth = window.__GarasiKuFirebaseSDK.getAuth(adminAutoApp);
+                    }
+                    if (!adminAutoAuth.currentUser) {
+                        await Promise.race([
+                            window.__GarasiKuFirebaseSDK.signInAnonymously(adminAutoAuth),
+                            new Promise((_, reject) => setTimeout(() => reject(new Error('Anonymous Auth AdminAuto timeout setelah 20 detik.')), 20000))
+                        ]);
+                    }
+                    if (!adminAutoAuth.currentUser) throw new Error('Anonymous Auth AdminAuto tidak menghasilkan sesi.');
+                    // Pastikan token benar-benar tersedia sebelum REST READ.
+                    await adminAutoAuth.currentUser.getIdToken(forceRefresh);
+                    return adminAutoAuth.currentUser;
+                } finally {
+                    adminAutoAuthPromise = null;
+                }
+            })();
+            return adminAutoAuthPromise;
+        }
+
+        async function getAdminAutoReaderToken(forceRefresh = false) {
+            const user = await ensureAdminAutoReaderAuth(forceRefresh);
+            const token = await user.getIdToken(forceRefresh);
+            if (!token) throw new Error('ID token AdminAuto kosong.');
+            return token;
+        }
+
+        window.AdminAutoMasterBridge = {
+            baseUrl: 'https://uns-fleet-service-default-rtdb.asia-southeast1.firebasedatabase.app',
+            vehiclesPath: 'artifacts/uns-fleet-service/public/data_v2/vehicles',
+            driversPath: 'artifacts/uns-fleet-service/public/data_v2/drivers',
             syncing: false,
             lastSuccess: null,
-            async sync() {
-                if (this.syncing) return;
+            lastError: '',
+            cacheKey: 'garasiku_adminauto_master_cache_v1',
+            cacheTtlMs: 5 * 60 * 1000,
+            authMode: 'anonymous-auth',
+
+            async readNode(path) {
+                const urlBase = `${this.baseUrl}/${path}.json`;
+                // Rules master AdminAuto mensyaratkan auth != null. Jangan melakukan
+                // public GET terlebih dahulu: langsung gunakan Anonymous Auth + ID token.
+                let token = await getAdminAutoReaderToken(false);
+                let res = await fetch(`${urlBase}?auth=${encodeURIComponent(token)}&ts=${Date.now()}`, { cache: 'no-store' });
+
+                // Token dapat kedaluwarsa; refresh sekali lalu ulangi READ.
+                if (res.status === 401 || res.status === 403) {
+                    token = await getAdminAutoReaderToken(true);
+                    res = await fetch(`${urlBase}?auth=${encodeURIComponent(token)}&ts=${Date.now()}`, { cache: 'no-store' });
+                }
+
+                if (!res.ok) {
+                    const body = await res.text().catch(() => '');
+                    if (res.status === 401 || res.status === 403) {
+                        throw new Error(`AdminAuto menolak READ ${path} (${res.status}). Anonymous Auth sudah dipanggil tetapi Rules/token tidak menerima sesi reader. ${body}`);
+                    }
+                    throw new Error(`HTTP ${res.status} saat membaca ${path}: ${body}`);
+                }
+                return await res.json();
+            },
+
+            async sync(force = false) {
+                if (this.syncing) return false;
                 this.syncing = true;
                 try {
-                    const res = await fetch(`${this.baseUrl}/${this.path}.json?ts=${Date.now()}`, {cache:'no-store'});
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    const data = await res.json();
-                    const arr = data && typeof data === 'object' ? Object.entries(data).map(([key,val]) => ({...(val || {}), _fbKey:key})) : [];
-                    window.vehicles = arr.map((v, i) => ({
-                        ...v,
-                        id: v.id || v._fbKey || `IDX1-${i+1}`,
-                        plate: String(v.plate || v.id || v._fbKey || '').toUpperCase().trim(),
-                        model: String(v.model || 'Mobil Dinas').trim(),
-                        driver: String(v.driver || '').trim(),
-                        category: canonicalVehicleCategory(v.category),
-                        odometer: Number(v.currentKm ?? v.odometer ?? 0) || 0,
-                        currentKm: Number(v.currentKm ?? v.odometer ?? 0) || 0,
-                        status: v.status || 'IN_GARAGE'
-                    }));
+                    let cached = null;
+                    if (!force) {
+                        try {
+                            const raw = sessionStorage.getItem(this.cacheKey);
+                            const parsed = raw ? JSON.parse(raw) : null;
+                            if (parsed && Array.isArray(parsed.vehicles) && Array.isArray(parsed.drivers) && Date.now() - Number(parsed.savedAt || 0) <= this.cacheTtlMs) cached = parsed;
+                        } catch (e) {}
+                    }
+                    const [vehicleData, driverData] = cached
+                        ? [cached.vehicles, cached.drivers]
+                        : await Promise.all([
+                            this.readNode(this.vehiclesPath),
+                            this.readNode(this.driversPath)
+                        ]);
+
+                    const vehiclesRaw = vehicleData && typeof vehicleData === 'object' ? vehicleData : {};
+                    const driversRaw = driverData && typeof driverData === 'object' ? driverData : {};
+
+                    window.vehicles = Object.entries(vehiclesRaw).map(([key, val], i) => {
+                        const v = val && typeof val === 'object' ? val : {};
+                        const plate = String(v.plate || v.nopol || v.id || key || '').toUpperCase().trim();
+                        const status = String(v.status || 'AKTIF').toUpperCase();
+                        return {
+                            ...v,
+                            id: String(v.id || key || `AUTO-${i+1}`),
+                            _fbKey: key,
+                            plate,
+                            model: String(v.model || v.name || 'Mobil Dinas').trim(),
+                            name: String(v.name || v.model || plate || 'Mobil Dinas').trim(),
+                            driverId: String(v.driverId || '').trim(),
+                            driver: String(v.driver || '').trim(),
+                            category: canonicalVehicleCategory(v.category),
+                            usageCategory: String(v.usage || v.usageCategory || '').toUpperCase() === 'PIMPINAN' ? 'PIMPINAN' : 'OPERATIONAL',
+                            odometer: Number(v.currentKm ?? v.odometer ?? 0) || 0,
+                            currentKm: Number(v.currentKm ?? v.odometer ?? 0) || 0,
+                            active: status !== 'NONAKTIF' && status !== 'OFF',
+                            status: v.status || 'IN_GARAGE'
+                        };
+                    });
+
+                    window.firebaseDrivers = Object.entries(driversRaw).map(([key, val]) => {
+                        const d = val && typeof val === 'object' ? val : {};
+                        const type = String(d.type || d.category || 'Operasional').toLowerCase();
+                        const status = String(d.status || 'AKTIF').toUpperCase();
+                        return {
+                            ...d,
+                            id: String(d.id || key),
+                            _fbKey: key,
+                            name: String(d.name || '').trim(),
+                            category: type === 'pimpinan' || type === 'executive' ? 'EXECUTIVE' : 'OPERATIONAL',
+                            cp: String(d.phone || d.cp || '').trim(),
+                            phone: String(d.phone || d.cp || '').trim(),
+                            active: status !== 'NONAKTIF' && status !== 'OFF',
+                            status: d.status || 'AVAILABLE'
+                        };
+                    }).filter(d => d.name);
+
+                    try {
+                        sessionStorage.setItem(this.cacheKey, JSON.stringify({
+                            savedAt: Date.now(),
+                            vehicles: vehiclesRaw,
+                            drivers: driversRaw
+                        }));
+                    } catch (e) {}
+
                     applyVehicleSettingsToMaster();
                     applyDriverSettingsToMasterDrivers();
-                    // Master Index 1 hanya memasok identitas kendaraan/ODO.
-                    // Status operasional Keluar/Masuk wajib mengikuti Logbook GarasiKu
-                    // agar refresh master setiap 5 detik tidak membatalkan transaksi gerbang.
                     reconcileVehicleOperationalState();
                     this.lastSuccess = new Date();
+                    this.lastError = '';
+                    window.adminAutoMasterReadError = '';
                     if (typeof renderAll === 'function') renderAll();
+                    return true;
                 } catch (e) {
-                    console.warn('Sinkron Master Index 1 gagal:', e.message);
+                    this.lastError = e?.message || 'Gagal membaca master AdminAuto';
+                    window.adminAutoMasterReadError = this.lastError;
+                    console.warn('Gagal membaca master AdminAuto:', this.lastError);
+                    if (typeof showToast === 'function') {
+                        showToast('Master AdminAuto belum terbaca', this.lastError, 'error');
+                    }
+                    return false;
                 } finally {
                     this.syncing = false;
                 }
             },
-            async syncOdometersToIndex1() {
-                const list = Array.isArray(window.vehicles) ? window.vehicles : [];
-                await Promise.all(list.map(async v => {
-                    const key = v._fbKey || v.id || normalizePlateKey(v.plate);
-                    if (!key) return;
-                    const km = Number(v.odometer ?? v.currentKm ?? 0) || 0;
-                    const masterKm = Number(v.currentKm ?? 0) || 0;
-                    if (km === masterKm) return;
-                    try {
-                        await fetch(`${this.baseUrl}/${this.path}/${encodeURIComponent(key)}.json`, {
-                            method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({currentKm:km})
-                        });
-                    } catch (e) { console.warn('Gagal update ODO Index 1:', v.plate, e.message); }
-                }));
+
+            async syncOdometersToAdminAuto() {
+                // FIX25: GarasiKu tidak menulis kembali master AdminAuto.
+                // Rules AdminAuto membatasi WRITE kendaraan ke UID admin tertentu,
+                // sedangkan GarasiKu memakai Anonymous Auth sebagai reader.
+                // Menahan fungsi lama mencegah request WRITE yang pasti ditolak
+                // dan menjaga arah sinkronisasi tetap satu arah: AdminAuto -> GarasiKu.
+                return false;
             },
-            start() {
-                clearInterval(this.timer);
-                this.timer = null;
-                return this.sync(); // satu READ saat buka/refresh
-            }
+
+            start() { return this.sync(); }
+        };
+
+        // Kompatibilitas nama lama di seluruh kode GarasiKu.
+        window.Index1MasterBridge = {
+            start: () => window.AdminAutoMasterBridge.start(),
+            sync: (force = false) => window.AdminAutoMasterBridge.sync(force),
+            syncOdometersToIndex1: () => window.AdminAutoMasterBridge.syncOdometersToAdminAuto()
         };
 
         // Global State & Settings
@@ -3207,14 +3607,40 @@
             timer: null,
             syncing: false,
             lastSuccess: null,
+            cacheKey: 'garasiku_etoll_master_cache_v1',
+            cacheTtlMs: 5 * 60 * 1000,
 
             normalizeNumber(value) {
                 return String(value || '').replace(/\D/g, '');
             },
 
-            async sync() {
+            async sync(force = false) {
                 if (this.syncing) return;
                 this.syncing = true;
+                if (!force) {
+                    try {
+                        const raw = sessionStorage.getItem(this.cacheKey);
+                        const parsed = raw ? JSON.parse(raw) : null;
+                        if (parsed && Array.isArray(parsed.cards) && Date.now() - Number(parsed.savedAt || 0) <= this.cacheTtlMs) {
+                            const cloudState = window.cloudEtollState || {};
+                            window.etolls = parsed.cards.map(card => {
+                                const key = String(card.sourceCardId || card.cardNo || card.id || '');
+                                const cloud = cloudState[key] || cloudState[String(card.cardNo || '')] || {};
+                                return Object.assign({}, card, cloud, {
+                                    active: cloud.active !== undefined ? cloud.active !== false : card.active !== false,
+                                    status: cloud.status === 'BORROWED' ? 'BORROWED' : (card.status === 'BORROWED' && cloud.status === undefined ? 'BORROWED' : 'AVAILABLE'),
+                                    holderName: cloud.status === 'BORROWED' ? (cloud.holderName || null) : (cloud.status === undefined ? (card.holderName || null) : null),
+                                    balance: Number.isFinite(Number(cloud.balance)) ? Number(cloud.balance) : Number(card.balance || 0)
+                                });
+                            });
+                            try { localStorage.setItem('garasiku_etolls', JSON.stringify(window.etolls)); } catch (e) {}
+                            this.lastSuccess = new Date(parsed.savedAt);
+                            if (typeof renderAll === 'function') renderAll();
+                            this.syncing = false;
+                            return true;
+                        }
+                    } catch (e) {}
+                }
                 const baseUrl = `https://${this.sourceProjectId}-default-rtdb.asia-southeast1.firebasedatabase.app`;
                 try {
                     const response = await fetch(`${baseUrl}/${this.sourcePath}.json?ts=${Date.now()}`, {
@@ -3261,6 +3687,9 @@
                         });
 
                     window.etolls = masterCards;
+                    try {
+                        sessionStorage.setItem(this.cacheKey, JSON.stringify({ savedAt: Date.now(), cards: window.etolls }));
+                    } catch (e) {}
                     this.lastSuccess = new Date();
                     try { localStorage.setItem('garasiku_etolls', JSON.stringify(window.etolls)); } catch (e) {}
                     // Perubahan operasional kartu disimpan ke Firebase melalui saveToStorage().
@@ -3277,13 +3706,13 @@
                 }
             },
 
-            start() {
+            start(force = false) {
                 clearInterval(this.timer);
                 this.timer = null;
-                return this.sync(); // satu READ saat buka/refresh
+                return this.sync(force); // satu READ hanya bila cache sesi tidak tersedia/kedaluwarsa
             }
         };
-        window.etollLogs = loadLocalJson('garasiku_etoll_logs', []);
+        window.etollLogs = []; // Riwayat E-Toll dibaca dari Firestore maksimal 3 bulan terakhir.
         window.logs = []; // Logbook bersumber dari Firestore gate_logs; tidak dipersist sebagai antrean lokal.
         window.adminPin = localStorage.getItem('garasiku_admin_pin') || "1234";
 
@@ -3311,11 +3740,15 @@
         function saveToStorage(options = {}) {
             // Cache lokal selalu diperbarui. Cloud hanya disentuh bila payload berubah.
             try {
+                sessionStorage.setItem('garasiku_etoll_master_cache_v1', JSON.stringify({ savedAt: Date.now(), cards: window.etolls || [] }));
+            } catch (e) {}
+
+            try {
                 localStorage.setItem('garasiku_vehicles', JSON.stringify(window.vehicles));
                 localStorage.setItem('garasiku_driver_settings', JSON.stringify(collectDriverSettings()));
                 localStorage.setItem('garasiku_vehicle_settings', JSON.stringify(collectVehicleSettings()));
                 localStorage.setItem('garasiku_etolls', JSON.stringify(window.etolls));
-                localStorage.setItem('garasiku_etoll_logs', JSON.stringify(window.etollLogs));
+                localStorage.setItem('garasiku_etoll_logs', JSON.stringify((window.etollLogs || []).filter(l => !l?.timestamp || Date.parse(l.timestamp) >= (() => { const d = new Date(); d.setMonth(d.getMonth() - 2); return d.getTime(); })())));
                 localStorage.setItem('garasiku_admin_pin', window.adminPin);
                 localStorage.setItem('garasiku_telegram', JSON.stringify(window.telegramConfig));
             } catch (error) {
@@ -3358,12 +3791,17 @@
                 window.vehicleSettings = cloudData.vehicleSettings;
                 applyVehicleSettingsToMaster();
             }
-            // Master driver tidak berasal dari shared_state. Dibaca satu kali dari koleksi garasiku_drivers.
+            // Identitas driver tetap dari AdminAuto. Hanya status ON/OFF operasional yang berasal dari GarasiKu.
+            if (cloudData.driverSettings && typeof cloudData.driverSettings === 'object') {
+                window.driverSettings = cloudData.driverSettings;
+                try { localStorage.setItem('garasiku_driver_settings', JSON.stringify(window.driverSettings)); } catch (e) {}
+                applyDriverSettingsToMasterDrivers();
+            }
+            // Master driver tidak berasal dari shared_state. Dibaca satu kali dari AdminAuto RTDB.
             // Master identitas kartu tetap RekapToll; overlay operasional berasal dari Firebase GarasiKu.
             if (cloudData.etollState && typeof cloudData.etollState === 'object') {
                 window.cloudEtollState = cloudData.etollState;
             }
-            if (cloudData.etollLogs && Array.isArray(cloudData.etollLogs)) window.etollLogs = cloudData.etollLogs;
             // Logbook gerbang disinkronkan khusus melalui subcollection gate_logs.
             if (cloudData.appSettings && typeof cloudData.appSettings === 'object') {
                 window.cloudAppSettings = cloudData.appSettings;
@@ -3399,7 +3837,7 @@
                 const payload = {
                     schemaVersion: cloudData.schemaVersion,
                     vehicleSettings: cloudData.vehicleSettings || {},
-                    etollLogs: Array.isArray(cloudData.etollLogs) ? cloudData.etollLogs : [],
+                    driverSettings: cloudData.driverSettings || {},
                     etollState: cloudData.etollState || {},
                     adminPin: cloudData.adminPin || '1234',
                     telegramConfig: cloudData.telegramConfig || {},
@@ -3416,9 +3854,14 @@
         // Manual refresh = satu kali READ cloud, tanpa listener/polling.
         window.refreshCloudDataNow = async function() {
             if (!window.FirebaseBridge) return false;
-            const ok = await window.FirebaseBridge.initialize();
-            if (ok && window.Index1MasterBridge) await window.Index1MasterBridge.sync();
-            if (ok && window.EtollMasterBridge) await window.EtollMasterBridge.sync();
+            try { sessionStorage.removeItem('garasiku_gate_logs_cache_v1'); } catch (e) {}
+            try { sessionStorage.removeItem('garasiku_gate_logs_cache_v2_3m'); } catch (e) {}
+            try { sessionStorage.removeItem('garasiku_adminauto_master_cache_v1'); } catch (e) {}
+            try { sessionStorage.removeItem('garasiku_etoll_master_cache_v1'); } catch (e) {}
+            try { sessionStorage.removeItem('garasiku_etoll_logs_cache_v1_3m'); } catch (e) {}
+            const ok = await window.FirebaseBridge.initialize(null, { force: true });
+            if (ok && window.AdminAutoMasterBridge) await window.AdminAutoMasterBridge.sync(true);
+            if (ok && window.EtollMasterBridge) await window.EtollMasterBridge.sync(true);
             return ok;
         };
 
@@ -3697,7 +4140,7 @@
             }
             const labels = {
                 vehicleSettings: 'pengaturan kendaraan Firebase',
-                driverSettings: 'master driver Firebase',
+                driverSettings: 'status operasional driver GarasiKu',
                 gate_logs: 'SELURUH logbook gerbang Firebase',
                 etoll: 'data E-Toll Firebase',
                 appSettings: 'konfigurasi aplikasi Firebase',
@@ -3716,6 +4159,105 @@
             } catch (e) {
                 console.error('Hapus Master Data Firebase gagal:', e);
                 showToast('Hapus Gagal', e?.message || 'Data Firebase tidak dapat dihapus.', 'error');
+            }
+        }
+
+
+        // ============================================================
+        // ARSIP > 2 BULAN — ON DEMAND ONLY
+        // Tidak ikut startup/read normal. Hanya membaca bulan yang dipilih.
+        // ============================================================
+        let archiveContext = 'gate';
+
+        function archiveCutoffDate() {
+            const d = new Date();
+            d.setMonth(d.getMonth() - 2);
+            d.setDate(1);
+            d.setHours(0, 0, 0, 0);
+            return d;
+        }
+
+        function openArchiveModal(type = 'gate') {
+            archiveContext = type === 'etoll' ? 'etoll' : 'gate';
+            const typeEl = document.getElementById('archive-type');
+            const titleEl = document.getElementById('archive-modal-title');
+            const resultEl = document.getElementById('archive-results');
+            if (typeEl) typeEl.value = archiveContext;
+            if (titleEl) titleEl.innerHTML = archiveContext === 'etoll'
+                ? '<i class="fa-solid fa-box-archive text-rose-400 mr-2"></i>Arsip Mutasi E-Toll'
+                : '<i class="fa-solid fa-box-archive text-cyan-400 mr-2"></i>Arsip Logbook Gerbang';
+            if (resultEl) resultEl.innerHTML = '<div class="p-8 text-center text-slate-500 text-xs">Pilih bulan lalu klik Baca Arsip dari Cloud.</div>';
+            prepareArchiveMonth();
+            openModal('modal-archive');
+        }
+
+        function prepareArchiveMonth() {
+            const type = document.getElementById('archive-type')?.value || archiveContext || 'gate';
+            archiveContext = type;
+            const input = document.getElementById('archive-month');
+            const status = document.getElementById('archive-status');
+            if (!input) return;
+            const cutoff = archiveCutoffDate();
+            // Default ke bulan pertama yang sudah pasti lebih tua dari 2 bulan.
+            const defaultDate = new Date(cutoff.getFullYear(), cutoff.getMonth(), 1); defaultDate.setMonth(defaultDate.getMonth() - 1);
+            const value = `${defaultDate.getFullYear()}-${String(defaultDate.getMonth()+1).padStart(2,'0')}`;
+            input.value = value;
+            if (status) status.textContent = `${type === 'etoll' ? 'Mutasi E-Toll' : 'Logbook Gerbang'}: pilih bulan yang seluruh periodenya sudah melewati batas 2 bulan (${cutoff.toLocaleDateString('id-ID', {month:'long', year:'numeric'})}).`;
+        }
+
+        function archiveMonthValueToDates(value) {
+            const m = String(value || '').match(/^(\d{4})-(\d{2})$/);
+            if (!m) return null;
+            const year = Number(m[1]), month = Number(m[2]);
+            if (!year || month < 1 || month > 12) return null;
+            return { year, month, start: new Date(year, month - 1, 1), end: new Date(year, month, 1) };
+        }
+
+        async function loadSelectedArchive() {
+            const type = document.getElementById('archive-type')?.value || 'gate';
+            const selected = archiveMonthValueToDates(document.getElementById('archive-month')?.value);
+            const status = document.getElementById('archive-status');
+            const result = document.getElementById('archive-results');
+            if (!selected) {
+                if (status) status.innerHTML = '<span class="text-rose-400">Bulan arsip belum dipilih.</span>';
+                return;
+            }
+            const cutoff = archiveCutoffDate();
+            if (selected.end > cutoff) {
+                if (status) status.innerHTML = '<span class="text-amber-300">Bulan tersebut masih termasuk 2 bulan terakhir. Gunakan riwayat normal.</span>';
+                return;
+            }
+            if (!window.FirebaseBridge?.db) {
+                if (status) status.innerHTML = '<span class="text-rose-400">Firebase belum siap.</span>';
+                return;
+            }
+            if (status) status.innerHTML = '<span class="text-cyan-300"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Membaca arsip dari Firestore...</span>';
+            if (result) result.innerHTML = '<div class="p-8 text-center text-slate-400 text-xs">Mengambil data cloud...</div>';
+            try {
+                const logs = type === 'etoll'
+                    ? await window.FirebaseBridge.loadEtollLogArchive(selected.year, selected.month)
+                    : await window.FirebaseBridge.loadGateLogArchive(selected.year, selected.month);
+                renderArchiveResults(type, logs, selected);
+                if (status) status.innerHTML = `<span class="text-emerald-400 font-semibold"><i class="fa-solid fa-cloud-check mr-1"></i>${logs.length} data arsip berhasil dibaca dari cloud.</span>`;
+            } catch (e) {
+                console.error('Baca arsip gagal:', e);
+                if (status) status.innerHTML = `<span class="text-rose-400">Gagal membaca arsip: ${escapeHtml(e?.message || 'error')}</span>`;
+                if (result) result.innerHTML = '<div class="p-8 text-center text-rose-400 text-xs">Arsip gagal dibaca.</div>';
+            }
+        }
+
+        function renderArchiveResults(type, logs, selected) {
+            const result = document.getElementById('archive-results');
+            if (!result) return;
+            const title = `${String(selected.month).padStart(2,'0')}/${selected.year}`;
+            if (!logs.length) {
+                result.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">Tidak ada data arsip untuk ${title}.</div>`;
+                return;
+            }
+            if (type === 'etoll') {
+                result.innerHTML = `<table class="w-full text-left text-xs"><thead class="bg-dark-card text-slate-400 uppercase"><tr><th class="p-3">Waktu</th><th class="p-3">Kartu</th><th class="p-3">Aksi</th><th class="p-3">Pemegang</th><th class="p-3">Terpakai</th><th class="p-3">Catatan</th></tr></thead><tbody class="divide-y divide-dark-border">${logs.map(l => `<tr class="hover:bg-dark-cardHover"><td class="p-3 font-mono">${formatDateTime(l.timestamp)}</td><td class="p-3 font-semibold text-white">${escapeHtml(l.cardName || '-')}</td><td class="p-3">${escapeHtml(l.action || '-')}</td><td class="p-3">${escapeHtml(l.holderName || '-')}</td><td class="p-3 font-mono">Rp ${(Number(l.amountSpent)||0).toLocaleString('id-ID')}</td><td class="p-3 text-slate-400">${escapeHtml(l.notes || '-')}</td></tr>`).join('')}</tbody></table>`;
+            } else {
+                result.innerHTML = `<table class="w-full text-left text-xs"><thead class="bg-dark-card text-slate-400 uppercase"><tr><th class="p-3">Kendaraan</th><th class="p-3">Driver</th><th class="p-3">Keluar</th><th class="p-3">Masuk</th><th class="p-3">Tujuan</th><th class="p-3">Status</th></tr></thead><tbody class="divide-y divide-dark-border">${logs.map(l => `<tr class="hover:bg-dark-cardHover"><td class="p-3"><b class="text-white">${escapeHtml(l.plate || '-')}</b><div class="text-slate-500">${escapeHtml(l.model || '')}</div></td><td class="p-3">${escapeHtml(l.driverName || '-')}</td><td class="p-3 font-mono">${formatDateTime(l.timeOut)}</td><td class="p-3 font-mono">${l.timeIn ? formatDateTime(l.timeIn) : '<span class="text-amber-300">Masih keluar</span>'}</td><td class="p-3">${escapeHtml(l.destination || '-')}</td><td class="p-3">${escapeHtml(l.status || '-')}</td></tr>`).join('')}</tbody></table>`;
             }
         }
 
@@ -4308,11 +4850,10 @@
             }
 
             if (!saved) {
-                closeModal('modal-checkout');
-                document.getElementById('form-checkout').reset();
+                // FIX32: jangan menutup modal / menghapus formulir ketika write gagal.
                 renderAll();
                 const firebaseError = window.FirebaseBridge?.lastGateWriteError || 'Firebase tidak mengonfirmasi write.';
-                showToast('Firebase Gagal Menyimpan', `${vehicle.plate}: ${firebaseError}`, 'warning');
+                showToast('Belum Tersimpan ke Firebase', `${vehicle.plate}: ${firebaseError}. Data formulir tetap dipertahankan.`, 'error');
                 return;
             }
 
@@ -4451,11 +4992,11 @@
             }
 
             if (!saved) {
-                closeModal('modal-checkin');
-                document.getElementById('form-checkin').reset();
+                // FIX34: jangan menghapus form saat Firebase menolak write.
+                // Data tetap tersedia untuk retry setelah Rules/koneksi diperbaiki.
                 renderAll();
                 const firebaseError = window.FirebaseBridge?.lastGateWriteError || 'Firebase tidak mengonfirmasi write.';
-                showToast('Firebase Gagal Menyimpan', `${trip.plate}: ${firebaseError}`, 'warning');
+                showToast('Firebase Gagal Menyimpan', `${trip.plate}: ${firebaseError}. Form tetap terbuka, silakan coba lagi.`, 'error');
                 return;
             }
 
@@ -4904,6 +5445,27 @@
         }
 
         // Driver Master Cards
+        function driverIdentityValues(driver) {
+            const d = driver || {};
+            return [d.id, d._fbKey, d.masterKey, d.name]
+                .map(v => String(v ?? '').trim())
+                .filter(Boolean);
+        }
+
+        function vehicleAssignedToDriver(vehicle, driver) {
+            const v = vehicle || {};
+            const driverIds = driverIdentityValues(driver);
+            const assignedId = String(v.driverId ?? '').trim();
+            if (assignedId && driverIds.some(id => id === assignedId)) return true;
+
+            const assignedName = normalizeDriverKey(v.driver || '');
+            if (assignedName) {
+                const driverNames = driverIdentityValues(driver).map(normalizeDriverKey);
+                if (driverNames.includes(assignedName)) return true;
+            }
+            return false;
+        }
+
         function renderDriversGrid() {
             const grid = document.getElementById('drivers-cards-grid');
             if (!grid) return;
@@ -4916,6 +5478,19 @@
             if (activeFilter === 'ON') list = list.filter(d => d.active !== false);
             if (activeFilter === 'OFF') list = list.filter(d => d.active === false);
             if (catFilter !== 'ALL') list = list.filter(d => (d.category || 'OPERATIONAL') === catFilter);
+
+            if (!list.length) {
+                const reason = window.adminAutoMasterReadError
+                    ? `Master AdminAuto belum terbaca: ${escapeHtml(window.adminAutoMasterReadError)}`
+                    : (window.firebaseDrivers?.length === 0 ? 'Belum ada data driver pada master AdminAuto.' : 'Tidak ada driver yang sesuai filter.');
+                grid.innerHTML = `
+                    <div class="col-span-full p-6 rounded-2xl border border-dashed border-slate-700 bg-slate-950/40 text-center">
+                        <i class="fa-solid fa-users-slash text-2xl text-slate-600"></i>
+                        <p class="mt-2 text-sm font-semibold text-slate-300">Daftar Driver belum tersedia</p>
+                        <p class="mt-1 text-xs text-slate-500 break-words">${reason}</p>
+                    </div>`;
+                return;
+            }
 
             list.forEach(d => {
                 const activeTrip = window.logs.find(l => l.driverId === d.id && l.status === 'ACTIVE');
@@ -4934,7 +5509,7 @@
                     <div>
                         <div class="flex items-center justify-between">
                             <h4 class="font-bold text-sm text-white">${escapeHtml(d.name)}</h4>
-                            <span class="px-2 py-0.5 rounded-md bg-slate-950 border border-slate-800 text-slate-400 text-[10px] font-bold"><i class="fa-solid fa-cloud mr-1"></i>Firebase</span>
+                            <span class="px-2 py-0.5 rounded-md bg-slate-950 border border-slate-800 text-slate-400 text-[10px] font-bold"><i class="fa-solid fa-cloud mr-1"></i>Master AdminAuto</span>
                         </div>
                         <div class="mt-1 flex items-center space-x-1.5">
                             <span class="px-2 py-0.5 rounded-md text-[10px] font-bold ${isExecutive ? 'bg-purple-950 text-purple-300 border border-purple-800/60' : 'bg-cyan-950 text-cyan-300 border border-cyan-800/60'}">
@@ -4943,6 +5518,16 @@
                             </span>
                         </div>
                         <p class="text-xs text-slate-400 mt-2"><i class="fa-solid fa-address-book mr-1.5 text-slate-500"></i>CP: <span class="text-slate-200">${escapeHtml(d.cp || d.phone || '-')}</span></p>
+                        ${(() => {
+                            const assigned = (window.vehicles || []).filter(v => vehicleAssignedToDriver(v, d));
+                            return `<div class="mt-2.5 p-2 rounded-xl bg-slate-950/70 border border-slate-800">
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="text-[10px] font-bold text-slate-400"><i class="fa-solid fa-car-side mr-1 text-sky-400"></i>Kendaraan Ditugaskan</span>
+                                    <span class="text-[11px] font-black text-emerald-400">${assigned.length}</span>
+                                </div>
+                                <div class="mt-1 flex flex-wrap gap-1">${assigned.length ? assigned.map(v => `<span class="px-1.5 py-0.5 rounded-md bg-slate-900 border border-slate-700 text-[9px] font-mono text-slate-300">${escapeHtml(v.plate || v.id || '-')}</span>`).join('') : '<span class="text-[9px] text-slate-600">Belum ditugaskan</span>'}</div>
+                            </div>`;
+                        })()}
                         <div class="mt-2.5">
                             ${activeTrip ? `
                                 <div class="p-2 rounded-xl bg-amber-950/40 border border-amber-800/40 text-amber-300 text-[11px] font-semibold">
@@ -4967,13 +5552,10 @@
                             `)}
                         </div>
                     </div>
-                    <div class="mt-4 pt-2.5 border-t border-dark-border flex items-center justify-end space-x-2 admin-col ${isAdminLoggedIn ? '' : 'hidden'}">
-                        <button onclick="openEditDriverModal('${d.id}')" class="px-3 py-1.5 rounded-lg border border-indigo-800/60 bg-indigo-950/40 text-indigo-300 hover:bg-indigo-900/50 text-[10px] font-bold inline-flex items-center gap-1.5">
-                            <i class="fa-solid fa-pen"></i>Edit
-                        </button>
-                        <button onclick="deleteDriver('${d.id}')" class="px-3 py-1.5 rounded-lg border border-rose-800/60 bg-rose-950/40 text-rose-300 hover:bg-rose-900/50 text-[10px] font-bold inline-flex items-center gap-1.5">
-                            <i class="fa-solid fa-trash"></i>Hapus
-                        </button>
+                    <div class="mt-4 pt-2.5 border-t border-dark-border flex items-center justify-end">
+                        <span class="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-950/60 text-slate-400 text-[10px] font-bold inline-flex items-center gap-1.5">
+                            <i class="fa-solid fa-database"></i>Identitas dikelola AdminAuto
+                        </span>
                     </div>
                 `;
                 grid.appendChild(card);
@@ -4981,99 +5563,30 @@
         }
 
         function toggleDriverActive(id) {
-            const d = window.drivers.find(item => item.id === id);
+            const d = (window.drivers || []).find(item => item.id === id);
             if (!d) return;
-            const activeTrip = window.logs.find(l => l.driverId === d.id && l.status === 'ACTIVE');
-            if (activeTrip) {
-                showToast("Driver Bertugas", "Driver sedang mengemudikan kendaraan di jalan.", "warning");
-                return;
-            }
             requireAdminAction(async () => {
-                try {
-                    d.active = d.active === false ? true : false;
-                    await window.FirebaseBridge.saveDriverMaster({
-                        id: d.id, name: d.name, category: d.category, cp: d.cp || d.phone || '',
-                        active: d.active, status: d.status || 'AVAILABLE'
-                    });
-                    localStorage.setItem('garasiku_driver_settings', JSON.stringify(collectDriverSettings()));
-                    renderAll();
-                    showToast("Status Pengemudi", `${escapeHtml(d.name)} kini ${d.active ? 'ON (Aktif)' : 'OFF (Cuti)'}.`, "info");
-                } catch (e) {
-                    d.active = d.active === false ? true : false;
-                    showToast('Gagal Mengubah Status', e?.message || 'Firebase tidak dapat menyimpan status driver.', 'error');
-                }
+                const next = d.active === false;
+                persistDriverOperationalStatus(d, next);
+                await saveToStorage();
+                renderAll();
+                showToast(
+                    next ? 'Driver Diaktifkan' : 'Driver Dinonaktifkan',
+                    `${escapeHtml(d.name)} kini ${next ? 'ON (Aktif Standby)' : 'OFF (Cuti/Izin)'} di GarasiKu. Status AdminAuto tidak diubah.`,
+                    next ? 'success' : 'warning'
+                );
             });
         }
 
         async function handleAddDriver(event) {
             if (event) event.preventDefault();
-            if (!isAdminLoggedIn) {
-                showToast('Akses Admin Diperlukan', 'Sesi admin sudah berakhir. Silakan login admin kembali.', 'warning');
-                closeModal('modal-add-driver');
-                return false;
-            }
-
-            const nameEl = document.getElementById('drv-name');
-            const categoryEl = document.getElementById('drv-category');
-            const phoneEl = document.getElementById('drv-phone');
-            const saveBtn = document.querySelector('#form-add-driver button[type="submit"]');
-            if (!nameEl || !categoryEl || !phoneEl) {
-                showToast('Form Driver Rusak', 'Form tambah driver tidak lengkap. Buka kembali modal driver.', 'error');
-                return false;
-            }
-
-            const name = nameEl.value.trim().replace(/\s+/g, ' ');
-            const category = categoryEl.value === 'EXECUTIVE' ? 'EXECUTIVE' : 'OPERATIONAL';
-            const cp = phoneEl.value.trim();
-            if (!name) { showToast('Data Belum Lengkap', 'Nama driver wajib diisi.', 'warning'); nameEl.focus(); return false; }
-
-            const key = normalizeDriverKey(name);
-            const exists = (window.firebaseDrivers || []).some(d => normalizeDriverKey(d.name) === key);
-            if (exists) { showToast('Driver Sudah Ada', 'Nama driver tersebut sudah terdaftar.', 'warning'); return false; }
-            if (!window.FirebaseBridge?.saveDriverMaster) {
-                showToast('Firebase Belum Siap', 'Tunggu sampai status Cloud terhubung, lalu coba lagi.', 'error');
-                return false;
-            }
-
-            try {
-                if (saveBtn) { saveBtn.disabled = true; saveBtn.dataset.oldText = saveBtn.innerHTML; saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Menyimpan...'; }
-                const id = `DRV-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
-                await window.FirebaseBridge.saveDriverMaster({ id, name, category, cp, active: true });
-
-                // Cache lokal hanya pelengkap UI. Kegagalan localStorage tidak boleh
-                // membatalkan keberhasilan write ke Firestore.
-                try { localStorage.setItem('garasiku_driver_settings', JSON.stringify(collectDriverSettings())); } catch (cacheErr) { console.warn('Cache driver tidak tersimpan:', cacheErr); }
-
-                const form = document.getElementById('form-add-driver');
-                if (form) form.reset();
-                closeModal('modal-add-driver');
-                renderAll();
-                showToast('Driver Tersimpan', `${name} berhasil disimpan ke Firebase.`, 'success');
-                return true;
-            } catch (e) {
-                console.error('Gagal menyimpan driver:', e);
-                showToast('Gagal Menyimpan Driver', e?.message || 'Firebase tidak dapat menyimpan driver.', 'error');
-                return false;
-            } finally {
-                if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = saveBtn.dataset.oldText || 'Simpan Driver'; }
-            }
+            closeModal('modal-add-driver');
+            showToast('Master Driver AdminAuto', 'Tambah driver dilakukan di AdminAuto. GarasiKu membaca master driver dari database AdminAuto.', 'info');
+            return false;
         }
 
         async function deleteDriver(id) {
-            const d = (window.drivers || []).find(item => item.id === id);
-            if (!d) return;
-            const activeTrip = (window.logs || []).find(l => l.driverId === d.id && l.status === 'ACTIVE');
-            if (activeTrip) { showToast('Driver Bertugas', 'Driver sedang mengemudikan kendaraan di jalan.', 'warning'); return; }
-            requireAdminAction(async () => {
-                try {
-                    await window.FirebaseBridge.deleteDriverMaster(id);
-                    localStorage.setItem('garasiku_driver_settings', JSON.stringify(collectDriverSettings()));
-                    renderAll();
-                    showToast('Driver Dihapus', `${escapeHtml(d.name)} dihapus dari master Firebase.`, 'success');
-                } catch (e) {
-                    showToast('Gagal Menghapus', e?.message || 'Firebase tidak dapat menghapus driver.', 'error');
-                }
-            });
+            showToast('Master Driver AdminAuto', 'Hapus driver dilakukan di AdminAuto. GarasiKu tidak menghapus master driver.', 'info');
         }
 
         function openEditDriverModal(id) {
@@ -5089,27 +5602,10 @@
         }
 
         async function handleEditDriver(event) {
-            event.preventDefault();
-            if (!isAdminLoggedIn) return;
-            const id = document.getElementById('edit-driver-key').value;
-            const d = (window.drivers || []).find(item => item.id === id);
-            if (!d) return;
-            try {
-                await window.FirebaseBridge.saveDriverMaster({
-                    id,
-                    name: document.getElementById('edit-driver-name').value.trim(),
-                    category: document.getElementById('edit-driver-category').value,
-                    cp: document.getElementById('edit-driver-phone').value.trim(),
-                    active: document.getElementById('edit-driver-active').value === 'ON',
-                    status: d.status || 'AVAILABLE'
-                });
-                localStorage.setItem('garasiku_driver_settings', JSON.stringify(collectDriverSettings()));
-                closeModal('modal-edit-driver');
-                renderAll();
-                showToast('Driver Disimpan', `${escapeHtml(d.name)} diperbarui dan tersimpan di Firebase.`, 'success');
-            } catch (e) {
-                showToast('Gagal Menyimpan', e?.message || 'Firebase tidak dapat menyimpan driver.', 'error');
-            }
+            if (event) event.preventDefault();
+            closeModal('modal-edit-driver');
+            showToast('Master Driver AdminAuto', 'Edit driver dilakukan di AdminAuto. GarasiKu hanya membaca master driver.', 'info');
+            return false;
         }
 
         // ==========================================
@@ -5216,7 +5712,7 @@
             openModal('modal-borrow-etoll');
         }
 
-        function handleBorrowEtoll(event) {
+        async function handleBorrowEtoll(event) {
             event.preventDefault();
             const id = document.getElementById('borrow-etoll-id').value;
             const selectVal = document.getElementById('borrow-driver-select').value;
@@ -5255,8 +5751,13 @@
                     timestamp: new Date().toISOString()
                 };
                 window.etollLogs.unshift(newRecap);
-
-                saveToStorage();
+                const etollLogSaved = await window.FirebaseBridge?.saveEtollLog?.(newRecap);
+                if (etollLogSaved === false) {
+                    window.etollLogs.shift();
+                    showToast('E-Toll Gagal Disimpan', 'Transaksi tidak tersimpan ke Firebase. Perubahan kartu dibatalkan.', 'error');
+                    return;
+                }
+                await saveToStorage();
                 closeModal('modal-borrow-etoll');
                 openStatDetail('etoll');
                 renderAll();
@@ -5281,7 +5782,7 @@
             openModal('modal-return-etoll');
         }
 
-        function handleReturnEtoll(event) {
+        async function handleReturnEtoll(event) {
             event.preventDefault();
             const id = document.getElementById('return-etoll-id').value;
             const newBalVal = document.getElementById('return-etoll-new-balance').value;
@@ -5318,8 +5819,13 @@
                     timestamp: new Date().toISOString()
                 };
                 window.etollLogs.unshift(newRecap);
-
-                saveToStorage();
+                const etollLogSaved = await window.FirebaseBridge?.saveEtollLog?.(newRecap);
+                if (etollLogSaved === false) {
+                    window.etollLogs.shift();
+                    showToast('E-Toll Gagal Disimpan', 'Transaksi tidak tersimpan ke Firebase. Perubahan kartu dibatalkan.', 'error');
+                    return;
+                }
+                await saveToStorage();
                 closeModal('modal-return-etoll');
                 openStatDetail('etoll');
                 renderAll();
@@ -5396,7 +5902,7 @@
             }
         }
 
-        function handleSwapEtoll(event) {
+        async function handleSwapEtoll(event) {
             event.preventDefault();
             const id = document.getElementById('swap-etoll-id').value;
             const currentBalInput = document.getElementById('swap-balance-current').value;
@@ -5456,6 +5962,12 @@
                     timestamp: new Date().toISOString()
                 };
                 window.etollLogs.unshift(newRecap);
+                const etollLogSaved = await window.FirebaseBridge?.saveEtollLog?.(newRecap);
+                if (etollLogSaved === false) {
+                    window.etollLogs.shift();
+                    showToast('E-Toll Gagal Disimpan', 'Transaksi tidak tersimpan ke Firebase. Perubahan kartu dibatalkan.', 'error');
+                    return;
+                }
                 showToast("Kartu Ditukar", `${escapeHtml(card.name)} kini OFF, ${reserveCard.name} kini ON.`, "success");
 
                 if (window.telegramConfig.notifyEtoll !== false && window.telegramConfig.botToken && window.telegramConfig.chatId) {
@@ -5502,6 +6014,12 @@
                     timestamp: new Date().toISOString()
                 };
                 window.etollLogs.unshift(newRecap);
+                const etollLogSaved = await window.FirebaseBridge?.saveEtollLog?.(newRecap);
+                if (etollLogSaved === false) {
+                    window.etollLogs.shift();
+                    showToast('E-Toll Gagal Disimpan', 'Transaksi tidak tersimpan ke Firebase. Perubahan kartu dibatalkan.', 'error');
+                    return;
+                }
                 showToast("Kartu Dioper", `${escapeHtml(card.name)} telah dioper ke ${newHolder}.`, "success");
 
                 if (window.telegramConfig.notifyEtoll !== false && window.telegramConfig.botToken && window.telegramConfig.chatId) {
@@ -5548,6 +6066,12 @@
                     timestamp: new Date().toISOString()
                 };
                 window.etollLogs.unshift(newRecap);
+                const etollLogSaved = await window.FirebaseBridge?.saveEtollLog?.(newRecap);
+                if (etollLogSaved === false) {
+                    window.etollLogs.shift();
+                    showToast('E-Toll Gagal Disimpan', 'Transaksi tidak tersimpan ke Firebase. Perubahan kartu dibatalkan.', 'error');
+                    return;
+                }
                 showToast("Kartu Ditukar", `${escapeHtml(card.name)} diganti dengan ${newCard.name} untuk ${oldHolder}.`, "success");
 
                 if (window.telegramConfig.notifyEtoll !== false && window.telegramConfig.botToken && window.telegramConfig.chatId) {
@@ -5559,7 +6083,7 @@
                 }
             }
 
-            saveToStorage();
+            await saveToStorage();
             closeModal('modal-swap-etoll');
             openStatDetail('etoll');
             renderAll();
@@ -5708,7 +6232,7 @@
             });
         }
 
-        function deleteEtollRecapRow(borrowId, returnId, activityId) {
+        async function deleteEtollRecapRow(borrowId, returnId, activityId) {
             if (!isAdminLoggedIn) {
                 openAdminAuthModal(() => deleteEtollRecapRow(borrowId, returnId, activityId));
                 return;
@@ -5763,7 +6287,15 @@
                 }
             });
 
-            saveToStorage();
+            for (const logId of ids) {
+                const ok = await window.FirebaseBridge?.deleteEtollLog?.(logId);
+                if (ok === false) {
+                    showToast('Hapus Gagal', `Log E-Toll ${logId} gagal dihapus dari Firebase.`, 'error');
+                    return;
+                }
+            }
+            await saveToStorage();
+            try { sessionStorage.removeItem('garasiku_etoll_logs_cache_v1_3m'); } catch (e) {}
             renderAll();
             showToast("Mutasi Dihapus", "Rekap mutasi E-Toll berhasil dihapus oleh Admin.", "success");
         }
@@ -6452,7 +6984,20 @@
             }
         }
 
+        function normalizeRuntimeArrays() {
+            // Guard utama: data Firebase/local lama tidak boleh membuat renderer
+            // memanggil .map/.filter pada undefined/non-array.
+            if (!Array.isArray(window.vehicles)) window.vehicles = [];
+            if (!Array.isArray(window.drivers)) window.drivers = [];
+            if (!Array.isArray(window.logs)) window.logs = [];
+            if (!Array.isArray(window.etolls)) window.etolls = [];
+            if (!Array.isArray(window.etollLogs)) window.etollLogs = [];
+            if (!window.driverSettings || typeof window.driverSettings !== 'object' || Array.isArray(window.driverSettings)) window.driverSettings = {};
+            if (!window.vehicleSettings || typeof window.vehicleSettings !== 'object' || Array.isArray(window.vehicleSettings)) window.vehicleSettings = {};
+        }
+
         function renderAll() {
+            normalizeRuntimeArrays();
             updateDashboardStats();
             renderMonitoringBay();
             renderLogsTable();
@@ -6472,6 +7017,14 @@
             renderAll();
             updateGlobalConnectionIndicator();
         });
+
+        // FIX32 diagnostic: runtime error dicatat tanpa mengosongkan UI.
+        window.addEventListener('error', (event) => {
+            console.error('GarasiKu runtime error:', event.error || event.message);
+        });
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('GarasiKu unhandled rejection:', event.reason);
+        });
     </script>
     <script>
         // Mulai sinkronisasi master kartu E-Toll dari aplikasi RekapToll setelah seluruh fungsi GarasiKu siap.
@@ -6479,6 +7032,45 @@
             if (window.EtollMasterBridge) window.EtollMasterBridge.start();
         }, { once: true });
     </script>
+
+
+
+    <!-- MODAL ARSIP > 2 BULAN -->
+    <div id="modal-archive" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-[70] hidden">
+        <div class="w-full max-w-5xl max-h-[90vh] overflow-hidden bg-dark-surface border border-dark-border rounded-3xl shadow-2xl flex flex-col">
+            <div class="px-5 py-4 border-b border-dark-border flex items-center justify-between bg-dark-card">
+                <div>
+                    <h3 id="archive-modal-title" class="font-extrabold text-base text-white"><i class="fa-solid fa-box-archive text-cyan-400 mr-2"></i>Arsip</h3>
+                    <p class="text-[11px] text-slate-400 mt-1">Data yang melewati 2 bulan tidak dibaca saat startup. Baca hanya saat diperlukan.</p>
+                </div>
+                <button type="button" onclick="closeModal('modal-archive')" class="w-9 h-9 rounded-xl border border-dark-border text-slate-300 hover:bg-slate-800">&times;</button>
+            </div>
+            <div class="p-4 border-b border-dark-border bg-dark-surface space-y-3">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-end">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Jenis Arsip</label>
+                        <select id="archive-type" onchange="prepareArchiveMonth()" class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-100 text-xs">
+                            <option value="gate">Logbook Gerbang</option>
+                            <option value="etoll">Mutasi E-Toll</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Bulan Arsip</label>
+                        <input type="month" id="archive-month" class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-100 text-xs">
+                    </div>
+                    <button type="button" onclick="loadSelectedArchive()" class="px-3 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold transition">
+                        <i class="fa-solid fa-cloud-arrow-down mr-1"></i>Baca Arsip dari Cloud
+                    </button>
+                </div>
+                <div id="archive-status" class="text-[11px] text-slate-400">Pilih bulan yang sudah melewati 2 bulan.</div>
+            </div>
+            <div class="flex-1 overflow-auto p-3">
+                <div id="archive-results" class="overflow-x-auto rounded-2xl border border-dark-border">
+                    <div class="p-8 text-center text-slate-500 text-xs">Belum ada arsip yang dibaca.</div>
+                </div>
+            </div>
+        </div>
+    </div>
 
 </body>
 </html>
