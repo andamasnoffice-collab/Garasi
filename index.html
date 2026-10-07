@@ -781,14 +781,7 @@
             }
         }
 
-    
-    <style>
-        /* FIX49: penegasan visual kendaraan di luar dan tombol Tugaskan Keluar */
-        #active-trips-container > div {
-            border-color: #f97316 !important;
-        }
     </style>
-</style>
 
 <style id="mobile-dashboard-cards-fix">
 /* FIX15 — dashboard statistic cards: prevent mobile text/button overlap */
@@ -2767,22 +2760,36 @@
                 }
             },
 
-            async migrateLegacyEtollLogsIfNeeded(legacyLogs) {
+            async migrateLegacyEtollLogsIfNeeded(legacyLogs, sharedData = null) {
+                // MIGRASI LEGACY = SATU KALI SAJA. Penanda berada di Firebase, bukan localStorage.
                 if (!this.db || !Array.isArray(legacyLogs) || !legacyLogs.length) return true;
                 if (this.etollLegacyMigrationRunning) return false;
+                const shared = sharedData || {};
+                if (Number(shared.etollLogsSchemaVersion || 0) >= 1 && !legacyLogs.length) return true;
+
                 this.etollLegacyMigrationRunning = true;
-                const col = this.etollLogsCollection();
-                const valid = legacyLogs.filter(l => l && l.id);
-                for (let i = 0; i < valid.length; i += 450) {
-                    const chunk = valid.slice(i, i + 450);
-                    const batch = writeBatch(this.db);
-                    chunk.forEach(log => batch.set(doc(col, String(log.id)), log, { merge: false }));
-                    if (chunk.length) await batch.commit();
-                }
                 try {
+                    const col = this.etollLogsCollection();
+                    const valid = legacyLogs.filter(l => l && l.id);
+                    for (let i = 0; i < valid.length; i += 450) {
+                        const chunk = valid.slice(i, i + 450);
+                        if (!chunk.length) continue;
+                        const batch = writeBatch(this.db);
+                        chunk.forEach(log => batch.set(doc(col, String(log.id)), log, { merge: false }));
+                        await batch.commit();
+                    }
+
+                    // Sumber legacy baru dihapus setelah SEMUA batch berhasil.
                     const sharedRef = doc(this.db, 'garasiku_fleet', 'shared_state');
-                    await setDoc(sharedRef, { etollLogs: deleteField(), etollLogsMigratedAt: new Date().toISOString(), etollLogsSchemaVersion: 1 }, { merge: true });
+                    await setDoc(sharedRef, {
+                        etollLogs: deleteField(),
+                        etollLogsMigratedAt: new Date().toISOString(),
+                        etollLogsSchemaVersion: 1
+                    }, { merge: true });
                     return true;
+                } catch (e) {
+                    console.error('Migrasi legacy E-Toll gagal; data legacy Firebase dipertahankan:', e);
+                    return false;
                 } finally {
                     this.etollLegacyMigrationRunning = false;
                 }
@@ -2847,6 +2854,15 @@
                     window.etollLogs = Array.isArray(recentEtollLogs) ? recentEtollLogs : [];
                     try { localStorage.setItem('garasiku_etoll_logs', JSON.stringify((window.etollLogs || []).filter(l => !l?.timestamp || Date.parse(l.timestamp) >= (() => { const d = new Date(); d.setMonth(d.getMonth() - 2); return d.getTime(); })()))); } catch (e) {}
 
+                    // FIX49: migrasi legacy hanya dipicu jika data legacy benar-benar ada di Firebase.
+                    // Migrasi ditunggu sebelum renderer final, sehingga tidak ada status lokal yang
+                    // mendahului hasil Firebase. Sumber legacy tidak dihapus sebelum seluruh write berhasil.
+                    const sharedDataForMigration = sharedSnap.exists() ? (sharedSnap.data() || {}) : {};
+                    const legacyGateLogs = Array.isArray(sharedDataForMigration.logs) ? sharedDataForMigration.logs : [];
+                    const legacyEtollLogs = Array.isArray(sharedDataForMigration.etollLogs) ? sharedDataForMigration.etollLogs : [];
+                    if (legacyGateLogs.length) await this.migrateLegacyLogsIfNeeded(sharedDataForMigration);
+                    if (legacyEtollLogs.length) await this.migrateLegacyEtollLogsIfNeeded(legacyEtollLogs, sharedDataForMigration);
+
                     // Migrasi sekali dari format lama shared_state.etollLogs ke collection
                     // terpisah. Startup tidak menunggu ribuan write migrasi; UI tetap hanya
                     // menampilkan 2 bulan terakhir dari data legacy sampai migrasi selesai.
@@ -2871,8 +2887,8 @@
                     // normal setelah refresh.
                     if (Array.isArray(gateSnap)) {
                         window.logs = gateSnap.map(log => ({ ...log, id: String(log.id) }));
-                        // Legacy shared_state.logs hanya digabung sebagai fallback/kompatibilitas.
-                        // Sumber utama tetap collection gate_logs dari Firestore.
+                        // Legacy shared_state.logs hanya menjadi fallback Firebase bila migrasi belum berhasil.
+                        // Sumber normal tetap collection gate_logs dari Firestore.
                         if (sharedSnap.exists() && Array.isArray(sharedSnap.data()?.logs)) {
                             const cutoff = new Date();
                             cutoff.setMonth(cutoff.getMonth() - this.gateReadMonths);
@@ -2932,20 +2948,28 @@
             },
 
             async migrateLegacyLogsIfNeeded(legacyData = null) {
+                // MIGRASI LEGACY = SATU KALI SAJA. Firebase tetap menjadi sumber kebenaran.
+                // Tidak memakai localStorage/sessionStorage sebagai penanda migrasi.
                 if (this.gateMigrationRunning || !this.db) return false;
+                const shared = legacyData || {};
+                const legacyLogs = Array.isArray(shared.logs) ? shared.logs.filter(log => log && log.id) : [];
+                const alreadyMigrated = Number(shared.gateLogsSchemaVersion || 0) >= 1 && !legacyLogs.length;
+                if (!legacyLogs.length || alreadyMigrated) return true;
+
                 this.gateMigrationRunning = true;
                 try {
-                    const legacyLogs = Array.isArray(legacyData?.logs) ? legacyData.logs : [];
-                    if (!legacyLogs.length) return true;
-
+                    // Batch hanya untuk migrasi data lama. Tidak dipanggil pada transaksi normal.
                     for (let i = 0; i < legacyLogs.length; i += 450) {
-                        const chunk = legacyLogs.slice(i, i + 450).filter(log => log && log.id);
+                        const chunk = legacyLogs.slice(i, i + 450);
                         if (!chunk.length) continue;
                         const batch = writeBatch(this.db);
-                        chunk.forEach(log => batch.set(this.gateLogRef(log.id), log, { merge: false }));
+                        chunk.forEach(log => batch.set(this.gateLogRef(String(log.id)), log, { merge: false }));
                         await batch.commit();
                     }
 
+                    // Hapus sumber legacy hanya SETELAH seluruh batch berhasil.
+                    // Jika penghapusan gagal, data legacy tetap ada sebagai fallback Firebase
+                    // dan migrasi akan dicoba lagi pada startup berikutnya.
                     const legacyRef = doc(this.db, 'garasiku_fleet', 'shared_state');
                     await setDoc(legacyRef, {
                         logs: deleteField(),
@@ -2953,6 +2977,9 @@
                         gateLogsSchemaVersion: 1
                     }, { merge: true });
                     return true;
+                } catch (e) {
+                    console.error('Migrasi legacy Gate Log gagal; data legacy Firebase dipertahankan:', e);
+                    return false;
                 } finally {
                     this.gateMigrationRunning = false;
                 }
@@ -4701,7 +4728,7 @@
                                 <span>Catat Masuk</span>
                             </button>
                         ` : `
-                            <button onclick="openQuickCheckout('${v.id}')" class="w-full py-2 rounded-xl bg-orange-500 hover:bg-orange-400 border-2 border-orange-300 hover:border-orange-200 text-slate-950 font-extrabold text-xs transition flex items-center justify-center space-x-1 shadow-md shadow-orange-500/25">
+                            <button onclick="openQuickCheckout('${v.id}')" class="w-full py-1.5 rounded-xl bg-dark-surface hover:bg-cyan-500 border border-dark-border hover:border-cyan-400 text-cyan-300 hover:text-slate-950 font-bold text-xs transition flex items-center justify-center space-x-1">
                                 <i class="fa-solid fa-arrow-right-from-bracket"></i>
                                 <span>Tugaskan Keluar</span>
                             </button>
@@ -4731,7 +4758,7 @@
                 const card = document.createElement('div');
                 // Kendaraan yang sedang berada di luar dibuat PUTIH agar kontras jelas
                 // dengan kendaraan yang masih berada di dalam garasi (dark card).
-                card.className = "bg-white p-3.5 rounded-2xl border-4 border-orange-500 shadow-lg shadow-orange-500/25 ring-2 ring-orange-300/30 flex flex-col justify-between space-y-2 text-slate-900";
+                card.className = "bg-white p-3.5 rounded-2xl border-2 border-amber-500/70 shadow-md shadow-amber-950/20 flex flex-col justify-between space-y-2 text-slate-900";
                 card.innerHTML = `
                     <div>
                         <div class="flex items-center justify-between">
@@ -6602,16 +6629,16 @@
 
                     el.innerHTML = `
                         <div class="space-y-1">
-                            <div class="flex items-center space-x-2">
-                                <span class="font-bold text-white">${escapeHtml(card.name)}</span>
-                                <span class="px-2 py-0.5 rounded-md bg-rose-950 border border-rose-800/60 text-rose-300 text-[10px] font-semibold">${escapeHtml(card.bank || 'E-Toll')}</span>
+                            <div class="flex items-center gap-3 min-h-[58px]">
+                                <span class="font-black text-white text-4xl sm:text-5xl leading-none tracking-[0.08em] drop-shadow-sm" style="font-variant-numeric: tabular-nums">${escapeHtml(card.name)}</span>
+                                <span class="px-2 py-0.5 rounded-md bg-rose-950 border border-rose-800/60 text-rose-300 text-[10px] font-bold">${escapeHtml(card.bank || 'E-Toll')}</span>
                                 ${isOff ? '<span class="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-700 text-slate-400 text-[10px] font-bold">OFF (Nonaktif)</span>' :
                                   (isBorrowed ? `<span class="px-2.5 py-1 rounded-md bg-amber-400 text-slate-950 border border-amber-200 text-[10px] font-black"><i class="fa-solid fa-user mr-1"></i>DIPAKAI · ${escapeHtml(card.holderName)}</span>` :
                                   '<span class="px-2.5 py-1 rounded-md bg-emerald-400 text-slate-950 border border-emerald-200 text-[10px] font-black"><i class="fa-solid fa-square-parking mr-1"></i>TERSEDIA · DI GARASI</span>')}
                             </div>
-                            <div class="flex items-center space-x-3 text-[11px] ${isBorrowed && !isOff ? 'text-amber-100' : 'text-slate-400'}">
-                                <span>Saldo: <strong class="text-white font-mono font-bold">Rp ${(Number(card.balance) || 0).toLocaleString('id-ID')}</strong></span>
-                                <span>No: <code class="font-mono text-slate-300">${escapeHtml(card.cardNo || '-')}</code></span>
+                            <div class="flex items-center flex-wrap gap-x-4 gap-y-1 text-sm ${isBorrowed && !isOff ? 'text-amber-100' : 'text-slate-300'}">
+                                <span>Saldo: <strong class="text-white font-mono font-black text-base">Rp ${(Number(card.balance) || 0).toLocaleString('id-ID')}</strong></span>
+                                <span>No: <code class="font-mono text-slate-200 text-base font-semibold tracking-wide">${escapeHtml(card.cardNo || '-')}</code></span>
                             </div>
                         </div>
                         <div class="flex flex-wrap items-center gap-1.5 self-end sm:self-center">
