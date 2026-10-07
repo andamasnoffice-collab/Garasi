@@ -1045,7 +1045,7 @@
             </div>
 
             <!-- Card 5: KARTU E-TOLL (MENCOLOK DENGAN GRADASI MERAH) -->
-            <div onclick="openStatDetail('etoll')" class="stat-summary-card col-span-2 sm:col-span-1 bg-gradient-to-br from-rose-950/60 via-dark-surface to-red-950/40 p-3.5 sm:p-4 rounded-2xl border-2 border-rose-500/80 shadow-lg shadow-rose-950/50 hover:border-rose-400 hover:-translate-y-0.5 transition cursor-pointer group backdrop-blur-sm relative overflow-hidden">
+            <div id="stat-etoll-card" onclick="openStatDetail('etoll')" class="stat-summary-card hidden col-span-2 sm:col-span-1 bg-gradient-to-br from-rose-950/60 via-dark-surface to-red-950/40 p-3.5 sm:p-4 rounded-2xl border-2 border-rose-500/80 shadow-lg shadow-rose-950/50 hover:border-rose-400 hover:-translate-y-0.5 transition cursor-pointer group backdrop-blur-sm relative overflow-hidden">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-1.5">
                         <span class="text-xs font-bold text-rose-300">Kartu E-Toll</span>
@@ -1059,7 +1059,7 @@
                     <h3 id="stat-etoll-ratio" class="text-xl sm:text-2xl font-black text-rose-300 font-mono">0 / 0</h3>
                     <span class="text-[11px] text-rose-400 font-bold group-hover:text-rose-200 transition">Kelola &rarr;</span>
                 </div>
-                <p id="stat-etoll-sub" class="text-[11px] sm:text-xs text-rose-200/80 mt-0.5 font-medium truncate">Total: Rp 0</p>
+                <p id="stat-etoll-sub" class="text-[11px] sm:text-xs text-rose-200/80 mt-0.5 font-medium truncate">Kartu tidak dipakai / Kartu ON</p>
             </div>
         </div>
 
@@ -1685,8 +1685,8 @@
         <div class="bg-dark-surface w-full max-w-md rounded-3xl shadow-2xl border border-dark-border overflow-hidden">
             <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-5 sm:px-6 py-4 text-white flex items-center justify-between">
                 <div>
-                    <h3 class="font-extrabold text-base"><i class="fa-solid fa-repeat mr-2"></i>Tukar / Oper Kartu E-Toll</h3>
-                    <p class="text-[11px] text-blue-100">Ganti pemegang atau tukar ke kartu cadangan (ON ⇄ OFF)</p>
+                    <h3 class="font-extrabold text-base"><i class="fa-solid fa-repeat mr-2"></i>Switch Kartu E-Toll</h3>
+                    <p class="text-[11px] text-blue-100">Switch kartu ON dengan kartu cadangan OFF</p>
                 </div>
                 <button onclick="closeModal('modal-swap-etoll'); openStatDetail('etoll');" class="text-white/80 hover:text-white text-xl font-bold">
                     <i class="fa-solid fa-xmark"></i>
@@ -1858,7 +1858,23 @@
             #modal-add-driver { align-items: flex-start; overflow-y: auto; padding-top: max(12px, env(safe-area-inset-top)); padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
             #modal-add-driver > div { margin-top: 8vh; margin-bottom: 8vh; max-height: 84vh; overflow-y: auto; }
         }
-    </style>
+    
+            /* FIX47: Plat nomor kendaraan dibuat lebih besar dan mudah dibaca */
+            .vehicle-plate-large {
+                font-size: 1.25rem !important;
+                line-height: 1.2 !important;
+                letter-spacing: 0.02em;
+                font-weight: 900 !important;
+            }
+            @media (min-width: 640px) {
+                .vehicle-plate-large { font-size: 1.45rem !important; }
+            }
+            .vehicle-plate-modal {
+                font-size: 1.15rem !important;
+                line-height: 1.2 !important;
+                font-weight: 900 !important;
+            }
+</style>
 
     <!-- MODAL TAMBAH DRIVER (ADMIN) -->
     <div id="modal-add-driver" class="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 hidden">
@@ -2313,7 +2329,7 @@
     <script type="module">
         import { initializeApp, getApps, getApp, deleteApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, initializeAuth, inMemoryPersistence, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { initializeFirestore, getFirestore, collection, doc, setDoc, getDoc, getDocs, writeBatch, deleteDoc, deleteField, query, where, orderBy, waitForPendingWrites } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeFirestore, getFirestore, collection, doc, setDoc, getDoc, getDocs, writeBatch, deleteDoc, deleteField, query, where, orderBy, waitForPendingWrites, updateDoc, FieldPath, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Expose only the Firebase app/auth helpers needed by the AdminAuto
         // reader bridge, which lives in a classic (non-module) script below.
@@ -2378,6 +2394,7 @@
             configProjectId: null,
             writeQueue: Promise.resolve(),
             gateWriteQueue: Promise.resolve(),
+            cloudWriteQueue: Promise.resolve(),
             gateLogsReady: false,
             gateMigrationRunning: false,
             etollLegacyMigrationRunning: false,
@@ -2388,6 +2405,8 @@
             etollCacheTtlMs: 5 * 60 * 1000,
             etollReadMonths: 2,
             cloudPayloadHash: localStorage.getItem('garasiku_cloud_payload_hash') || '',
+            lastCloudPayload: null,
+            cloudDocExists: false,
 
             hashCloudPayload(payload) {
                 const raw = JSON.stringify(payload || {});
@@ -2718,6 +2737,7 @@
                 if (!col) return false;
                 try {
                     await setDoc(doc(col, String(log.id)), { ...log }, { merge: false });
+                    await waitForPendingWrites(this.db);
                     try { sessionStorage.removeItem(this.etollCacheKey); } catch (e) {}
                     return true;
                 } catch (e) {
@@ -2771,7 +2791,7 @@
 
                     // Master Armada + Driver sekarang dibaca dari AdminAuto RTDB.
                     // Firestore GarasiKu tetap hanya untuk data GarasiKu sendiri.
-                    // NORMAL READ dibatasi 3 bulan terakhir. Data yang lebih lama tetap
+                    // NORMAL READ dibatasi 2 bulan terakhir. Data yang lebih lama tetap
                     // berada di Firebase dan hanya dibaca lewat fungsi arsip/administrasi.
                     // FIX36: refresh manual harus membaca gate log dari server,
                     // bukan session cache, agar status keluar/masuk tidak pernah
@@ -2794,20 +2814,25 @@
                     if (sharedSnap.exists()) {
                         const data = sharedSnap.data();
                         if (window.syncFromCloud) window.syncFromCloud(data);
-                        this.cloudPayloadHash = this.hashCloudPayload({
-                            schemaVersion: data.schemaVersion,
+                        this.lastCloudPayload = {
+                            schemaVersion: data.schemaVersion || 8,
                             vehicleSettings: data.vehicleSettings || {},
+                            driverSettings: data.driverSettings || {},
                             etollState: data.etollState || {},
                             adminPin: data.adminPin || '1234',
                             telegramConfig: data.telegramConfig || {},
                             appSettings: data.appSettings || {}
-                        });
+                        };
+                        this.cloudPayloadHash = this.hashCloudPayload(this.lastCloudPayload);
+                        this.cloudDocExists = true;
                         try { localStorage.setItem('garasiku_cloud_payload_hash', this.cloudPayloadHash); } catch (e) {}
                     } else {
                         // DATABASE BARU BOLEH KOSONG.
                         // Jangan melakukan WRITE otomatis saat startup/refresh.
                         // WRITE hanya dilakukan ketika pengguna benar-benar mengubah data.
                         this.cloudPayloadHash = '';
+                        this.lastCloudPayload = null;
+                        this.cloudDocExists = false;
                         try { localStorage.removeItem('garasiku_cloud_payload_hash'); } catch (e) {}
                     }
 
@@ -2879,7 +2904,7 @@
 
                     reconcileVehicleOperationalState();
                     if (typeof renderAll === 'function') renderAll();
-                    this.updateStatusUI(true, 'Firebase • terhubung; gate log dibaca langsung dari Firestore; log normal 3 bulan terakhir');
+                    this.updateStatusUI(true, 'Firebase • terhubung; gate log dibaca langsung dari Firestore; log normal 2 bulan terakhir');
                     if (window.updateGlobalConnectionIndicator) window.updateGlobalConnectionIndicator();
                     return true;
                 } catch (error) {
@@ -2927,6 +2952,10 @@
             },
 
             async saveGateLog(log, options = {}) {
+                const task=async()=>this._saveGateLogDirect(log,options);
+                const chained=this.gateWriteQueue.then(task,task); this.gateWriteQueue=chained.catch(()=>false); return chained;
+            },
+            async _saveGateLogDirect(log, options = {}) {
                 if (!this.db || !this.currentUser || !log || !log.id) {
                     this.lastGateWriteError = 'Firebase/Auth belum siap';
                     this.updateStatusUI(false, this.lastGateWriteError);
@@ -3002,6 +3031,9 @@
                 }
                 try {
                     await deleteDoc(ref);
+                    await waitForPendingWrites(this.db);
+                    const verify=await getDoc(ref,{source:'server'});
+                    if(verify.exists()) throw new Error('Dokumen gate_logs masih ditemukan di server setelah penghapusan.');
                     window.logs = (Array.isArray(window.logs) ? window.logs : []).filter(l => l && String(l.id) !== String(logId));
                     this.saveGateLogsCache(window.logs);
                     this.lastGateWriteError = '';
@@ -3114,63 +3146,82 @@
                 return true;
             },
 
+            buildCloudDirtyUpdates(payload, previous) {
+                const next = payload || {}, prev = previous || {}, updates = [];
+                const fp = (root, key, leaf) => new FieldPath(root, String(key), String(leaf));
+                const mapDiff = (root, a, b) => {
+                    const am = a && typeof a === 'object' ? a : {}, bm = b && typeof b === 'object' ? b : {};
+                    new Set([...Object.keys(am), ...Object.keys(bm)]).forEach(key => {
+                        const x = am[key] || {}, y = bm[key] || {};
+                        new Set([...Object.keys(x), ...Object.keys(y)]).forEach(leaf => {
+                            if (JSON.stringify(x[leaf]) !== JSON.stringify(y[leaf])) updates.push(fp(root,key,leaf), x[leaf] === undefined ? null : x[leaf]);
+                        });
+                    });
+                };
+                if (next.schemaVersion !== prev.schemaVersion) updates.push('schemaVersion', next.schemaVersion);
+                mapDiff('vehicleSettings', next.vehicleSettings, prev.vehicleSettings);
+                mapDiff('driverSettings', next.driverSettings, prev.driverSettings);
+                mapDiff('etollState', next.etollState, prev.etollState);
+                const na=next.appSettings||{}, pa=prev.appSettings||{};
+                if (na.selectedCategoryFilter !== pa.selectedCategoryFilter) updates.push(new FieldPath('appSettings','selectedCategoryFilter'),na.selectedCategoryFilter);
+                if (na.selectedSortMode !== pa.selectedSortMode) updates.push(new FieldPath('appSettings','selectedSortMode'),na.selectedSortMode);
+                if (next.adminPin !== prev.adminPin) updates.push('adminPin',next.adminPin);
+                const nt=next.telegramConfig||{}, pt=prev.telegramConfig||{};
+                ['botToken','chatId','notifyCheckout','notifyCheckin','notifyEtoll'].forEach(k=>{if(JSON.stringify(nt[k])!==JSON.stringify(pt[k])) updates.push(new FieldPath('telegramConfig',k),nt[k]);});
+                return updates;
+            },
+
             async pushStateToCloud(options = {}) {
-                if (!this.db || !this.currentUser) {
-                    this.updateStatusUI(false, 'Firebase belum siap / Auth belum aktif');
-                    return false;
-                }
-                try {
-                    const payload = this.buildCloudPayload();
-                    const hash = this.hashCloudPayload(payload);
-
-                    // Jika tidak ada perubahan, STOP. Tidak ada WRITE.
-                    if (!options.force && hash === this.cloudPayloadHash) return true;
-
-                    const syncDoc = doc(this.db, 'garasiku_fleet', 'shared_state');
-                    const writeTime = new Date().toISOString();
-
-                    await setDoc(syncDoc, {
-                        ...payload,
-                        updatedAt: writeTime
-                    }, { merge: true });
-
-                    this.cloudPayloadHash = hash;
-                    this.lastSyncTime = new Date();
-                    this.isConnected = true;
+                if (!this.db || !this.currentUser) { this.updateStatusUI(false, 'Firebase belum siap / Auth belum aktif'); return false; }
+                const run = async () => {
                     try {
-                        localStorage.setItem('garasiku_cloud_payload_hash', hash);
-                        localStorage.setItem('garasiku_last_cloud_write', String(Date.parse(writeTime)));
-                        localStorage.removeItem('garasiku_pending_cloud_write');
-                    } catch (e) {}
-
-                    this.updateStatusUI(true, 'Firebase • 1 write perubahan');
-                    if (window.updateGlobalConnectionIndicator) window.updateGlobalConnectionIndicator();
-                    return true;
-                } catch (e) {
-                    console.error('Error pushing shared_state ke cloud:', e);
-                    this.isConnected = false;
-                    const code = e?.code ? ` [${e.code}]` : '';
-                    this.updateStatusUI(false, `Firebase WRITE${code}: ${e?.message || 'write ditolak'}`);
-                    if (window.updateGlobalConnectionIndicator) window.updateGlobalConnectionIndicator();
-                    return false;
-                }
+                        const payload = options.payload || this.buildCloudPayload();
+                        const baseline = this.lastCloudPayload || {};
+                        const hash = this.hashCloudPayload(payload);
+                        if (!options.force && this.lastCloudPayload && hash === this.hashCloudPayload(this.lastCloudPayload)) return true;
+                        const ref = doc(this.db, 'garasiku_fleet', 'shared_state');
+                        const updates = Array.isArray(options.dirtyUpdates) ? options.dirtyUpdates : this.buildCloudDirtyUpdates(payload, baseline);
+                        let wrote = false;
+                        await runTransaction(this.db, async tx => {
+                            const snap = await tx.get(ref);
+                            if (!snap.exists()) { tx.set(ref, { ...payload, updatedAt:new Date().toISOString() }, {merge:true}); wrote=true; return; }
+                            if (updates.length) { tx.update(ref, ...updates, 'updatedAt', new Date().toISOString()); wrote=true; }
+                        });
+                        this.lastCloudPayload=JSON.parse(JSON.stringify(payload)); this.cloudPayloadHash=hash; this.cloudDocExists=true;
+                        this.lastSyncTime=new Date(); this.isConnected=true;
+                        try { localStorage.setItem('garasiku_cloud_payload_hash',hash); localStorage.setItem('garasiku_last_cloud_write',String(Date.now())); if(wrote)localStorage.removeItem('garasiku_pending_cloud_write'); } catch(e){}
+                        this.updateStatusUI(true,wrote?'Firebase • perubahan tersimpan atomik':'Firebase • tidak ada perubahan');
+                        if(window.updateGlobalConnectionIndicator) window.updateGlobalConnectionIndicator();
+                        return true;
+                    } catch(e) {
+                        console.error('Error transactional shared_state ke cloud:',e); this.isConnected=false;
+                        try{localStorage.setItem('garasiku_pending_cloud_write','1')}catch(e2){}
+                        const code=e?.code?` [${e.code}]`:''; this.updateStatusUI(false,`Firebase WRITE${code}: ${e?.message||'write ditolak'}`);
+                        if(window.updateGlobalConnectionIndicator) window.updateGlobalConnectionIndicator(); return false;
+                    }
+                };
+                const chained=this.cloudWriteQueue.then(run,run); this.cloudWriteQueue=chained.catch(()=>false); return chained;
             },
 
         };
         window.addEventListener('online', () => {
             // Event-based retry only when there is a known unsent change; no polling.
             if (localStorage.getItem('garasiku_pending_cloud_write') === '1' && window.FirebaseBridge) {
-                window.FirebaseBridge.pushStateToCloud().catch(err => console.warn('Retry Cloud saat online gagal:', err));
+                const payload = window.FirebaseBridge.buildCloudPayload();
+                const dirtyUpdates = window.FirebaseBridge.buildCloudDirtyUpdates(payload, window.FirebaseBridge.lastCloudPayload || {});
+                window.FirebaseBridge.pushStateToCloud({payload,dirtyUpdates}).catch(err => console.warn('Retry Cloud saat online gagal:', err));
             }
         });
         window.addEventListener('DOMContentLoaded', async () => {
-            // FIX34: startup diselesaikan dulu sebelum render final. Sebelumnya AdminAuto
-            // dan Firestore berjalan paralel sehingga salah satu proses dapat merender state
-            // kendaraan lama tepat setelah proses lainnya menyimpan transaksi.
-            const tasks = [];
-            if (window.AdminAutoMasterBridge) tasks.push(window.AdminAutoMasterBridge.start().catch(err => { console.warn('AdminAuto master start gagal:', err); return false; }));
-            if (window.FirebaseBridge) tasks.push(window.FirebaseBridge.initialize().catch(err => { console.warn('GarasiKu Firebase init gagal:', err); return false; }));
-            await Promise.all(tasks);
+            // FIX44: startup berurutan. Master Armada/Driver selesai lebih dulu, lalu
+            // Firestore menerapkan state operasional. Ini mencegah renderer dari satu
+            // sumber menimpa state dari sumber lain pada saat startup.
+            if (window.AdminAutoMasterBridge) {
+                await window.AdminAutoMasterBridge.start().catch(err => console.warn('AdminAuto master start gagal:', err));
+            }
+            if (window.FirebaseBridge) {
+                await window.FirebaseBridge.initialize().catch(err => console.warn('GarasiKu Firebase init gagal:', err));
+            }
             if (typeof reconcileVehicleOperationalState === 'function') reconcileVehicleOperationalState();
             if (typeof renderAll === 'function') renderAll();
         }, { once: true });
@@ -3343,7 +3394,8 @@
             if (!vehicles.length || !logs.length) return;
 
             vehicles.forEach(vehicle => {
-                const activeTrip = logs.find(log => log && log.vehicleId === vehicle.id && log.status === 'ACTIVE');
+                const vehiclePlateKey=normalizePlateKey(vehicle.plate);
+                const activeTrip=logs.find(log=>log&&log.status==='ACTIVE'&&(log.vehicleId===vehicle.id||(vehiclePlateKey&&normalizePlateKey(log.plate)===vehiclePlateKey)));
                 if (activeTrip) {
                     vehicle.status = 'ON_TRIP';
                     if (activeTrip.kmStart !== null && activeTrip.kmStart !== undefined) {
@@ -3356,7 +3408,7 @@
                 // Jika tidak ada perjalanan aktif, kendaraan berada di garasi.
                 // Odometer terakhir diambil dari perjalanan COMPLETED bila tersedia.
                 const completed = logs
-                    .filter(log => log && log.vehicleId === vehicle.id && log.status === 'COMPLETED')
+                    .filter(log=>log&&log.status==='COMPLETED'&&(log.vehicleId===vehicle.id||(vehiclePlateKey&&normalizePlateKey(log.plate)===vehiclePlateKey)))
                     .sort((a, b) => new Date(b.timeIn || b.timeOut || 0) - new Date(a.timeIn || a.timeOut || 0))[0];
 
                 vehicle.status = 'IN_GARAGE';
@@ -3625,12 +3677,16 @@
                             const cloudState = window.cloudEtollState || {};
                             window.etolls = parsed.cards.map(card => {
                                 const key = String(card.sourceCardId || card.cardNo || card.id || '');
-                                const cloud = cloudState[key] || cloudState[String(card.cardNo || '')] || {};
-                                return Object.assign({}, card, cloud, {
-                                    active: cloud.active !== undefined ? cloud.active !== false : card.active !== false,
-                                    status: cloud.status === 'BORROWED' ? 'BORROWED' : (card.status === 'BORROWED' && cloud.status === undefined ? 'BORROWED' : 'AVAILABLE'),
-                                    holderName: cloud.status === 'BORROWED' ? (cloud.holderName || null) : (cloud.status === undefined ? (card.holderName || null) : null),
-                                    balance: Number.isFinite(Number(cloud.balance)) ? Number(cloud.balance) : Number(card.balance || 0)
+                                const cloud = cloudState[key] || cloudState[String(card.cardNo || '')] || null;
+                                // Cache hanya untuk identitas master. Status ON/OFF, holder, saldo
+                                // selalu mengikuti cloudState; jangan menghidupkan kembali state lokal lama.
+                                return Object.assign({}, card, {
+                                    active: cloud ? cloud.active !== false : true,
+                                    status: cloud?.status === 'BORROWED' ? 'BORROWED' : 'AVAILABLE',
+                                    holderName: cloud?.status === 'BORROWED' ? (cloud.holderName || null) : null,
+                                    balance: cloud && Number.isFinite(Number(cloud.balance)) ? Number(cloud.balance) : Number(card.balance || 0),
+                                    nopol: cloud?.nopol ?? card.nopol ?? '',
+                                    color: cloud?.color ?? card.color ?? ''
                                 });
                             });
                             try { localStorage.setItem('garasiku_etolls', JSON.stringify(window.etolls)); } catch (e) {}
@@ -3712,7 +3768,7 @@
                 return this.sync(force); // satu READ hanya bila cache sesi tidak tersedia/kedaluwarsa
             }
         };
-        window.etollLogs = []; // Riwayat E-Toll dibaca dari Firestore maksimal 3 bulan terakhir.
+        window.etollLogs = []; // Riwayat E-Toll dibaca dari Firestore maksimal 2 bulan terakhir.
         window.logs = []; // Logbook bersumber dari Firestore gate_logs; tidak dipersist sebagai antrean lokal.
         window.adminPin = localStorage.getItem('garasiku_admin_pin') || "1234";
 
@@ -3761,7 +3817,9 @@
             const pushCloud = async () => {
                 let cloudOk = true;
                 if (window.FirebaseBridge && typeof window.FirebaseBridge.pushStateToCloud === 'function') {
-                    cloudOk = await window.FirebaseBridge.pushStateToCloud();
+                    const payload = window.FirebaseBridge.buildCloudPayload();
+                    const dirtyUpdates = window.FirebaseBridge.buildCloudDirtyUpdates(payload, window.FirebaseBridge.lastCloudPayload || {});
+                    cloudOk = await window.FirebaseBridge.pushStateToCloud({payload, dirtyUpdates});
                 }
 
                 // PATCH ODO hanya jika nilainya benar-benar berbeda. Tidak ada polling.
@@ -3784,9 +3842,8 @@
 
         window.syncFromCloud = function(cloudData) {
             if (!cloudData) return;
-            const cloudTime = cloudData.updatedAt ? Date.parse(cloudData.updatedAt) : 0;
-            const lastLocalCloudWrite = Number(localStorage.getItem('garasiku_last_cloud_write') || 0);
-            if (cloudTime && Math.max(localWriteAt, lastLocalCloudWrite) && cloudTime < Math.max(localWriteAt, lastLocalCloudWrite)) return;
+            // Firestore source: server read selalu menjadi sumber kebenaran saat startup/refresh.
+            // Cache local tidak boleh menolak data server karena timestamp perangkat bisa berbeda.
             if (cloudData.vehicleSettings && typeof cloudData.vehicleSettings === 'object') {
                 window.vehicleSettings = cloudData.vehicleSettings;
                 applyVehicleSettingsToMaster();
@@ -3843,7 +3900,9 @@
                     telegramConfig: cloudData.telegramConfig || {},
                     appSettings: cloudData.appSettings || {}
                 };
+                window.FirebaseBridge.lastCloudPayload = JSON.parse(JSON.stringify(payload));
                 window.FirebaseBridge.cloudPayloadHash = window.FirebaseBridge.hashCloudPayload(payload);
+                window.FirebaseBridge.cloudDocExists = true;
                 try { localStorage.setItem('garasiku_cloud_payload_hash', window.FirebaseBridge.cloudPayloadHash); } catch (e) {}
             }
             try { localStorage.removeItem('garasiku_pending_cloud_write'); } catch (e) {}
@@ -4037,6 +4096,7 @@
             const btnAddDrv = document.getElementById('btn-add-driver');
             const btnCloudModal = document.getElementById('btn-cloud-settings-modal');
             const btnStatAddEtoll = document.getElementById('btn-stat-add-etoll');
+            const statEtollCard = document.getElementById('stat-etoll-card');
 
             if (isAdminLoggedIn) {
                 if (badgeIcon) badgeIcon.className = "fa-solid fa-lock-open text-emerald-400 text-xs";
@@ -4053,6 +4113,7 @@
                 }
                 if (btnCloudModal) btnCloudModal.classList.remove('hidden');
                 if (btnStatAddEtoll) btnStatAddEtoll.classList.add('hidden');
+                if (statEtollCard) statEtollCard.classList.remove('hidden');
                 document.querySelectorAll('.admin-col').forEach(el => el.classList.remove('hidden'));
             } else {
                 if (badgeIcon) badgeIcon.className = "fa-solid fa-user-shield text-slate-400 text-xs";
@@ -4066,6 +4127,9 @@
                 if (btnAddDrv) { btnAddDrv.classList.add('hidden'); btnAddDrv.classList.remove('inline-flex'); }
                 if (btnCloudModal) btnCloudModal.classList.add('hidden');
                 if (btnStatAddEtoll) btnStatAddEtoll.classList.add('hidden');
+                // Inventaris E-Toll tetap terlihat di Mode Tamu, tetapi hanya kartu ON yang ditampilkan.
+                // Kartu OFF hanya terlihat setelah Mode Admin aktif.
+                if (statEtollCard) statEtollCard.classList.remove('hidden');
                 document.querySelectorAll('.admin-col').forEach(el => el.classList.add('hidden'));
             }
         }
@@ -4081,7 +4145,7 @@
             openModal('modal-change-pin');
         }
 
-        function handleChangePinSubmit(event) {
+        async function handleChangePinSubmit(event) {
             event.preventDefault();
             const oldPin = document.getElementById('pin-old').value.trim();
             const newPin = document.getElementById('pin-new').value.trim();
@@ -4101,10 +4165,9 @@
                 return;
             }
 
-            window.adminPin = newPin;
-            saveToStorage();
-            closeModal('modal-change-pin');
-            showToast("PIN Berhasil Diganti", "PIN baru telah aktif & tersimpan di Firebase.", "success");
+            const beforePin=window.adminPin; window.adminPin=newPin;
+            const ok=await saveToStorage(); if(!ok){window.adminPin=beforePin;showToast('PIN Gagal Disimpan','PIN baru belum diterima Firebase.','error');return;}
+            closeModal('modal-change-pin'); showToast("PIN Berhasil Diganti","PIN baru telah aktif & tersimpan di Firebase.","success");
         }
 
         // ============================================================
@@ -4257,7 +4320,7 @@
             if (type === 'etoll') {
                 result.innerHTML = `<table class="w-full text-left text-xs"><thead class="bg-dark-card text-slate-400 uppercase"><tr><th class="p-3">Waktu</th><th class="p-3">Kartu</th><th class="p-3">Aksi</th><th class="p-3">Pemegang</th><th class="p-3">Terpakai</th><th class="p-3">Catatan</th></tr></thead><tbody class="divide-y divide-dark-border">${logs.map(l => `<tr class="hover:bg-dark-cardHover"><td class="p-3 font-mono">${formatDateTime(l.timestamp)}</td><td class="p-3 font-semibold text-white">${escapeHtml(l.cardName || '-')}</td><td class="p-3">${escapeHtml(l.action || '-')}</td><td class="p-3">${escapeHtml(l.holderName || '-')}</td><td class="p-3 font-mono">Rp ${(Number(l.amountSpent)||0).toLocaleString('id-ID')}</td><td class="p-3 text-slate-400">${escapeHtml(l.notes || '-')}</td></tr>`).join('')}</tbody></table>`;
             } else {
-                result.innerHTML = `<table class="w-full text-left text-xs"><thead class="bg-dark-card text-slate-400 uppercase"><tr><th class="p-3">Kendaraan</th><th class="p-3">Driver</th><th class="p-3">Keluar</th><th class="p-3">Masuk</th><th class="p-3">Tujuan</th><th class="p-3">Status</th></tr></thead><tbody class="divide-y divide-dark-border">${logs.map(l => `<tr class="hover:bg-dark-cardHover"><td class="p-3"><b class="text-white">${escapeHtml(l.plate || '-')}</b><div class="text-slate-500">${escapeHtml(l.model || '')}</div></td><td class="p-3">${escapeHtml(l.driverName || '-')}</td><td class="p-3 font-mono">${formatDateTime(l.timeOut)}</td><td class="p-3 font-mono">${l.timeIn ? formatDateTime(l.timeIn) : '<span class="text-amber-300">Masih keluar</span>'}</td><td class="p-3">${escapeHtml(l.destination || '-')}</td><td class="p-3">${escapeHtml(l.status || '-')}</td></tr>`).join('')}</tbody></table>`;
+                result.innerHTML = `<table class="w-full text-left text-xs"><thead class="bg-dark-card text-slate-400 uppercase"><tr><th class="p-3">Kendaraan</th><th class="p-3">Driver</th><th class="p-3">Keluar</th><th class="p-3">Masuk</th><th class="p-3">Tujuan</th><th class="p-3">Status</th></tr></thead><tbody class="divide-y divide-dark-border">${logs.map(l => `<tr class="hover:bg-dark-cardHover"><td class="p-3"><b class="text-white vehicle-plate-modal">${escapeHtml(l.plate || '-')}</b><div class="text-slate-500">${escapeHtml(l.model || '')}</div></td><td class="p-3">${escapeHtml(l.driverName || '-')}</td><td class="p-3 font-mono">${formatDateTime(l.timeOut)}</td><td class="p-3 font-mono">${l.timeIn ? formatDateTime(l.timeIn) : '<span class="text-amber-300">Masih keluar</span>'}</td><td class="p-3">${escapeHtml(l.destination || '-')}</td><td class="p-3">${escapeHtml(l.status || '-')}</td></tr>`).join('')}</tbody></table>`;
             }
         }
 
@@ -4401,9 +4464,14 @@
             const readyGarage = inGarage;
             const readyDrivers = window.drivers.filter(isDriverReady).length;
 
-            const totalEtoll = window.etolls.length;
-            const readyEtoll = window.etolls.filter(e => e.status === 'AVAILABLE' && e.active !== false).length;
-            const totalBalance = window.etolls.reduce((sum, e) => sum + (Number(e.balance) || 0), 0);
+            // Dashboard E-Toll khusus ADMIN:
+            // - denominator hanya kartu yang ON/aktif
+            // - OFF tidak dihitung dan tidak ditampilkan pada angka dashboard
+            // - numerator = kartu ON yang sedang tidak dipakai (AVAILABLE)
+            const activeEtoll = window.etolls.filter(e => e.active !== false);
+            const totalEtollOn = activeEtoll.length;
+            const readyEtoll = activeEtoll.filter(e => e.status === 'AVAILABLE').length;
+            const totalBalance = activeEtoll.reduce((sum, e) => sum + (Number(e.balance) || 0), 0);
 
             document.getElementById('stat-total-vehicles').innerText = `${activeVehicles.length} / ${totalVehicles}`;
             document.getElementById('stat-in-garage').innerText = inGarage;
@@ -4411,8 +4479,8 @@
             document.getElementById('stat-active-drivers').innerText = readyDrivers;
             document.getElementById('stat-drivers-sub').innerText = 'Operasional aktif & tidak bertugas keluar';
 
-            document.getElementById('stat-etoll-ratio').innerText = `${readyEtoll} / ${totalEtoll}`;
-            document.getElementById('stat-etoll-sub').innerText = `Total: Rp ${totalBalance.toLocaleString('id-ID')}`;
+            document.getElementById('stat-etoll-ratio').innerText = `${readyEtoll} / ${totalEtollOn}`;
+            document.getElementById('stat-etoll-sub').innerText = 'Tidak dipakai / Kartu ON';
 
             const activeBadge = document.getElementById('active-trips-badge');
             if (activeBadge) activeBadge.innerText = `${onTrip} Unit`;
@@ -4589,7 +4657,7 @@
                         <div class="flex items-center justify-between">
                             <div class="flex items-center space-x-1.5">
                                 ${v.unitNo ? `<span class="px-1.5 py-0.5 rounded bg-cyan-950 border border-cyan-700/60 text-cyan-300 font-mono text-[10px] font-bold">#${v.unitNo}</span>` : ''}
-                                <span class="font-mono font-extrabold text-sm text-white">${escapeHtml(v.plate)}</span>
+                                <span class="font-mono font-extrabold vehicle-plate-large text-white">${escapeHtml(v.plate)}</span>
                             </div>
                             ${isOff ?
                                 `<span class="px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-slate-400 text-[10px] font-bold"><i class="fa-solid fa-power-off mr-1"></i>OFF</span>` :
@@ -4599,7 +4667,7 @@
                                         `<span class="px-2 py-0.5 rounded-full bg-amber-950 border border-amber-700 text-amber-300 text-[10px] font-bold">Keluar</span>` :
                                         `<span class="px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-700 text-emerald-300 text-[10px] font-bold">Di Garasi</span>`))}
                         </div>
-                        <h4 class="font-bold text-xs text-slate-200 mt-1">${escapeHtml(v.model)}</h4>
+                        <h4 class="font-bold text-sm text-slate-200 mt-1">${escapeHtml(v.model)}</h4>
                         <div class="mt-2 flex flex-wrap items-center gap-1.5">
                             <span class="px-2 py-0.5 rounded-md bg-dark-surface border border-dark-border text-cyan-300 text-[10px] font-semibold">${escapeHtml(v.category || 'Armada')}</span>
                             <span class="px-2 py-0.5 rounded-md ${normalizeVehicleUsageCategory(v) === 'PIMPINAN' ? 'bg-violet-950 border border-violet-800/50 text-violet-300' : 'bg-emerald-950 border border-emerald-800/50 text-emerald-300'} text-[10px] font-semibold">${vehicleUsageLabel(v)}</span>
@@ -4654,22 +4722,24 @@
 
             activeList.forEach(trip => {
                 const card = document.createElement('div');
-                card.className = "bg-dark-card p-3.5 rounded-2xl border border-amber-800/40 shadow-md flex flex-col justify-between space-y-2";
+                // Kendaraan yang sedang berada di luar dibuat PUTIH agar kontras jelas
+                // dengan kendaraan yang masih berada di dalam garasi (dark card).
+                card.className = "bg-white p-3.5 rounded-2xl border-2 border-amber-500/70 shadow-md shadow-amber-950/20 flex flex-col justify-between space-y-2 text-slate-900";
                 card.innerHTML = `
                     <div>
                         <div class="flex items-center justify-between">
-                            <span class="font-mono font-bold text-white">${trip.plate}</span>
-                            <span class="text-[10px] text-slate-400 font-mono"><i class="fa-regular fa-clock mr-1"></i>${formatTimeOnly(trip.timeOut)}</span>
+                            <span class="font-mono font-bold vehicle-plate-large text-slate-900">${escapeHtml(trip.plate || '-')}</span>
+                            <span class="text-[10px] text-slate-500 font-mono"><i class="fa-regular fa-clock mr-1"></i>${formatTimeOnly(trip.timeOut)}</span>
                         </div>
-                        <p class="font-semibold text-xs text-slate-200">${trip.model}</p>
-                        <div class="mt-1 text-[11px] text-slate-300">
-                            <p><i class="fa-solid fa-user text-amber-400 mr-1"></i>${trip.driverName}</p>
-                            <p><i class="fa-solid fa-location-dot text-rose-400 mr-1"></i>${trip.destination || '-'}</p>
+                        <p class="font-semibold text-xs text-slate-800">${escapeHtml(trip.model || '-')}</p>
+                        <div class="mt-1 text-[11px] text-slate-700">
+                            <p><i class="fa-solid fa-user text-amber-500 mr-1"></i>${escapeHtml(trip.driverName || '-')}</p>
+                            <p><i class="fa-solid fa-location-dot text-rose-500 mr-1"></i>${escapeHtml(trip.destination || '-')}</p>
                         </div>
                     </div>
-                    <div class="pt-2 border-t border-dark-border flex items-center justify-between gap-2">
-                        <button onclick="showTicketModal('${trip.id}')" class="px-2.5 py-1.5 rounded-xl border border-dark-border text-slate-300 hover:bg-dark-cardHover text-[11px]">
-                            <i class="fa-solid fa-ticket text-cyan-400 mr-1"></i>Tiket
+                    <div class="pt-2 border-t border-slate-200 flex items-center justify-between gap-2">
+                        <button onclick="showTicketModal('${trip.id}')" class="px-2.5 py-1.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-[11px]">
+                            <i class="fa-solid fa-ticket text-cyan-500 mr-1"></i>Tiket
                         </button>
                         <button onclick="openQuickCheckin('${trip.id}')" class="flex-1 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center space-x-1 shadow-sm">
                             <i class="fa-solid fa-arrow-right-to-bracket"></i>
@@ -5401,10 +5471,10 @@
                 showToast("Armada Sedang Tugas", "Tidak dapat menonaktifkan unit yang berada di luar.", "warning");
                 return;
             }
-            requireAdminAction(() => {
-                const next = v.active === false;
-                persistVehicleOverlay(v, { active: next });
-                saveToStorage();
+            requireAdminAction(async () => {
+                const before=v.active, next=v.active===false;
+                persistVehicleOverlay(v,{active:next});
+                const ok=await saveToStorage(); if(!ok){persistVehicleOverlay(v,{active:before});renderAll();showToast('Status Armada Gagal Disimpan','Perubahan belum diterima Firebase.','error');return;}
                 renderAll();
                 showToast("Status Diperbarui", `${escapeHtml(v.plate)} berstatus ${v.active ? 'ON (Aktif)' : 'OFF (Nonaktif)'}.`, "info");
             });
@@ -5413,10 +5483,10 @@
         function toggleVehicleOperational(id) {
             const v = window.vehicles.find(item => item.id === id);
             if (!v) return;
-            requireAdminAction(() => {
-                const next = v.operational === false;
-                persistVehicleOverlay(v, { operational: next });
-                saveToStorage();
+            requireAdminAction(async () => {
+                const before=v.operational, next=v.operational===false;
+                persistVehicleOverlay(v,{operational:next});
+                const ok=await saveToStorage(); if(!ok){persistVehicleOverlay(v,{operational:before});renderAll();showToast('Kondisi Armada Gagal Disimpan','Perubahan belum diterima Firebase.','error');return;}
                 renderAll();
                 showToast("Kondisi Diperbarui", `${escapeHtml(v.plate)} kini: ${v.operational ? 'Siap Jalan' : 'Dalam Perbaikan'}.`, "info");
             });
@@ -5425,10 +5495,10 @@
         function changeVehicleUsageCategory(id, value) {
             const v = window.vehicles.find(item => item.id === id);
             if (!v) return;
-            requireAdminAction(() => {
-                const category = value === 'PIMPINAN' ? 'PIMPINAN' : 'OPERATIONAL';
-                persistVehicleOverlay(v, { usageCategory: category });
-                saveToStorage();
+            requireAdminAction(async () => {
+                const before=normalizeVehicleUsageCategory(v), category=value==='PIMPINAN'?'PIMPINAN':'OPERATIONAL';
+                persistVehicleOverlay(v,{usageCategory:category});
+                const ok=await saveToStorage(); if(!ok){persistVehicleOverlay(v,{usageCategory:before});renderAll();showToast('Kategori Armada Gagal Disimpan','Perubahan belum diterima Firebase.','error');return;}
                 renderAll();
                 showToast('Kategori Mobil Diperbarui', `${escapeHtml(v.plate)} sekarang kategori ${vehicleUsageLabel(v)}.`, 'success');
             });
@@ -5566,9 +5636,11 @@
             const d = (window.drivers || []).find(item => item.id === id);
             if (!d) return;
             requireAdminAction(async () => {
+                const before = d.active;
                 const next = d.active === false;
                 persistDriverOperationalStatus(d, next);
-                await saveToStorage();
+                const ok = await saveToStorage();
+                if (!ok) { persistDriverOperationalStatus(d, before); renderAll(); showToast('Status Driver Gagal Disimpan', 'Perubahan ON/OFF belum diterima Firebase.', 'error'); return; }
                 renderAll();
                 showToast(
                     next ? 'Driver Diaktifkan' : 'Driver Dinonaktifkan',
@@ -5618,9 +5690,9 @@
                 showToast("Kartu Sedang Dipakai", "Kembalikan kartu terlebih dahulu sebelum dinonaktifkan.", "warning");
                 return;
             }
-            requireAdminAction(() => {
-                card.active = card.active === false ? true : false;
-                saveToStorage();
+            requireAdminAction(async () => {
+                const before=card.active; card.active=card.active===false?true:false;
+                const ok=await saveToStorage(); if(!ok){card.active=before;renderAll();showToast('Status Kartu Gagal Disimpan','Perubahan ON/OFF belum diterima Firebase.','error');return;}
                 renderAll();
                 openStatDetail('etoll');
                 showToast("Status Kartu", `${escapeHtml(card.name)} kini ${card.active ? 'ON (Aktif)' : 'OFF (Nonaktif)'}.`, "info");
@@ -5648,13 +5720,14 @@
             openModal('modal-edit-etoll');
         }
 
-        function handleEditEtoll(event) {
+        async function handleEditEtoll(event) {
             event.preventDefault();
             const id = document.getElementById('edit-etoll-id').value;
             const balance = parseInt(document.getElementById('edit-etoll-balance').value) || 0;
 
             const card = window.etolls.find(e => e.id === id);
             if (card) {
+                const cardBefore = { name: card.name, balance: card.balance, active: card.active, status: card.status, holderName: card.holderName };
                 if (card.status === 'BORROWED') {
                     showToast('Kartu Sedang Dipakai', 'Kembalikan kartu sebelum mengubah data kartu.', 'warning');
                     return;
@@ -5664,7 +5737,7 @@
                 card.name = normalizedCardNo.length >= 4 ? normalizedCardNo.slice(-4) : (card.name || '');
                 card.balance = balance;
 
-                saveToStorage();
+                const ok=await saveToStorage(); if(!ok){ Object.assign(card,cardBefore); renderAll(); showToast('Kartu Gagal Disimpan','Perubahan saldo belum diterima Firebase. Perubahan dibatalkan.','error'); return; }
                 closeModal('modal-edit-etoll');
                 openStatDetail('etoll');
                 renderAll();
@@ -5726,6 +5799,7 @@
 
             const card = window.etolls.find(e => e.id === id);
             if (card) {
+                const cardBefore={status:card.status,holderName:card.holderName,balance:card.balance,active:card.active};
                 const existingDriverCard = findEtollHeldByDriver(holder);
                 if (existingDriverCard) {
                     showToast('Driver Sudah Memegang E-Toll', `${holder} sudah menggunakan kartu ${existingDriverCard.name}. Kartu tersebut harus dikembalikan atau dioper terlebih dahulu sebelum meminjam kartu lain.`, 'warning');
@@ -5753,11 +5827,11 @@
                 window.etollLogs.unshift(newRecap);
                 const etollLogSaved = await window.FirebaseBridge?.saveEtollLog?.(newRecap);
                 if (etollLogSaved === false) {
-                    window.etollLogs.shift();
-                    showToast('E-Toll Gagal Disimpan', 'Transaksi tidak tersimpan ke Firebase. Perubahan kartu dibatalkan.', 'error');
-                    return;
+                    window.etollLogs.shift(); Object.assign(card,cardBefore);
+                    showToast('E-Toll Gagal Disimpan','Transaksi tidak tersimpan ke Firebase. Perubahan kartu dibatalkan.','error'); return;
                 }
-                await saveToStorage();
+                const stateSaved=await saveToStorage();
+                if(!stateSaved){ Object.assign(card,cardBefore); window.etollLogs=window.etollLogs.filter(l=>String(l.id)!==String(newRecap.id)); await window.FirebaseBridge?.deleteEtollLog?.(newRecap.id); renderAll(); showToast('E-Toll Gagal Menyimpan Status','Status kartu tidak terkonfirmasi di Firebase. Perubahan dibatalkan.','error'); return; }
                 closeModal('modal-borrow-etoll');
                 openStatDetail('etoll');
                 renderAll();
@@ -5789,6 +5863,7 @@
 
             const card = window.etolls.find(e => e.id === id);
             if (card) {
+                const cardBefore={status:card.status,holderName:card.holderName,balance:card.balance,active:card.active};
                 if (card.status !== 'BORROWED') {
                     showToast('Kartu Tidak Sedang Dipinjam', 'Tidak ada pengembalian yang perlu dicatat untuk kartu ini.', 'warning');
                     return;
@@ -5821,11 +5896,11 @@
                 window.etollLogs.unshift(newRecap);
                 const etollLogSaved = await window.FirebaseBridge?.saveEtollLog?.(newRecap);
                 if (etollLogSaved === false) {
-                    window.etollLogs.shift();
-                    showToast('E-Toll Gagal Disimpan', 'Transaksi tidak tersimpan ke Firebase. Perubahan kartu dibatalkan.', 'error');
-                    return;
+                    window.etollLogs.shift(); Object.assign(card,cardBefore);
+                    showToast('E-Toll Gagal Disimpan','Transaksi tidak tersimpan ke Firebase. Perubahan kartu dibatalkan.','error'); return;
                 }
-                await saveToStorage();
+                const stateSaved=await saveToStorage();
+                if(!stateSaved){ Object.assign(card,cardBefore); window.etollLogs=window.etollLogs.filter(l=>String(l.id)!==String(newRecap.id)); await window.FirebaseBridge?.deleteEtollLog?.(newRecap.id); renderAll(); showToast('E-Toll Gagal Menyimpan Status','Status kartu tidak terkonfirmasi di Firebase. Perubahan dibatalkan.','error'); return; }
                 closeModal('modal-return-etoll');
                 openStatDetail('etoll');
                 renderAll();
@@ -5841,6 +5916,12 @@
             closeModal('modal-stat-detail');
             const card = window.etolls.find(e => e.id === etollId);
             if (!card) return;
+            // Kartu yang sedang dipakai tidak boleh di-switch. Harus dikembalikan terlebih dahulu.
+            if (card.status === 'BORROWED') {
+                showToast('Kartu Sedang Dipakai', 'Kartu yang sedang dipakai hanya dapat dikembalikan, bukan di-switch.', 'warning');
+                openReturnEtollModal(etollId);
+                return;
+            }
 
             document.getElementById('swap-etoll-id').value = card.id;
             document.getElementById('swap-info-card').innerText = card.name;
@@ -5910,6 +5991,15 @@
 
             const card = window.etolls.find(e => e.id === id);
             if (!card) return;
+            const cardBefore={status:card.status,holderName:card.holderName,balance:card.balance,active:card.active};
+
+            // Proteksi kedua di level submit: kartu yang sedang dipakai tidak boleh di-switch.
+            if (card.status === 'BORROWED') {
+                showToast('Kartu Sedang Dipakai', 'Kembalikan kartu terlebih dahulu. Switch hanya untuk kartu yang masih di garasi.', 'warning');
+                closeModal('modal-swap-etoll');
+                openReturnEtollModal(id);
+                return;
+            }
 
             const oldHolder = card.holderName || 'Driver';
             const oldBal = card.balance || 0;
@@ -5935,6 +6025,7 @@
                     showToast('Kartu Sudah OFF', 'Kartu yang dipilih sudah nonaktif.', 'warning');
                     return;
                 }
+                const reserveBefore={status:reserveCard.status,holderName:reserveCard.holderName,balance:reserveCard.balance,active:reserveCard.active};
 
                 const wasBorrowed = card.status === 'BORROWED';
                 reserveCard.active = true;
@@ -5963,11 +6054,9 @@
                 };
                 window.etollLogs.unshift(newRecap);
                 const etollLogSaved = await window.FirebaseBridge?.saveEtollLog?.(newRecap);
-                if (etollLogSaved === false) {
-                    window.etollLogs.shift();
-                    showToast('E-Toll Gagal Disimpan', 'Transaksi tidak tersimpan ke Firebase. Perubahan kartu dibatalkan.', 'error');
-                    return;
-                }
+                if (etollLogSaved === false) { window.etollLogs.shift(); Object.assign(card,cardBefore); Object.assign(reserveCard,reserveBefore); showToast('E-Toll Gagal Disimpan','Transaksi tidak tersimpan ke Firebase. Perubahan kartu dibatalkan.','error'); return; }
+                const stateSaved=await saveToStorage();
+                if(!stateSaved){ Object.assign(card,cardBefore); Object.assign(reserveCard,reserveBefore); window.etollLogs=window.etollLogs.filter(l=>String(l.id)!==String(newRecap.id)); await window.FirebaseBridge?.deleteEtollLog?.(newRecap.id); renderAll(); showToast('E-Toll Gagal Menyimpan Status','Status kartu tidak terkonfirmasi di Firebase. Perubahan dibatalkan.','error'); return; }
                 showToast("Kartu Ditukar", `${escapeHtml(card.name)} kini OFF, ${reserveCard.name} kini ON.`, "success");
 
                 if (window.telegramConfig.notifyEtoll !== false && window.telegramConfig.botToken && window.telegramConfig.chatId) {
@@ -6015,11 +6104,9 @@
                 };
                 window.etollLogs.unshift(newRecap);
                 const etollLogSaved = await window.FirebaseBridge?.saveEtollLog?.(newRecap);
-                if (etollLogSaved === false) {
-                    window.etollLogs.shift();
-                    showToast('E-Toll Gagal Disimpan', 'Transaksi tidak tersimpan ke Firebase. Perubahan kartu dibatalkan.', 'error');
-                    return;
-                }
+                if (etollLogSaved === false) { window.etollLogs.shift(); Object.assign(card,cardBefore); showToast('E-Toll Gagal Disimpan','Transaksi tidak tersimpan ke Firebase. Perubahan kartu dibatalkan.','error'); return; }
+                const stateSaved=await saveToStorage();
+                if(!stateSaved){ Object.assign(card,cardBefore); window.etollLogs=window.etollLogs.filter(l=>String(l.id)!==String(newRecap.id)); await window.FirebaseBridge?.deleteEtollLog?.(newRecap.id); renderAll(); showToast('E-Toll Gagal Menyimpan Status','Status kartu tidak terkonfirmasi di Firebase. Perubahan dibatalkan.','error'); return; }
                 showToast("Kartu Dioper", `${escapeHtml(card.name)} telah dioper ke ${newHolder}.`, "success");
 
                 if (window.telegramConfig.notifyEtoll !== false && window.telegramConfig.botToken && window.telegramConfig.chatId) {
@@ -6045,6 +6132,7 @@
                     showToast('Kartu Belum Dipinjam', 'Pertukaran kartu untuk perjalanan hanya berlaku pada kartu yang sedang dibawa.', 'warning');
                     return;
                 }
+                const newCardBefore={status:newCard.status,holderName:newCard.holderName,balance:newCard.balance,active:newCard.active};
 
                 card.status = 'AVAILABLE';
                 card.holderName = null;
@@ -6067,11 +6155,9 @@
                 };
                 window.etollLogs.unshift(newRecap);
                 const etollLogSaved = await window.FirebaseBridge?.saveEtollLog?.(newRecap);
-                if (etollLogSaved === false) {
-                    window.etollLogs.shift();
-                    showToast('E-Toll Gagal Disimpan', 'Transaksi tidak tersimpan ke Firebase. Perubahan kartu dibatalkan.', 'error');
-                    return;
-                }
+                if (etollLogSaved === false) { window.etollLogs.shift(); Object.assign(card,cardBefore); Object.assign(newCard,newCardBefore); showToast('E-Toll Gagal Disimpan','Transaksi tidak tersimpan ke Firebase. Perubahan kartu dibatalkan.','error'); return; }
+                const stateSaved=await saveToStorage();
+                if(!stateSaved){ Object.assign(card,cardBefore); Object.assign(newCard,newCardBefore); window.etollLogs=window.etollLogs.filter(l=>String(l.id)!==String(newRecap.id)); await window.FirebaseBridge?.deleteEtollLog?.(newRecap.id); renderAll(); showToast('E-Toll Gagal Menyimpan Status','Status kartu tidak terkonfirmasi di Firebase. Perubahan dibatalkan.','error'); return; }
                 showToast("Kartu Ditukar", `${escapeHtml(card.name)} diganti dengan ${newCard.name} untuk ${oldHolder}.`, "success");
 
                 if (window.telegramConfig.notifyEtoll !== false && window.telegramConfig.botToken && window.telegramConfig.chatId) {
@@ -6083,7 +6169,6 @@
                 }
             }
 
-            await saveToStorage();
             closeModal('modal-swap-etoll');
             openStatDetail('etoll');
             renderAll();
@@ -6294,7 +6379,13 @@
                     return;
                 }
             }
-            await saveToStorage();
+            const stateSaved = await saveToStorage();
+            if (!stateSaved) {
+                showToast('Status Kartu Gagal Disimpan', 'Penghapusan mutasi belum sepenuhnya terkonfirmasi Firebase. Sinkronisasi ulang diperlukan.', 'error');
+                try { await window.FirebaseBridge?.initialize?.(null, { force: true }); } catch (e) {}
+                renderAll();
+                return;
+            }
             try { sessionStorage.removeItem('garasiku_etoll_logs_cache_v1_3m'); } catch (e) {}
             renderAll();
             showToast("Mutasi Dihapus", "Rekap mutasi E-Toll berhasil dihapus oleh Admin.", "success");
@@ -6353,11 +6444,22 @@
             const searchInput = document.getElementById('stat-modal-search');
             if (searchInput) searchInput.value = '';
 
+            const modalSub = document.getElementById('stat-modal-subtitle');
+            if (modalSub) modalSub.innerText = 'Rincian data sistem';
+
             if (type === 'total') title.innerText = "Daftar Seluruh Armada";
             else if (type === 'garage') title.innerText = "Armada Siap di Garasi";
             else if (type === 'out') title.innerText = "Armada Sedang di Luar";
             else if (type === 'ready') title.innerText = "Driver Ready";
-            else if (type === 'etoll') title.innerText = "Inventaris Kartu E-Toll";
+            else if (type === 'etoll') {
+                title.innerText = "Inventaris Kartu E-Toll";
+                const modalSub = document.getElementById('stat-modal-subtitle');
+                if (modalSub) {
+                    modalSub.innerText = isAdminLoggedIn
+                        ? 'Kartu ON dan OFF • Mode Admin'
+                        : 'Hanya kartu ON yang dapat digunakan';
+                }
+            }
 
             renderStatModalContent('');
             openModal('modal-stat-detail');
@@ -6386,7 +6488,7 @@
                     card.innerHTML = `
                         <div>
                             <div class="flex items-center space-x-2">
-                                <span class="font-mono font-bold text-white">${escapeHtml(v.plate)}</span>
+                                <span class="font-mono font-bold vehicle-plate-modal text-white">${escapeHtml(v.plate)}</span>
                                 <span class="px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 text-[10px] font-semibold">${escapeHtml(v.category || 'Armada')}</span>
                             </div>
                             <p class="text-slate-300 text-xs mt-0.5">${escapeHtml(v.model)}</p>
@@ -6462,18 +6564,16 @@
                     body.appendChild(card);
                 });
             } else if (activeStatType === 'etoll') {
-                let list = [...window.etolls];
-                if (filterText) list = list.filter(e => e.name.toLowerCase().includes(filterText) || (e.holderName && e.holderName.toLowerCase().includes(filterText)));
+                // INVENTARIS E-TOLL: Mode Tamu melihat kartu ON saja.
+                // Mode Admin melihat seluruh kartu ON + OFF agar kartu nonaktif tetap dapat dikelola.
+                let list = (window.etolls || []).filter(e => e && (isAdminLoggedIn || e.active !== false));
+                if (filterText) list = list.filter(e => String(e.name || '').toLowerCase().includes(filterText) || (e.holderName && String(e.holderName).toLowerCase().includes(filterText)));
                 
-                // Urutkan: Kartu ON di atas (yang sedang dibawa dulu, lalu available), kartu OFF di paling bawah
+                // Urutkan: kartu yang sedang dipakai di atas, lalu kartu ON yang tersedia.
                 list.sort((a, b) => {
-                    const aActive = a.active !== false;
-                    const bActive = b.active !== false;
-                    if (aActive && !bActive) return -1;
-                    if (!aActive && bActive) return 1;
                     if (a.status === 'BORROWED' && b.status !== 'BORROWED') return -1;
                     if (a.status !== 'BORROWED' && b.status === 'BORROWED') return 1;
-                    return a.name.localeCompare(b.name);
+                    return String(a.name || '').localeCompare(String(b.name || ''));
                 });
 
                 count = list.length;
@@ -6487,10 +6587,10 @@
                     const isOff = card.active === false;
 
                     const el = document.createElement('div');
-                    el.className = `p-3.5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                        isOff ? 'bg-slate-950/60 border-slate-800 opacity-60' :
-                        isBorrowed ? 'bg-amber-950/20 border-amber-800/40' :
-                        'bg-dark-card border-dark-border'
+                    el.className = `p-3.5 rounded-2xl border-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        isOff ? 'bg-slate-950/90 border-slate-700/80 opacity-80' :
+                        (isBorrowed ? 'bg-amber-950/70 border-amber-400/80 shadow-lg shadow-amber-950/40' :
+                        'bg-emerald-950/55 border-emerald-400/70 shadow-lg shadow-emerald-950/30')
                     }`;
 
                     el.innerHTML = `
@@ -6499,28 +6599,24 @@
                                 <span class="font-bold text-white">${escapeHtml(card.name)}</span>
                                 <span class="px-2 py-0.5 rounded-md bg-rose-950 border border-rose-800/60 text-rose-300 text-[10px] font-semibold">${escapeHtml(card.bank || 'E-Toll')}</span>
                                 ${isOff ? '<span class="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-700 text-slate-400 text-[10px] font-bold">OFF (Nonaktif)</span>' :
-                                  (isBorrowed ? `<span class="px-2 py-0.5 rounded-md bg-amber-950 border border-amber-700 text-amber-300 text-[10px] font-bold"><i class="fa-solid fa-user mr-1"></i>${escapeHtml(card.holderName)}</span>` :
-                                  '<span class="px-2 py-0.5 rounded-md bg-emerald-950 border border-emerald-700 text-emerald-300 text-[10px] font-bold">Di Garasi</span>')}
+                                  (isBorrowed ? `<span class="px-2.5 py-1 rounded-md bg-amber-400 text-slate-950 border border-amber-200 text-[10px] font-black"><i class="fa-solid fa-user mr-1"></i>DIPAKAI · ${escapeHtml(card.holderName)}</span>` :
+                                  '<span class="px-2.5 py-1 rounded-md bg-emerald-400 text-slate-950 border border-emerald-200 text-[10px] font-black"><i class="fa-solid fa-square-parking mr-1"></i>TERSEDIA · DI GARASI</span>')}
                             </div>
-                            <div class="flex items-center space-x-3 text-[11px] text-slate-400">
+                            <div class="flex items-center space-x-3 text-[11px] ${isBorrowed && !isOff ? 'text-amber-100' : 'text-slate-400'}">
                                 <span>Saldo: <strong class="text-white font-mono font-bold">Rp ${(Number(card.balance) || 0).toLocaleString('id-ID')}</strong></span>
                                 <span>No: <code class="font-mono text-slate-300">${escapeHtml(card.cardNo || '-')}</code></span>
                             </div>
                         </div>
                         <div class="flex flex-wrap items-center gap-1.5 self-end sm:self-center">
                             ${!isOff && isBorrowed ? `
-                                <button onclick="openSwapEtollModal('${card.id}')" class="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center space-x-1 shadow-sm">
-                                    <i class="fa-solid fa-repeat"></i>
-                                    <span>Tukar Kartu</span>
-                                </button>
                                 <button onclick="openReturnEtollModal('${card.id}')" class="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center space-x-1 shadow-sm">
                                     <i class="fa-solid fa-arrow-rotate-left"></i>
                                     <span>Kembalikan</span>
                                 </button>
                             ` : (!isOff ? `
-                                <button onclick="openSwapEtollModal('${card.id}')" class="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center space-x-1 shadow-sm" title="Tukar kartu ini dengan kartu cadangan yang OFF">
-                                    <i class="fa-solid fa-repeat"></i>
-                                    <span>Tukar ON⇄OFF</span>
+                                <button onclick="openSwapEtollModal('${card.id}')" class="px-1.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] leading-none flex items-center space-x-1 shadow-sm" title="Switch kartu ON dengan kartu cadangan OFF">
+                                    <i class="fa-solid fa-repeat text-[9px]"></i>
+                                    <span>Switch</span>
                                 </button>
                                 <button onclick="openBorrowEtollModal('${card.id}')" class="px-3 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs flex items-center space-x-1 shadow-sm">
                                     <i class="fa-solid fa-hand-holding-hand"></i>
@@ -6528,10 +6624,8 @@
                                 </button>
                             ` : '')}
                             ${isAdminLoggedIn ? `
-                                <button onclick="toggleEtollActive('${card.id}')" title="ON / OFF Kartu" class="px-2.5 py-1.5 rounded-xl border border-dark-border text-xs font-bold ${
-                                    isOff ? 'bg-emerald-950 text-emerald-300 hover:bg-emerald-900' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
-                                }">
-                                    ${isOff ? 'Nyalakan (ON)' : 'OFF'}
+                                <button onclick="toggleEtollActive('${card.id}')" title="${isOff ? 'Aktifkan kartu ini' : 'Matikan kartu ini'}" class="px-2.5 py-1.5 rounded-xl border ${isOff ? 'border-emerald-700 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/50' : 'border-dark-border bg-slate-900 text-slate-400 hover:bg-slate-800'} text-xs font-bold">
+                                    ${isOff ? 'ON' : 'OFF'}
                                 </button>
                                 <span class="px-2 py-1.5 rounded-xl border border-slate-700 bg-slate-950/60 text-[10px] font-bold text-slate-500" title="Nama, bank, nomor, tambah, dan hapus mengikuti aplikasi RekapToll">
                                     <i class="fa-solid fa-link mr-1"></i>Master RekapToll
@@ -6700,7 +6794,7 @@
             return msg;
         }
 
-        function saveTelegramSettings(event) {
+        async function saveTelegramSettings(event) {
             event.preventDefault();
             const token = telegramTokenFromInput();
             const chatId = String(document.getElementById('tg-chatid')?.value || '').trim();
@@ -6714,16 +6808,15 @@
                 showToast('Chat ID Belum Diisi', 'Klik Deteksi Otomatis setelah mengirim /start ke bot.', 'warning');
                 return;
             }
+            const beforeTelegram=JSON.parse(JSON.stringify(window.telegramConfig));
             window.telegramConfig.botToken = token;
             window.telegramConfig.chatId = chatId;
             window.telegramConfig.notifyCheckout = document.getElementById('tg-notify-checkout').checked;
             window.telegramConfig.notifyCheckin = document.getElementById('tg-notify-checkin').checked;
             window.telegramConfig.notifyEtoll = document.getElementById('tg-notify-etoll') ? document.getElementById('tg-notify-etoll').checked : true;
-
-            saveToStorage();
-            updateTelegramStatusDot();
-            closeModal('modal-telegram');
-            showToast('Pengaturan Tersimpan', 'Konfigurasi Bot Telegram tersimpan.', 'success');
+            const ok=await saveToStorage();
+            if(!ok){window.telegramConfig=beforeTelegram;updateTelegramStatusDot();showToast('Telegram Gagal Disimpan','Konfigurasi belum diterima Firebase.','error');return;}
+            updateTelegramStatusDot(); closeModal('modal-telegram'); showToast('Pengaturan Tersimpan','Konfigurasi Bot Telegram tersimpan.','success');
         }
 
         function escapeTg(str) {
