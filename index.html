@@ -705,6 +705,20 @@
                     </div>
                 </div>
 
+                <div class="flex flex-wrap items-center gap-2 mb-3">
+                    <button id="btn-etoll-history-migrate" type="button" onclick="migrateEtollHistoryToEfficientStorage()" class="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold">
+                        <i class="fa-solid fa-box-archive mr-1"></i>Optimasi & Arsipkan Histori E-Toll (Admin)
+                    </button>
+                    <label for="etoll-history-from" class="text-xs text-slate-300 font-semibold">Mulai tanggal</label>
+                    <input id="etoll-history-from" type="date" class="px-2 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-100 text-xs" aria-label="Tanggal mulai histori E-Toll">
+                    <label for="etoll-history-to" class="text-xs text-slate-300 font-semibold">Sampai</label>
+                    <input id="etoll-history-to" type="date" class="px-2 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-100 text-xs" aria-label="Tanggal akhir histori E-Toll">
+                    <button id="btn-etoll-history-load" type="button" onclick="loadEtollHistoryManual()" class="px-3 py-2 rounded-xl border border-cyan-700 text-cyan-300 text-xs font-bold">
+                        <i class="fa-solid fa-clock-rotate-left mr-1"></i>Ambil Histori Lama
+                    </button>
+                    <span class="text-[10px] text-slate-500">Startup: 1 bulan terakhir setelah migrasi. Histori lama tetap di Firebase.</span>
+                </div>
+
                 <!-- Filter Controls -->
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div class="relative">
@@ -1695,7 +1709,7 @@
     <script type="module">
         import { initializeApp, getApps, getApp, deleteApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { initializeFirestore, getFirestore, collection, doc, setDoc, getDoc, getDocs, getDocFromServer, getDocsFromServer, query, where, writeBatch, deleteDoc, deleteField } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeFirestore, getFirestore, collection, doc, setDoc, getDoc, getDocs, getDocFromServer, getDocsFromServer, query, where, writeBatch, deleteDoc, deleteField, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const DEFAULT_FIREBASE_CONFIG = {
             apiKey: "AIzaSyCiWsAbEW-tU0FZ54yE3A3-kuHdSuiYWAQ",
@@ -1739,6 +1753,8 @@
         }
 
         window.FirebaseBridge = {
+            stateBaseline: null,
+            stateWriteInFlight: null,
             app: null,
             db: null,
             auth: null,
@@ -1751,7 +1767,8 @@
             writeQueue: Promise.resolve(),
             gateWriteQueue: Promise.resolve(),
             gateLogsReady: false,
-            gateReadMonths: 2,
+            gateReadMonths: 1,
+            etollLogsSplitEnabled: false,
             gateMigrationRunning: false,
 
             async initialize(customConfig = null) {
@@ -1825,9 +1842,8 @@
                     this.gateLogsReady = false;
                     this.updateStatusUI(false, `Menghubungkan (${config.projectId})...`);
                     this.startRealtimeSync();
-                    if (window.EtollMasterBridge && typeof window.EtollMasterBridge.sync === 'function') {
-                        window.EtollMasterBridge.sync();
-                    }
+                    // Master E-Toll dibaca satu kali oleh EtollMasterBridge.start() saat load.
+                    // Hindari pembacaan ganda pada startup.
                     if (window.updateGlobalConnectionIndicator) window.updateGlobalConnectionIndicator();
                     return true;
                 } catch (error) {
@@ -1872,6 +1888,85 @@
                 }
             },
 
+            etollLogsCollection() {
+                if (!this.db) return null;
+                // Log E-Toll disimpan per dokumen agar histori lama tidak ikut terunduh saat startup.
+                return collection(this.db, 'garasiku_fleet', 'shared_state', 'etoll_logs');
+            },
+            etollLogRef(logId) {
+                const col = this.etollLogsCollection();
+                return col ? doc(col, String(logId)) : null;
+            },
+            async loadEtollHistoryRange(from, to) {
+                const col = this.etollLogsCollection();
+                const q = query(col, where('timestamp', '>=', `${from}T00:00:00`), where('timestamp', '<=', `${to}T23:59:59.999`));
+                const snap = await getDocsFromServer(q);
+                return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            },
+            async loadRecentEtollLogs(months = 1) {
+                const col = this.etollLogsCollection();
+                if (!col) return false;
+                const cutoff = new Date();
+                cutoff.setMonth(cutoff.getMonth() - Math.max(1, Number(months) || 1));
+                try {
+                    const recentQ = query(col, where('timestamp', '>=', cutoff.toISOString()));
+                    const snap = await getDocsFromServer(recentQ);
+                    window.etollLogs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                        .sort((a,b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
+                    try { localStorage.setItem('garasiku_etoll_logs', JSON.stringify(window.etollLogs)); } catch(e) {}
+                    this.etollLogsBaseline = JSON.parse(JSON.stringify(window.etollLogs));
+                    if (typeof renderEtollRecapTable === 'function') renderEtollRecapTable();
+                    return true;
+                } catch (e) {
+                    console.warn('Gagal membaca log E-Toll terbaru:', e);
+                    return false;
+                }
+            },
+            async saveChangedEtollLogs() {
+                if (!this.db || !this.currentUser) return false;
+                const current = Array.isArray(window.etollLogs) ? window.etollLogs : [];
+                const baseline = Array.isArray(this.etollLogsBaseline) ? this.etollLogsBaseline : [];
+                const oldMap = new Map(baseline.map((x,i) => [String(x.id || x.logId || `legacy-${i}`), x]));
+                const newMap = new Map(current.map((x,i) => [String(x.id || x.logId || `legacy-${i}`), x]));
+                const tasks = [];
+                for (const [id, item] of newMap) {
+                    const old = oldMap.get(id);
+                    if (JSON.stringify(old ?? null) !== JSON.stringify(item ?? null)) {
+                        const ref = this.etollLogRef(id);
+                        if (ref) tasks.push(setDoc(ref, { ...item, id }, { merge: true }));
+                    }
+                }
+                // Penghapusan log lama tidak otomatis disinkronkan dari cache parsial.
+                // Ini menghindari penghapusan histori yang tidak sedang dimuat pada perangkat ini.
+                await Promise.all(tasks);
+                this.etollLogsBaseline = JSON.parse(JSON.stringify(current));
+                return true;
+            },
+            async migrateLegacyEtollLogsToCollection() {
+                if (!this.db || !this.currentUser) throw new Error('Firebase/Auth belum siap');
+                const sharedRef = doc(this.db, 'garasiku_fleet', 'shared_state');
+                const snap = await getDocFromServer(sharedRef);
+                const legacy = snap.exists() && Array.isArray(snap.data()?.etollLogs) ? snap.data().etollLogs : [];
+                const col = this.etollLogsCollection();
+                if (legacy.length) {
+                    // Migrasi dilakukan hanya atas permintaan Admin, bukan otomatis saat startup.
+                    for (let i = 0; i < legacy.length; i += 400) {
+                        const batch = writeBatch(this.db);
+                        legacy.slice(i, i + 400).forEach((item, j) => {
+                            const rawId = item?.id || item?.logId || `legacy-${i+j}`;
+                            const safeId = String(rawId).replace(/[\\/]/g, '_');
+                            batch.set(doc(col, safeId), { ...item, id: safeId }, { merge: true });
+                        });
+                        await batch.commit();
+                    }
+                }
+                // Hanya setelah seluruh batch sukses, hapus array lama dari dokumen besar.
+                await setDoc(sharedRef, { etollLogs: deleteField(), etollLogsMigratedAt: new Date().toISOString() }, { merge: true });
+                this.etollLogsSplitEnabled = true;
+                await this.loadRecentEtollLogs(1);
+                return legacy.length;
+            },
+
             gateLogsCollection() {
                 if (!this.db) return null;
                 // Subcollection khusus transaksi gerbang: setiap log = satu dokumen.
@@ -1906,6 +2001,8 @@
                         await this.pushStateToCloud();
                     }
                     await this.startGateLogsRealtimeSync();
+                    this.etollLogsSplitEnabled = !!(snapshot.exists() && snapshot.data()?.etollLogsMigratedAt);
+                    if (this.etollLogsSplitEnabled) await this.loadRecentEtollLogs(1);
                 } catch (error) {
                     console.error('Firestore startup sync error:', error);
                     this.isConnected = false;
@@ -1921,10 +2018,10 @@
                 if (!col) return false;
                 try {
                     const cutoff = new Date();
-                    cutoff.setMonth(cutoff.getMonth() - (Number(this.gateReadMonths) || 2));
+                    cutoff.setMonth(cutoff.getMonth() - (Number(this.gateReadMonths) || 1));
                     const cutoffIso = cutoff.toISOString();
 
-                    // Hanya baca log 2 bulan terakhir + transaksi yang masih ACTIVE.
+                    // Hanya baca log 1 bulan terakhir + transaksi yang masih ACTIVE.
                     // Dua query kecil menghindari download seluruh histori bertahun-tahun.
                     const recentQ = query(col, where('timeOut', '>=', cutoffIso));
                     const activeQ = query(col, where('status', '==', 'ACTIVE'));
@@ -1944,7 +2041,7 @@
                     this.lastSyncTime = new Date();
                     if (typeof reconcileVehicleOperationalState === 'function') reconcileVehicleOperationalState();
                     if (typeof renderAll === 'function') renderAll();
-                    this.updateStatusUI(true, `Firebase SERVER • Logbook ${this.gateReadMonths || 2} bulan (${window.logs.length} data)`);
+                    this.updateStatusUI(true, `Firebase SERVER • Logbook ${this.gateReadMonths || 1} bulan (${window.logs.length} data)`);
                     return true;
                 } catch (error) {
                     this.gateLogsReady = false;
@@ -2144,55 +2241,132 @@
                     this.updateStatusUI(false, 'Firebase belum siap / Auth belum aktif');
                     return false;
                 }
-                try {
-                    const syncDoc = doc(this.db, 'garasiku_fleet', 'shared_state');
-                    const etollState = {};
-                    (window.etolls || []).forEach(card => {
-                        const key = String(card.sourceCardId || card.cardNo || card.id || '').trim();
-                        if (!key) return;
-                        etollState[key] = {
-                            active: card.active !== false,
-                            status: card.status === 'BORROWED' ? 'BORROWED' : 'AVAILABLE',
-                            holderName: card.status === 'BORROWED' ? (card.holderName || null) : null,
-                            balance: Number.isFinite(Number(card.balance)) ? Number(card.balance) : 0,
-                            nopol: String(card.nopol || ''),
-                            color: String(card.color || '')
-                        };
-                    });
-                    const writeTime = new Date().toISOString();
-                    await setDoc(syncDoc, {
-                        schemaVersion: 6,
-                        vehicleSettings: collectVehicleSettings(),
-                        driverSettings: collectDriverSettings(),
-                        etollLogs: window.etollLogs || [],
-                        etollState,
-                        adminPin: window.adminPin || '1234',
-                        telegramConfig: window.telegramConfig || {
-                            botToken: '', chatId: '', notifyCheckout: true, notifyCheckin: true, notifyEtoll: true
-                        },
-                        appSettings: {
-                            selectedCategoryFilter: typeof selectedCategoryFilter !== 'undefined' ? selectedCategoryFilter : 'Semua',
-                            selectedSortMode: typeof selectedSortMode !== 'undefined' ? selectedSortMode : 'frequent'
-                        },
-                        updatedAt: writeTime
-                    }, { merge: true });
-                    this.isConnected = true;
-                    this.lastSyncTime = new Date();
+                // Gabungkan pemanggilan beruntun agar tidak mengirim write identik paralel.
+                if (this.stateWriteInFlight) return this.stateWriteInFlight;
+                this.stateWriteInFlight = (async () => {
                     try {
-                        localStorage.setItem('garasiku_last_cloud_write', String(Date.parse(writeTime)));
-                        localStorage.removeItem('garasiku_pending_cloud_write');
-                    } catch (e) {}
-                    this.updateStatusUI(true, `Terhubung (${this.configProjectId || 'Firebase'})`);
-                    if (window.updateGlobalConnectionIndicator) window.updateGlobalConnectionIndicator();
-                    return true;
-                } catch (e) {
-                    console.error('Error pushing shared_state ke cloud:', e);
-                    this.isConnected = false;
-                    const code = e?.code ? ` [${e.code}]` : '';
-                    this.updateStatusUI(false, `Firebase gagal${code}: ${e?.message || 'write ditolak'}`);
-                    if (window.updateGlobalConnectionIndicator) window.updateGlobalConnectionIndicator();
-                    return false;
-                }
+                        const syncDoc = doc(this.db, 'garasiku_fleet', 'shared_state');
+                        const etollState = {};
+                        (window.etolls || []).forEach(card => {
+                            const key = String(card.sourceCardId || card.cardNo || card.id || '').trim();
+                            if (!key) return;
+                            etollState[key] = {
+                                active: card.active !== false,
+                                status: card.status === 'BORROWED' ? 'BORROWED' : 'AVAILABLE',
+                                holderName: card.status === 'BORROWED' ? (card.holderName || null) : null,
+                                balance: Number.isFinite(Number(card.balance)) ? Number(card.balance) : 0,
+                                nopol: String(card.nopol || ''),
+                                color: String(card.color || '')
+                            };
+                        });
+                        const payload = {
+                            schemaVersion: 6,
+                            vehicleSettings: collectVehicleSettings(),
+                            driverSettings: collectDriverSettings(),
+                            etollState,
+                            adminPin: window.adminPin || '1234',
+                            telegramConfig: window.telegramConfig || {
+                                botToken: '', chatId: '', notifyCheckout: true, notifyCheckin: true, notifyEtoll: true
+                            },
+                            appSettings: {
+                                selectedCategoryFilter: typeof selectedCategoryFilter !== 'undefined' ? selectedCategoryFilter : 'Semua',
+                                selectedSortMode: typeof selectedSortMode !== 'undefined' ? selectedSortMode : 'frequent'
+                            }
+                        };
+                        const clone = value => value == null ? value : JSON.parse(JSON.stringify(value));
+                        const same = (a, b) => JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b);
+                        const objectLike = value => value && typeof value === 'object' && !Array.isArray(value);
+                        // Merge per-key untuk map pengaturan/etollState agar perubahan perangkat lain
+                        // pada key berbeda tidak tertimpa oleh cache lokal yang lebih lama.
+                        const mergeObjectChanges = (base, local, latest) => {
+                            const out = objectLike(latest) ? clone(latest) : {};
+                            const b = objectLike(base) ? base : {};
+                            const l = objectLike(local) ? local : {};
+                            const keys = new Set([...Object.keys(b), ...Object.keys(l)]);
+                            for (const key of keys) {
+                                const inBase = Object.prototype.hasOwnProperty.call(b, key);
+                                const inLocal = Object.prototype.hasOwnProperty.call(l, key);
+                                if (inBase === inLocal && same(b[key], l[key])) continue;
+                                if (!inLocal) delete out[key];
+                                else out[key] = clone(l[key]);
+                            }
+                            return out;
+                        };
+                        // Merge log E-Toll berdasarkan ID: log baru/perubahan/penghapusan dari perangkat
+                        // ini diterapkan ke versi server terbaru, bukan mengganti seluruh array lama.
+                        const mergeLogs = (base, local, latest) => {
+                            const keyOf = (item, index) => String(item?.id ?? item?.logId ?? `__noid_${index}_${JSON.stringify(item)}`);
+                            const toMap = arr => new Map((Array.isArray(arr) ? arr : []).map((item, i) => [keyOf(item, i), item]));
+                            const b = toMap(base), l = toMap(local), out = toMap(latest);
+                            for (const [key, oldItem] of b) {
+                                if (!l.has(key)) out.delete(key);
+                                else if (!same(oldItem, l.get(key))) out.set(key, clone(l.get(key)));
+                            }
+                            for (const [key, item] of l) if (!b.has(key)) out.set(key, clone(item));
+                            return [...out.values()].sort((a, b) => String(b?.time || b?.timestamp || b?.date || b?.createdAt || '').localeCompare(String(a?.time || a?.timestamp || a?.date || a?.createdAt || '')));
+                        };
+                        const mergeField = (field, base, local, latest) => {
+                            if (same(base, local)) return clone(latest);
+                            if (['vehicleSettings','driverSettings','etollState','telegramConfig','appSettings'].includes(field)) {
+                                return mergeObjectChanges(base, local, latest);
+                            }
+                            return clone(local);
+                        };
+
+                        // Bila tidak ada perubahan sejak sync terakhir, jangan melakukan transaksi/read/write.
+                        if (this.stateBaseline && Object.keys(payload).every(field => same(this.stateBaseline[field], payload[field]))) {
+                            try { localStorage.removeItem('garasiku_pending_cloud_write'); } catch (e) {}
+                            this.isConnected = true;
+                            this.lastSyncTime = new Date();
+                            this.updateStatusUI(true, 'Terhubung • tidak ada perubahan');
+                            if (window.updateGlobalConnectionIndicator) window.updateGlobalConnectionIndicator();
+                            return true;
+                        }
+
+                        let writtenPayload = null;
+                        await runTransaction(this.db, async transaction => {
+                            const snap = await transaction.get(syncDoc);
+                            const latest = snap.exists() ? (snap.data() || {}) : {};
+                            const base = this.stateBaseline || (snap.exists() ? clone(latest) : {});
+                            const patch = {};
+                            if (!snap.exists()) {
+                                Object.assign(patch, clone(payload));
+                            } else {
+                                for (const field of Object.keys(payload)) {
+                                    const mergedValue = mergeField(field, base[field], payload[field], latest[field]);
+                                    if (!same(mergedValue, latest[field])) patch[field] = mergedValue;
+                                }
+                            }
+                            if (Object.keys(patch).length) {
+                                patch.updatedAt = new Date().toISOString();
+                                transaction.set(syncDoc, patch, { merge: true });
+                                writtenPayload = { ...latest, ...patch };
+                            } else {
+                                writtenPayload = latest;
+                            }
+                        });
+                        this.stateBaseline = clone(writtenPayload || payload);
+                        this.isConnected = true;
+                        this.lastSyncTime = new Date();
+                        try {
+                            localStorage.setItem('garasiku_last_cloud_write', String(Date.now()));
+                            localStorage.removeItem('garasiku_pending_cloud_write');
+                        } catch (e) {}
+                        this.updateStatusUI(true, Object.keys(writtenPayload || {}).length ? `Terhubung (${this.configProjectId || 'Firebase'})` : 'Terhubung • tidak ada perubahan');
+                        if (window.updateGlobalConnectionIndicator) window.updateGlobalConnectionIndicator();
+                        return true;
+                    } catch (e) {
+                        console.error('Error pushing perubahan shared_state ke cloud:', e);
+                        this.isConnected = false;
+                        const code = e?.code ? ` [${e.code}]` : '';
+                        this.updateStatusUI(false, `Firebase gagal${code}: ${e?.message || 'write ditolak'}`);
+                        if (window.updateGlobalConnectionIndicator) window.updateGlobalConnectionIndicator();
+                        return false;
+                    } finally {
+                        this.stateWriteInFlight = null;
+                    }
+                })();
+                return this.stateWriteInFlight;
             }
         };
 
@@ -2394,6 +2568,7 @@
             timer: null,
             syncing: false,
             lastSuccess: null,
+            lastOdometerSent: new Map(),
             async sync() {
                 if (this.syncing) return;
                 this.syncing = true;
@@ -2474,11 +2649,16 @@
                     if (!key) return;
                     const km = Number(v.odometer ?? v.currentKm ?? 0) || 0;
                     const masterKm = Number(v.currentKm ?? 0) || 0;
-                    if (km === masterKm) return;
+                    const sentKm = this.lastOdometerSent.get(String(key));
+                    if (km === masterKm || km === sentKm) return;
                     try {
-                        await fetch(`${this.baseUrl}/${this.path}/${encodeURIComponent(key)}.json`, {
+                        const response = await fetch(`${this.baseUrl}/${this.path}/${encodeURIComponent(key)}.json`, {
                             method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({currentKm:km})
                         });
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        this.lastOdometerSent.set(String(key), km);
+                        // Perbarui cache lokal supaya pemanggilan berikutnya tidak PATCH ulang.
+                        v.currentKm = km;
                     } catch (e) { console.warn('Gagal update ODO Index 1:', v.plate, e.message); }
                 }));
             },
@@ -2702,13 +2882,12 @@
                 let cloudOk = true;
                 if (window.FirebaseBridge && typeof window.FirebaseBridge.pushStateToCloud === 'function') {
                     cloudOk = await window.FirebaseBridge.pushStateToCloud();
+                    try {
+                        if (window.FirebaseBridge.etollLogsSplitEnabled) await window.FirebaseBridge.saveChangedEtollLogs();
+                    } catch (e) { console.warn('Sinkron log E-Toll terpisah tertunda:', e); }
                 }
-                // Update ODO ke Index 1 berjalan di belakang layar agar transaksi Logbook
-                // tidak menunggu puluhan PATCH jaringan. Firebase GarasiKu tetap menjadi
-                // tujuan simpan utama dan ditunggu sampai selesai.
-                if (window.Index1MasterBridge && typeof window.Index1MasterBridge.syncOdometersToIndex1 === 'function') {
-                    window.Index1MasterBridge.syncOdometersToIndex1().catch(e => console.warn('Sinkron ODO Index 1 tertunda:', e));
-                }
+                // Jangan scan/sinkron seluruh odometer pada setiap save umum.
+                // Sinkron ODO lintas proyek hanya dipanggil pada transaksi yang relevan.
                 return cloudOk !== false;
             };
 
@@ -2729,6 +2908,9 @@
             const pendingLocalWrite = localStorage.getItem('garasiku_pending_cloud_write') === '1';
             if (pendingLocalWrite) return;
             if (cloudTime && Math.max(localWriteAt, lastLocalCloudWrite) && cloudTime < Math.max(localWriteAt, lastLocalCloudWrite)) return;
+            if (window.FirebaseBridge) {
+                try { window.FirebaseBridge.stateBaseline = JSON.parse(JSON.stringify(cloudData)); } catch (e) {}
+            }
             if (cloudData.vehicleSettings && typeof cloudData.vehicleSettings === 'object') {
                 window.vehicleSettings = cloudData.vehicleSettings;
                 applyVehicleSettingsToMaster();
@@ -2741,7 +2923,9 @@
             if (cloudData.etollState && typeof cloudData.etollState === 'object') {
                 window.cloudEtollState = cloudData.etollState;
             }
-            if (cloudData.etollLogs && Array.isArray(cloudData.etollLogs)) window.etollLogs = cloudData.etollLogs;
+            if (!cloudData.etollLogsMigratedAt && cloudData.etollLogs && Array.isArray(cloudData.etollLogs)) {
+                window.etollLogs = cloudData.etollLogs;
+            }
             // Logbook gerbang disinkronkan khusus melalui subcollection gate_logs.
             if (cloudData.appSettings && typeof cloudData.appSettings === 'object') {
                 window.cloudAppSettings = cloudData.appSettings;
@@ -4800,6 +4984,55 @@
             closeModal('modal-swap-etoll');
             openStatDetail('etoll');
             renderAll();
+        }
+
+        async function migrateEtollHistoryToEfficientStorage() {
+            if (!isAdminLoggedIn) {
+                showToast('Khusus Admin', 'Masuk Mode Admin terlebih dahulu untuk memindahkan histori E-Toll.', 'warning');
+                return;
+            }
+            if (!confirm('Pindahkan histori E-Toll lama ke koleksi per-log? Data lama baru dilepas dari shared_state setelah semua batch berhasil. Proses ini dapat memakai kuota sesuai jumlah histori.')) return;
+            const btn = document.getElementById('btn-etoll-history-migrate');
+            if (btn) { btn.disabled = true; btn.textContent = 'Memindahkan histori...'; }
+            try {
+                const count = await window.FirebaseBridge.migrateLegacyEtollLogsToCollection();
+                showToast('Optimasi histori selesai', `${count} log dipindahkan. Startup selanjutnya membaca 1 bulan terbaru; histori lama tetap tersimpan.`, 'success');
+            } catch (e) {
+                console.error(e);
+                showToast('Migrasi belum selesai', e?.message || 'Data lama tidak dihapus. Periksa koneksi lalu coba lagi.', 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-box-archive mr-1"></i>Optimasi & Arsipkan Histori E-Toll (Admin)'; }
+            }
+        }
+
+        (function initEtollHistoryDateInputs() {
+            const to = document.getElementById('etoll-history-to');
+            if (to && !to.value) to.value = new Date().toISOString().slice(0, 10);
+        })();
+
+        async function loadEtollHistoryManual() {
+            const from = document.getElementById('etoll-history-from')?.value || '';
+            const to = document.getElementById('etoll-history-to')?.value || '';
+            if (!from || !to) {
+                showToast('Periode belum lengkap', 'Pilih tanggal mulai dan tanggal akhir di samping tombol Ambil Histori Lama.', 'warning');
+                return;
+            }
+            if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(from) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(to) || from > to) {
+                showToast('Rentang tanggal tidak valid', 'Tanggal mulai harus sebelum atau sama dengan tanggal akhir.', 'warning');
+                return;
+            }
+            try {
+                const loaded = await window.FirebaseBridge.loadEtollHistoryRange(from, to);
+                const map = new Map((window.etollLogs || []).map(x => [String(x.id || x.logId), x]));
+                loaded.forEach(x => map.set(String(x.id || x.logId), x));
+                window.etollLogs = [...map.values()].sort((a,b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
+                window.FirebaseBridge.etollLogsBaseline = JSON.parse(JSON.stringify(window.etollLogs));
+                renderEtollRecapTable();
+                showToast('Histori berhasil diambil', `${loaded.length} log dimuat dari ${from} sampai ${to}.`, 'success');
+            } catch (e) {
+                console.error(e);
+                showToast('Gagal mengambil histori', e?.message || 'Periksa koneksi dan format tanggal.', 'error');
+            }
         }
 
         function buildEtollRecapRows() {
