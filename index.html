@@ -1650,7 +1650,7 @@
 
                     <div class="p-4 rounded-2xl border border-rose-900/60 bg-rose-950/20">
                         <div class="flex items-start justify-between gap-3">
-                            <div><h4 class="font-bold text-white">E-Toll</h4><p class="text-[11px] text-slate-400 mt-1">etollState dan etollLogs pada shared_state.</p></div>
+                            <div><h4 class="font-bold text-white">E-Toll</h4><p class="text-[11px] text-slate-400 mt-1">Status operasional pada shared_state; histori per transaksi.</p></div>
                             <i class="fa-solid fa-credit-card text-rose-400"></i>
                         </div>
                         <button type="button" onclick="deleteFirebaseMasterSection('etoll')" class="mt-3 w-full py-2 rounded-xl bg-rose-950/70 hover:bg-rose-900 border border-rose-800/60 text-rose-300 font-bold">Hapus Data E-Toll Firebase</button>
@@ -1710,7 +1710,7 @@
     <script type="module">
         import { initializeApp, getApps, getApp, deleteApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { initializeFirestore, getFirestore, collection, doc, setDoc, getDoc, getDocs, getDocFromServer, getDocsFromServer, query, where, writeBatch, deleteDoc, deleteField, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeFirestore, getFirestore, collection, doc, setDoc, getDoc, getDocs, getDocFromServer, getDocsFromServer, query, where, writeBatch, deleteDoc, deleteField, runTransaction, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const DEFAULT_FIREBASE_CONFIG = {
             apiKey: "AIzaSyCiWsAbEW-tU0FZ54yE3A3-kuHdSuiYWAQ",
@@ -1762,6 +1762,7 @@
             currentUser: null,
             unsubscribers: [],
             gateLogsUnsubscriber: null,
+            etollStateUnsubscriber: null,
             isConnected: false,
             lastSyncTime: null,
             configProjectId: null,
@@ -1798,6 +1799,7 @@
                     if (this.app && this.configProjectId && this.configProjectId !== config.projectId) {
                         this.unsubscribers.forEach(unsub => unsub && unsub());
                         this.unsubscribers = [];
+                        if (this.etollStateUnsubscriber) { try { this.etollStateUnsubscriber(); } catch (e) {} this.etollStateUnsubscriber = null; }
                         if (this.gateLogsUnsubscriber) {
                             try { this.gateLogsUnsubscriber(); } catch (e) {}
                             this.gateLogsUnsubscriber = null;
@@ -2004,9 +2006,47 @@
             removePendingGateLog() {},
             mergePendingGateLogs(cloudLogs) { return cloudLogs; },
 
-            // MODE EFISIEN: startup hanya melakukan one-shot read.
-            // Tidak memakai onSnapshot agar tidak mempertahankan listener realtime
-            // dan tidak membaca seluruh gate_logs setiap ada perubahan kecil.
+            // E-Toll: shared_state.etollState adalah sumber kebenaran operasional bersama.
+            // Listener hanya memantau dokumen kecil shared_state; tidak membaca ulang master RekapToll.
+            startEtollStateRealtimeSync() {
+                if (!this.db || this.etollStateUnsubscriber) return;
+                const ref = doc(this.db, 'garasiku_fleet', 'shared_state');
+                this.etollStateUnsubscriber = onSnapshot(ref, { includeMetadataChanges: false }, (snap) => {
+                    // Jangan render snapshot lokal yang masih pending; tunggu konfirmasi server.
+                    if (!snap.exists()) return;
+                    const data = snap.data() || {};
+                    if (!data.etollState || typeof data.etollState !== 'object') return;
+                    window.cloudEtollState = data.etollState;
+                    const state = data.etollState;
+                    let changed = false;
+                    (window.etolls || []).forEach(card => {
+                        const sourceId = String(card.sourceCardId || '').trim();
+                        const number = String(card.cardNo || '').replace(/\D/g, '');
+                        const item = state[sourceId] || state[number] || state[String(card.id || '')];
+                        if (!item) return;
+                        const status = item.status === 'BORROWED' ? 'BORROWED' : 'AVAILABLE';
+                        const holderName = status === 'BORROWED' ? (item.holderName || null) : null;
+                        const balance = Number.isFinite(Number(item.balance)) ? Number(item.balance) : 0;
+                        const active = item.active !== false;
+                        if (card.status !== status || (card.holderName || null) !== holderName || Number(card.balance || 0) !== balance || (card.active !== false) !== active) changed = true;
+                        card.status = status; card.holderName = holderName; card.balance = balance; card.active = active;
+                        if (item.nopol != null) card.nopol = String(item.nopol);
+                        if (item.color != null) card.color = String(item.color);
+                    });
+                    if (changed) {
+                        try { localStorage.setItem('garasiku_etolls', JSON.stringify(window.etolls || [])); } catch (e) {}
+                        if (typeof renderAll === 'function') renderAll();
+                        if (typeof activeStatType !== 'undefined' && activeStatType === 'etoll' && typeof renderStatModalContent === 'function') {
+                            const modal = document.getElementById('modal-stat-detail');
+                            if (modal && !modal.classList.contains('hidden')) renderStatModalContent(document.getElementById('stat-modal-search')?.value?.toLowerCase().trim() || '');
+                        }
+                    }
+                }, (error) => {
+                    console.warn('Listener status E-Toll gagal:', error);
+                });
+            },
+
+            // MODE EFISIEN: startup membaca shared_state satu kali, lalu listener menjaga status E-Toll lintas perangkat tetap sama.
             async startRealtimeSync() {
                 if (!this.db || !this.currentUser) return;
                 try {
@@ -2020,6 +2060,7 @@
                     } else {
                         await this.pushStateToCloud();
                     }
+                    this.startEtollStateRealtimeSync();
                     await this.startGateLogsRealtimeSync();
                     this.etollLogsSplitEnabled = !!(snapshot.exists() && snapshot.data()?.etollLogsMigratedAt);
                     if (this.etollLogsSplitEnabled) await this.loadRecentEtollLogs(1);
@@ -2307,6 +2348,11 @@
                                 const inBase = Object.prototype.hasOwnProperty.call(b, key);
                                 const inLocal = Object.prototype.hasOwnProperty.call(l, key);
                                 if (inBase === inLocal && same(b[key], l[key])) continue;
+                                const remoteChangedSameKey = !same(b[key], out[key]);
+                                const localChangedSameKey = !(inBase === inLocal && same(b[key], l[key]));
+                                // Jika perangkat lain sudah mengubah key yang sama, pertahankan versi server.
+                                // Perubahan lokal pada key berbeda tetap digabungkan tanpa menimpa seluruh map.
+                                if (remoteChangedSameKey && localChangedSameKey) continue;
                                 if (!inLocal) delete out[key];
                                 else out[key] = clone(l[key]);
                             }
@@ -4618,9 +4664,10 @@
                 showToast("Kartu Sedang Dipakai", "Kembalikan kartu terlebih dahulu sebelum dinonaktifkan.", "warning");
                 return;
             }
-            requireAdminAction(() => {
+            requireAdminAction(async () => {
                 card.active = card.active === false ? true : false;
-                saveToStorage();
+                const cloudSaved = await saveToStorage();
+                if (cloudSaved === false) { showToast('Sinkronisasi Belum Berhasil', 'Perubahan belum terkonfirmasi di cloud. Periksa koneksi Firebase sebelum melanjutkan.', 'error'); }
                 renderAll();
                 openStatDetail('etoll');
                 showToast("Status Kartu", `${card.name} kini ${card.active ? 'ON (Aktif)' : 'OFF (Nonaktif)'}.`, "info");
@@ -4648,7 +4695,7 @@
             openModal('modal-edit-etoll');
         }
 
-        function handleEditEtoll(event) {
+        async function handleEditEtoll(event) {
             event.preventDefault();
             const id = document.getElementById('edit-etoll-id').value;
             const balance = parseInt(document.getElementById('edit-etoll-balance').value) || 0;
@@ -4664,7 +4711,8 @@
                 card.name = normalizedCardNo.length >= 4 ? normalizedCardNo.slice(-4) : (card.name || '');
                 card.balance = balance;
 
-                saveToStorage();
+                const cloudSaved = await saveToStorage();
+                if (cloudSaved === false) { showToast('Sinkronisasi Belum Berhasil', 'Perubahan belum terkonfirmasi di cloud. Periksa koneksi Firebase sebelum melanjutkan.', 'error'); }
                 closeModal('modal-edit-etoll');
                 openStatDetail('etoll');
                 renderAll();
@@ -4712,7 +4760,7 @@
             openModal('modal-borrow-etoll');
         }
 
-        function handleBorrowEtoll(event) {
+        async function handleBorrowEtoll(event) {
             event.preventDefault();
             const id = document.getElementById('borrow-etoll-id').value;
             const selectVal = document.getElementById('borrow-driver-select').value;
@@ -4739,7 +4787,7 @@
                 card.holderName = holder;
                 
                 const newRecap = {
-                    id: `ETL-${Date.now()}`,
+                    id: `ETL-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
                     etollId: card.id,
                     cardName: card.name,
                     action: 'BORROW',
@@ -4753,7 +4801,8 @@
                 };
                 window.etollLogs.unshift(newRecap);
 
-                saveToStorage();
+                const cloudSaved = await saveToStorage();
+                if (cloudSaved === false) { showToast('Sinkronisasi Belum Berhasil', 'Perubahan belum terkonfirmasi di cloud. Periksa koneksi Firebase sebelum melanjutkan.', 'error'); }
                 closeModal('modal-borrow-etoll');
                 openStatDetail('etoll');
                 renderAll();
@@ -4778,7 +4827,7 @@
             openModal('modal-return-etoll');
         }
 
-        function handleReturnEtoll(event) {
+        async function handleReturnEtoll(event) {
             event.preventDefault();
             const id = document.getElementById('return-etoll-id').value;
             const newBalVal = document.getElementById('return-etoll-new-balance').value;
@@ -4803,7 +4852,7 @@
                 card.balance = newBal;
 
                 const newRecap = {
-                    id: `ETL-${Date.now()}`,
+                    id: `ETL-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
                     etollId: card.id,
                     cardName: card.name,
                     action: 'RETURN',
@@ -4817,7 +4866,8 @@
                 };
                 window.etollLogs.unshift(newRecap);
 
-                saveToStorage();
+                const cloudSaved = await saveToStorage();
+                if (cloudSaved === false) { showToast('Sinkronisasi Belum Berhasil', 'Perubahan belum terkonfirmasi di cloud. Periksa koneksi Firebase sebelum melanjutkan.', 'error'); }
                 closeModal('modal-return-etoll');
                 openStatDetail('etoll');
                 renderAll();
@@ -4894,7 +4944,7 @@
             }
         }
 
-        function handleSwapEtoll(event) {
+        async function handleSwapEtoll(event) {
             event.preventDefault();
             const id = document.getElementById('swap-etoll-id').value;
             const currentBalInput = document.getElementById('swap-balance-current').value;
@@ -4942,7 +4992,7 @@
                 card.balance = intermediateBal;
 
                 const newRecap = {
-                    id: `ETL-${Date.now()}`,
+                    id: `ETL-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
                     etollId: card.id,
                     cardName: `${card.name} [OFF] ⇄ ${reserveCard.name} [ON]`,
                     action: 'SWAP',
@@ -4989,7 +5039,7 @@
                 card.balance = intermediateBal;
 
                 const newRecap = {
-                    id: `ETL-${Date.now()}`,
+                    id: `ETL-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
                     etollId: card.id,
                     cardName: card.name,
                     action: 'SWAP',
@@ -5036,7 +5086,7 @@
                 newCard.holderName = oldHolder;
 
                 const newRecap = {
-                    id: `ETL-${Date.now()}`,
+                    id: `ETL-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
                     etollId: card.id,
                     cardName: `${card.name} ➔ ${newCard.name}`,
                     action: 'SWAP',
@@ -5060,7 +5110,8 @@
                 }
             }
 
-            saveToStorage();
+            const cloudSaved = await saveToStorage();
+            if (cloudSaved === false) showToast('Sinkronisasi Belum Berhasil', 'Perubahan belum terkonfirmasi di cloud. Periksa koneksi Firebase sebelum melanjutkan.', 'error');
             closeModal('modal-swap-etoll');
             openStatDetail('etoll');
             renderAll();
@@ -5782,6 +5833,7 @@
             if (window.FirebaseBridge) {
                 window.FirebaseBridge.unsubscribers.forEach(unsub => unsub && unsub());
                 window.FirebaseBridge.unsubscribers = [];
+                if (window.FirebaseBridge.etollStateUnsubscriber) { try { window.FirebaseBridge.etollStateUnsubscriber(); } catch (e) {} window.FirebaseBridge.etollStateUnsubscriber = null; }
                 window.FirebaseBridge.isConnected = false;
                 window.FirebaseBridge.lastSyncTime = null;
                 window.FirebaseBridge.db = null;
