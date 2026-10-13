@@ -1695,7 +1695,8 @@
                 <p class="text-xs text-cyan-100 mt-1">Nama dan ID disimpan ke database GarasiKu.</p>
             </div>
             <form onsubmit="saveDeviceName(event)" class="p-5 space-y-4">
-                <div><label class="block text-xs font-semibold text-slate-300 mb-1">ID Device otomatis</label><div id="device-id-display" class="font-mono text-sm text-cyan-300 break-all p-3 rounded-xl bg-slate-950 border border-slate-700"></div></div>
+                <div><label class="block text-xs font-semibold text-slate-300 mb-1">ID Device otomatis</label><div id="device-id-display" class="font-mono text-sm text-cyan-300 break-all p-3 rounded-xl bg-slate-950 border border-slate-700"></div>
+                    <input id="device-target-id" type="hidden" value=""></div>
                 <div><label for="device-name-input" class="block text-xs font-semibold text-slate-300 mb-1">Nama perangkat</label><input id="device-name-input" maxlength="60" required placeholder="Contoh: HP Petugas Gerbang Utama" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-white"></div>
                 <div class="flex justify-end gap-2"><button type="button" onclick="closeModal('modal-device-name')" class="px-4 py-2 rounded-xl border border-dark-border text-slate-300">Batal</button><button type="submit" class="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold">Simpan ke Database</button></div>
             </form>
@@ -1876,15 +1877,34 @@
                 if (!this.db) return null;
                 return collection(this.db, 'garasiku_fleet', 'shared_state', 'device_registry');
             },
+            async loadDeviceRegistration(deviceId) {
+                if (!this.db || !deviceId) return null;
+                const ref = doc(this.deviceRegistryCollection(), String(deviceId));
+                const snap = await getDocFromServer(ref);
+                return snap.exists() ? snap.data() : null;
+            },
             async saveDeviceRegistration(deviceId, deviceName) {
-                if (!this.db || !this.currentUser || !deviceId || !deviceName) return false;
+                if (!this.db || !deviceId || !String(deviceName || '').trim()) return false;
+                // Tunggu autentikasi Firebase siap, tanpa polling berkepanjangan.
+                for (let attempt = 0; !this.currentUser && attempt < 8; attempt++) {
+                    await new Promise(resolve => setTimeout(resolve, 250));
+                }
+                if (!this.currentUser) {
+                    console.warn('Identitas perangkat belum disimpan: autentikasi Firebase belum siap.');
+                    return false;
+                }
                 try {
                     const ref = doc(this.deviceRegistryCollection(), String(deviceId));
-                    await setDoc(ref, { deviceId: String(deviceId), deviceName: String(deviceName).trim(), updatedAt: new Date().toISOString() }, { merge: true });
+                    await setDoc(ref, {
+                        deviceId: String(deviceId),
+                        deviceName: String(deviceName).trim().slice(0, 60),
+                        updatedAt: new Date().toISOString()
+                    }, { merge: true });
                     return true;
                 } catch (error) {
                     console.error('Gagal menyimpan identitas perangkat:', error);
-                    return false;
+                    // Teruskan kode/pesan Firebase agar penyebab nyata terlihat di UI.
+                    throw error;
                 }
             },
 
@@ -2808,32 +2828,79 @@
         function getGarasikuDeviceMeta() {
             return { deviceId: getGarasikuDeviceId(), deviceName: getGarasikuDeviceName() };
         }
-        function openDeviceNameModal() {
-            if (!isAdminLoggedIn) { openAdminAuthModal(() => openDeviceNameModal()); return; }
-            document.getElementById('device-id-display').textContent = getGarasikuDeviceId();
-            document.getElementById('device-name-input').value = getGarasikuDeviceName() === 'Perangkat Belum Dinamai' ? '' : getGarasikuDeviceName();
-            openModal('modal-device-name');
+        async function openDeviceNameModal(targetDeviceId = null) {
+            const modal = document.getElementById('modal-device-name');
+            const idDisplay = document.getElementById('device-id-display');
+            const targetInput = document.getElementById('device-target-id');
+            const nameInput = document.getElementById('device-name-input');
+            if (!modal || !idDisplay || !nameInput || !targetInput) {
+                if (typeof showToast === 'function') showToast('Dialog Nama Perangkat tidak ditemukan', 'Muat ulang file aplikasi terbaru.', 'error');
+                return;
+            }
+            if (!isAdminLoggedIn) {
+                openAdminAuthModal(() => openDeviceNameModal(targetDeviceId));
+                return;
+            }
+            const id = String(targetDeviceId || getGarasikuDeviceId());
+            idDisplay.textContent = id;
+            targetInput.value = id;
+            let knownName = '';
+            try {
+                const registry = await window.FirebaseBridge.loadDeviceRegistration(id);
+                knownName = registry?.deviceName || '';
+            } catch (e) { console.warn('Nama perangkat belum dapat dibaca dari Firebase:', e); }
+            nameInput.value = knownName || (id === getGarasikuDeviceId() && getGarasikuDeviceName() !== 'Perangkat Belum Dinamai' ? getGarasikuDeviceName() : '');
+            modal.classList.remove('hidden');
+            nameInput.focus();
         }
+        // Pastikan handler tersedia global untuk onclick dan browser yang memuat halaman statis.
+        window.openDeviceNameModal = openDeviceNameModal;
+        window.addEventListener('DOMContentLoaded', () => {
+            const button = document.getElementById('btn-device-registry');
+            if (button && !button.dataset.deviceClickBound) {
+                button.dataset.deviceClickBound = '1';
+                button.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    window.openDeviceNameModal();
+                });
+            }
+        });
         async function saveDeviceName(event) {
             event.preventDefault();
             if (!isAdminLoggedIn) return;
             const name = document.getElementById('device-name-input').value.trim();
             if (!name) { showToast('Nama Perangkat Kosong', 'Masukkan nama perangkat.', 'warning'); return; }
+            const submitBtn = document.querySelector('#modal-device-name form button[type="submit"]');
+            const originalLabel = submitBtn?.innerHTML || '';
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Menyimpan...'; }
             try {
-                localStorage.setItem('garasiku_device_name', name);
                 const ok = window.FirebaseBridge && typeof window.FirebaseBridge.saveDeviceRegistration === 'function'
-                    ? await window.FirebaseBridge.saveDeviceRegistration(getGarasikuDeviceId(), name)
+                    ? await window.FirebaseBridge.saveDeviceRegistration(document.getElementById('device-target-id')?.value || getGarasikuDeviceId(), name)
                     : false;
                 if (!ok) {
-                    showToast('Nama tersimpan lokal', 'Nama tersimpan di perangkat, tetapi database belum berhasil menyimpan. Periksa koneksi Firebase lalu simpan ulang.', 'warning');
+                    showToast('Gagal menyimpan ke Firebase', 'Nama belum dikonfirmasi tersimpan di database. Periksa koneksi/login Firebase dan rules, lalu tekan Simpan lagi.', 'warning');
                     return;
                 }
+                // Simpan lokal hanya setelah Firebase mengonfirmasi keberhasilan.
+                const targetId = document.getElementById('device-target-id')?.value || getGarasikuDeviceId();
+                if (targetId === getGarasikuDeviceId()) localStorage.setItem('garasiku_device_name', name);
+                // Perbarui nama pada logbook yang sudah termuat untuk ID yang dipilih.
+                (window.logs || []).forEach(log => {
+                    if (String(log.deviceId || '') === targetId) log.deviceName = name;
+                    if (String(log.checkinDeviceId || '') === targetId) log.checkinDeviceName = name;
+                });
                 closeModal('modal-device-name');
-                showToast('Perangkat Terdaftar', `${name} (${getGarasikuDeviceId()}) disimpan ke database.`, 'success');
+                document.querySelectorAll('[data-device-name-label]').forEach(el => { el.textContent = name; });
+                renderLogsTable();
+                showToast('Perangkat Terdaftar', `${targetId} diberi nama "${name}" dan disimpan ke Firebase.`, 'success');
             } catch (err) {
-                showToast('Gagal Menyimpan Perangkat', err?.message || 'Periksa koneksi Firebase.', 'error');
+                const detail = [err?.code, err?.message].filter(Boolean).join(': ');
+                showToast('Gagal Menyimpan ke Firebase', detail || 'Periksa koneksi, autentikasi, dan Firestore Rules.', 'error');
+            } finally {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalLabel; }
             }
         }
+
 
         window.etollLogs = loadLocalJson('garasiku_etoll_logs', []);
         window.logs = []; // Logbook bersumber dari Firestore gate_logs; tidak dipersist sebagai antrean lokal.
@@ -3271,6 +3338,17 @@
             if (tabId === 'tab-vehicles') renderFleetTable();
             if (tabId === 'tab-drivers') renderDriversGrid();
             if (tabId === 'tab-etoll-recap') renderEtollRecapTable();
+
+            // FIX63: minta nama perangkat saat Admin membuka Logbook jika belum dinamai.
+            if (tabId === 'tab-logbook' && isAdminLoggedIn &&
+                getGarasikuDeviceName() === 'Perangkat Belum Dinamai' &&
+                !window.__garasikuDeviceNamePromptShown) {
+                window.__garasikuDeviceNamePromptShown = true;
+                setTimeout(() => {
+                    const modal = document.getElementById('modal-device-name');
+                    if (modal && modal.classList.contains('hidden')) openDeviceNameModal();
+                }, 250);
+            }
         }
 
         function openModal(modalId) {
@@ -4047,8 +4125,10 @@
                         ${log.notes ? `<div class="mt-1 px-2 py-0.5 rounded bg-amber-950/40 border border-amber-800/40 text-[10px] text-amber-300"><i class="fa-solid fa-note-sticky mr-1"></i>${log.notes}</div>` : ''}
                         <div class="admin-col ${isAdminLoggedIn ? '' : 'hidden'} mt-1 px-2 py-1 rounded bg-cyan-950/40 border border-cyan-900/50 text-[10px] text-cyan-200">
                             <div><i class="fa-solid fa-mobile-screen-button mr-1"></i>${String(log.deviceName || 'Perangkat lama / belum dinamai').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}</div>
-                            <div class="font-mono">Keluar: ${String(log.deviceId || '-').replace(/[&<>"']/g, '')}</div>
-                            ${log.checkinDeviceId ? `<div class="font-mono mt-1">Masuk: ${String(log.checkinDeviceName || 'Perangkat').replace(/[&<>"']/g, '')} · ${String(log.checkinDeviceId).replace(/[&<>"']/g, '')}</div>` : ''}
+                            <div class="font-mono">Keluar: ${String(log.deviceId || '-').replace(/[&<>"']/g, '')}
+                                ${log.deviceId ? `<button type="button" onclick="openDeviceNameModal('${String(log.deviceId).replace(/[^A-Za-z0-9_-]/g, '')}')" class="ml-1 px-1.5 py-0.5 rounded border border-cyan-700 text-cyan-300 hover:bg-cyan-900/50">Namai ID</button>` : ''}
+                            </div>
+                            ${log.checkinDeviceId ? `<div class="font-mono mt-1">Masuk: ${String(log.checkinDeviceName || 'Perangkat').replace(/[&<>"']/g, '')} · ${String(log.checkinDeviceId).replace(/[&<>"']/g, '')} <button type="button" onclick="openDeviceNameModal('${String(log.checkinDeviceId).replace(/[^A-Za-z0-9_-]/g, '')}')" class="ml-1 px-1.5 py-0.5 rounded border border-cyan-700 text-cyan-300 hover:bg-cyan-900/50">Namai ID</button></div>` : ''}
                         </div>
                     </td>
                     <td class="p-3 font-mono text-[11px] text-slate-300">
