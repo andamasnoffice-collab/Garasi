@@ -4847,14 +4847,21 @@
                 window.etollLogs.unshift(newRecap);
 
                 try {
+                    // Status kartu sudah dikonfirmasi melalui transaksi Firestore di atas.
+                    // Simpan cache/riwayat sebagai langkah pendukung; kegagalan sinkronisasi
+                    // umum tidak boleh membatalkan status kartu yang sudah berhasil ditulis.
                     await persistEtollCardState(card);
-                    const cloudSaved = await saveToStorage();
-                    if (cloudSaved === false) throw new Error('Penyimpanan data pendukung gagal');
+                    try {
+                        const cloudSaved = await saveToStorage();
+                        if (cloudSaved === false) console.warn('Status kartu tersimpan, tetapi sinkronisasi data pendukung tertunda.');
+                    } catch (supportErr) {
+                        console.warn('Status kartu tersimpan; sinkronisasi data pendukung tertunda:', supportErr);
+                    }
                 } catch (err) {
                     card.status = 'AVAILABLE'; card.holderName = null;
                     window.etollLogs = (window.etollLogs || []).filter(x => x.id !== newRecap.id);
                     setEtollFormSaving(event, false);
-                    showToast('Gagal Menyimpan', 'Status kartu belum terkonfirmasi di Firebase. Coba lagi setelah koneksi pulih.', 'error');
+                    showToast('Gagal Menyimpan', (err && err.message) ? `Status kartu gagal disimpan: ${err.message}` : 'Status kartu gagal disimpan. Periksa koneksi, login, dan Firebase Rules.', 'error');
                     console.error('Gagal menyimpan status e-Toll:', err); return;
                 }
                 setEtollFormSaving(event, false);
@@ -4924,14 +4931,21 @@
                 window.etollLogs.unshift(newRecap);
 
                 try {
+                    // Status kartu sudah dikonfirmasi melalui transaksi Firestore di atas.
+                    // Simpan cache/riwayat sebagai langkah pendukung; kegagalan sinkronisasi
+                    // umum tidak boleh membatalkan status kartu yang sudah berhasil ditulis.
                     await persistEtollCardState(card);
-                    const cloudSaved = await saveToStorage();
-                    if (cloudSaved === false) throw new Error('Penyimpanan data pendukung gagal');
+                    try {
+                        const cloudSaved = await saveToStorage();
+                        if (cloudSaved === false) console.warn('Status kartu tersimpan, tetapi sinkronisasi data pendukung tertunda.');
+                    } catch (supportErr) {
+                        console.warn('Status kartu tersimpan; sinkronisasi data pendukung tertunda:', supportErr);
+                    }
                 } catch (err) {
                     card.status = 'BORROWED'; card.holderName = oldHolder; card.balance = oldBal;
                     window.etollLogs = (window.etollLogs || []).filter(x => x.id !== newRecap.id);
                     setEtollFormSaving(event, false);
-                    showToast('Gagal Menyimpan', 'Status pengembalian belum terkonfirmasi di Firebase. Coba lagi setelah koneksi pulih.', 'error');
+                    showToast('Gagal Menyimpan', (err && err.message) ? `Pengembalian gagal disimpan: ${err.message}` : 'Pengembalian gagal disimpan. Periksa koneksi, login, dan Firebase Rules.', 'error');
                     console.error('Gagal menyimpan pengembalian e-Toll:', err); return;
                 }
                 setEtollFormSaving(event, false);
