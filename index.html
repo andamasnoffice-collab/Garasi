@@ -404,11 +404,11 @@
                 <p class="text-[11px] sm:text-xs text-slate-400 mt-0.5">Di luar garasi</p>
             </div>
 
-            <div onclick="openStatDetail('ready')" class="bg-dark-surface/90 p-3.5 sm:p-4 rounded-2xl border border-dark-border hover:border-indigo-500/60 shadow-lg shadow-black/20 hover:-translate-y-0.5 transition cursor-pointer group backdrop-blur-sm">
+            <div onclick="openStatDetail('drivers-ready')" class="bg-dark-surface/90 p-3.5 sm:p-4 rounded-2xl border border-dark-border hover:border-indigo-500/60 shadow-lg shadow-black/20 hover:-translate-y-0.5 transition cursor-pointer group backdrop-blur-sm">
                 <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold text-slate-400 group-hover:text-indigo-400 transition">Kendaraan Ready Garasi</span>
+                    <span class="text-xs font-semibold text-slate-400 group-hover:text-indigo-400 transition">Driver Operasional Ready</span>
                     <div class="w-8 h-8 rounded-lg bg-indigo-950/70 border border-indigo-800/50 text-indigo-400 flex items-center justify-center text-sm group-hover:bg-indigo-500 group-hover:text-black transition">
-                        <i class="fa-solid fa-square-parking"></i>
+                        <i class="fa-solid fa-user-check"></i>
                     </div>
                 </div>
                 <div class="mt-2 flex items-baseline justify-between">
@@ -3499,6 +3499,15 @@
             const totalVehicles = window.vehicles.length;
             const inGarage = window.vehicles.filter(isVehicleReadyGarage).length;
             const onTrip = activeVehicleKeys.size;
+            const activeDriverNames = new Set(activeLogs.map(l => String(l.driverName || '').trim().toLowerCase()).filter(Boolean));
+            const readyOperationalDrivers = window.drivers.filter(d => {
+                if (!d || d.active === false || d.enabled === false) return false;
+                const category = String(d.category || d.type || 'Operasional').trim().toLowerCase();
+                if (category === 'executive' || category === 'pimpinan' || category === 'driver pimpinan') return false;
+                const idBusy = d.id != null && activeDriverKeys.has(`id:${d.id}`);
+                const nameBusy = activeDriverNames.has(String(d.name || '').trim().toLowerCase());
+                return !idBusy && !nameBusy;
+            });
             const readyGarage = inGarage;
 
             // KPI E-Toll: tampilkan hanya kartu ON/aktif.
@@ -3512,8 +3521,8 @@
             document.getElementById('stat-total-vehicles').innerText = `${activeVehicles.length} / ${totalVehicles}`;
             document.getElementById('stat-in-garage').innerText = inGarage;
             document.getElementById('stat-on-trip').innerText = onTrip;
-            document.getElementById('stat-active-drivers').innerText = readyGarage;
-            document.getElementById('stat-drivers-sub').innerText = 'Operasional ON & tidak keluar';
+            document.getElementById('stat-active-drivers').innerText = readyOperationalDrivers.length;
+            document.getElementById('stat-drivers-sub').innerText = 'Driver operasional aktif & tidak bertugas';
 
             document.getElementById('stat-etoll-ratio').innerText = `${readyEtoll} / ${totalEtoll}`;
             document.getElementById('stat-etoll-sub').innerText = `Total: Rp ${totalBalance.toLocaleString('id-ID')}`;
@@ -5536,6 +5545,7 @@
             else if (type === 'garage') title.innerText = "Armada Siap di Garasi";
             else if (type === 'out') title.innerText = "Armada Sedang di Luar";
             else if (type === 'ready') title.innerText = "Kendaraan Ready Garasi";
+            else if (type === 'drivers-ready') title.innerText = "Driver Operasional Ready";
             else if (type === 'etoll') title.innerText = "Inventaris Kartu E-Toll";
 
             renderStatModalContent('');
@@ -5599,6 +5609,30 @@
                         <button onclick="openQuickCheckout('${v.id}')" class="shrink-0 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs">
                             Tugaskan
                         </button>
+                    `;
+                    body.appendChild(card);
+                });
+            } else if (activeStatType === 'drivers-ready') {
+                const busyIds = new Set(window.logs.filter(l => l && l.status === 'ACTIVE').map(l => String(l.driverId || '')).filter(Boolean));
+                const busyNames = new Set(window.logs.filter(l => l && l.status === 'ACTIVE').map(l => String(l.driverName || '').trim().toLowerCase()).filter(Boolean));
+                let list = window.drivers.filter(d => {
+                    if (!d || d.active === false || d.enabled === false) return false;
+                    const category = String(d.category || d.type || 'Operasional').trim().toLowerCase();
+                    if (category === 'executive' || category === 'pimpinan' || category === 'driver pimpinan') return false;
+                    return !(d.id != null && busyIds.has(String(d.id))) && !busyNames.has(String(d.name || '').trim().toLowerCase());
+                });
+                if (filterText) list = list.filter(d => [d.name, d.category, d.phone, d.cp].some(v => String(v || '').toLowerCase().includes(filterText)));
+                count = list.length;
+                list.sort((a,b) => String(a.name || '').localeCompare(String(b.name || ''), 'id'));
+                list.forEach(d => {
+                    const card = document.createElement('div');
+                    card.className = "p-3 bg-dark-card rounded-2xl border border-dark-border flex items-center justify-between gap-3";
+                    card.innerHTML = `
+                        <div class="min-w-0">
+                            <div class="font-bold text-white">${d.name || 'Driver tanpa nama'}</div>
+                            <p class="text-xs text-slate-400 mt-1">${d.category === 'EXECUTIVE' || String(d.category || '').toLowerCase() === 'pimpinan' ? 'Pimpinan' : 'Operasional'} · Siap bertugas</p>
+                        </div>
+                        <span class="shrink-0 px-2 py-1 rounded-lg bg-emerald-950 text-emerald-300 text-xs font-bold">READY</span>
                     `;
                     body.appendChild(card);
                 });
