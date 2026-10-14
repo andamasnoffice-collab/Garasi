@@ -4742,6 +4742,49 @@
             ) || null;
         }
 
+
+        // FIX: tulis status satu kartu secara atomik terlebih dahulu. Jangan menunggu
+        // push state umum yang dapat memakai baseline/cache perangkat yang sudah usang.
+        async function persistEtollCardState(card) {
+            const bridge = window.FirebaseBridge;
+            if (!bridge?.db || !bridge?.currentUser || !card) throw new Error('Firebase belum siap');
+            const key = String(card.sourceCardId || card.cardNo || card.id || '').trim();
+            if (!key) throw new Error('ID kartu E-Toll tidak ditemukan');
+            const stateItem = {
+                active: card.active !== false,
+                status: card.status === 'BORROWED' ? 'BORROWED' : 'AVAILABLE',
+                holderName: card.status === 'BORROWED' ? (card.holderName || null) : null,
+                balance: Number.isFinite(Number(card.balance)) ? Number(card.balance) : 0,
+                nopol: String(card.nopol || ''),
+                color: String(card.color || ''),
+                updatedAt: new Date().toISOString()
+            };
+            const ref = doc(bridge.db, 'garasiku_fleet', 'shared_state');
+            await runTransaction(bridge.db, async tx => {
+                const snap = await tx.get(ref);
+                const latest = snap.exists() ? (snap.data() || {}) : {};
+                const latestState = latest.etollState && typeof latest.etollState === 'object' ? latest.etollState : {};
+                tx.set(ref, { etollState: { ...latestState, [key]: stateItem }, updatedAt: new Date().toISOString() }, { merge: true });
+            });
+            // Baseline harus mengikuti status yang baru dikonfirmasi server agar
+            // saveToStorage berikutnya tidak menganggapnya konflik dari cache lama.
+            bridge.stateBaseline = bridge.stateBaseline || {};
+            bridge.stateBaseline.etollState = { ...(bridge.stateBaseline.etollState || {}), [key]: stateItem };
+            window.cloudEtollState = { ...(window.cloudEtollState || {}), [key]: stateItem };
+            return true;
+        }
+
+        function setEtollFormSaving(event, saving) {
+            const form = event?.currentTarget;
+            if (!form) return;
+            if (form.dataset.saving === '1' && saving) return;
+            form.dataset.saving = saving ? '1' : '0';
+            form.querySelectorAll('button[type="submit"],button:not([type])').forEach(btn => {
+                if (saving) { btn.dataset.wasDisabled = btn.disabled ? '1' : '0'; btn.disabled = true; btn.classList.add('opacity-60'); }
+                else { btn.disabled = btn.dataset.wasDisabled === '1'; btn.classList.remove('opacity-60'); delete btn.dataset.wasDisabled; }
+            });
+        }
+
         function openBorrowEtollModal(etollId) {
             closeModal('modal-stat-detail');
             const card = window.etolls.find(e => e.id === etollId);
@@ -4762,6 +4805,8 @@
 
         async function handleBorrowEtoll(event) {
             event.preventDefault();
+            if (event.currentTarget?.dataset.saving === '1') return;
+            setEtollFormSaving(event, true);
             const id = document.getElementById('borrow-etoll-id').value;
             const selectVal = document.getElementById('borrow-driver-select').value;
             const customVal = document.getElementById('borrow-driver-custom').value.trim();
@@ -4769,7 +4814,7 @@
             const holder = customVal || selectVal;
             if (!holder) {
                 showToast("Pilih Driver", "Tentukan driver yang membawa kartu E-Toll.", "warning");
-                return;
+                setEtollFormSaving(event, false); return;
             }
 
             const card = window.etolls.find(e => e.id === id);
@@ -4777,11 +4822,11 @@
                 const existingDriverCard = findEtollHeldByDriver(holder);
                 if (existingDriverCard) {
                     showToast('Driver Sudah Memegang E-Toll', `${holder} sudah menggunakan kartu ${existingDriverCard.name}. Kartu tersebut harus dikembalikan atau dioper terlebih dahulu sebelum meminjam kartu lain.`, 'warning');
-                    return;
+                    setEtollFormSaving(event, false); return;
                 }
                 if (card.active === false || card.status === 'BORROWED') {
                     showToast('Kartu Tidak Tersedia', 'Kartu harus aktif dan berada di pool sebelum diserahkan.', 'warning');
-                    return;
+                    setEtollFormSaving(event, false); return;
                 }
                 card.status = 'BORROWED';
                 card.holderName = holder;
@@ -4801,8 +4846,18 @@
                 };
                 window.etollLogs.unshift(newRecap);
 
-                const cloudSaved = await saveToStorage();
-                if (cloudSaved === false) { showToast('Sinkronisasi Belum Berhasil', 'Perubahan belum terkonfirmasi di cloud. Periksa koneksi Firebase sebelum melanjutkan.', 'error'); }
+                try {
+                    await persistEtollCardState(card);
+                    const cloudSaved = await saveToStorage();
+                    if (cloudSaved === false) throw new Error('Penyimpanan data pendukung gagal');
+                } catch (err) {
+                    card.status = 'AVAILABLE'; card.holderName = null;
+                    window.etollLogs = (window.etollLogs || []).filter(x => x.id !== newRecap.id);
+                    setEtollFormSaving(event, false);
+                    showToast('Gagal Menyimpan', 'Status kartu belum terkonfirmasi di Firebase. Coba lagi setelah koneksi pulih.', 'error');
+                    console.error('Gagal menyimpan status e-Toll:', err); return;
+                }
+                setEtollFormSaving(event, false);
                 closeModal('modal-borrow-etoll');
                 openStatDetail('etoll');
                 renderAll();
@@ -4829,6 +4884,8 @@
 
         async function handleReturnEtoll(event) {
             event.preventDefault();
+            if (event.currentTarget?.dataset.saving === '1') return;
+            setEtollFormSaving(event, true);
             const id = document.getElementById('return-etoll-id').value;
             const newBalVal = document.getElementById('return-etoll-new-balance').value;
 
@@ -4836,13 +4893,13 @@
             if (card) {
                 if (card.status !== 'BORROWED') {
                     showToast('Kartu Tidak Sedang Dipinjam', 'Tidak ada pengembalian yang perlu dicatat untuk kartu ini.', 'warning');
-                    return;
+                    setEtollFormSaving(event, false); return;
                 }
                 const oldBal = Number(card.balance) || 0;
                 const newBal = newBalVal !== '' ? Math.max(0, Number(newBalVal) || 0) : oldBal;
                 if (newBal > oldBal) {
                     showToast('Saldo Tidak Valid', 'Saldo saat dikembalikan tidak boleh lebih besar dari saldo saat diserahkan. Gunakan proses top-up terpisah untuk menambah saldo.', 'warning');
-                    return;
+                    setEtollFormSaving(event, false); return;
                 }
                 const spent = oldBal - newBal;
                 const oldHolder = card.holderName || 'Driver';
@@ -4866,8 +4923,18 @@
                 };
                 window.etollLogs.unshift(newRecap);
 
-                const cloudSaved = await saveToStorage();
-                if (cloudSaved === false) { showToast('Sinkronisasi Belum Berhasil', 'Perubahan belum terkonfirmasi di cloud. Periksa koneksi Firebase sebelum melanjutkan.', 'error'); }
+                try {
+                    await persistEtollCardState(card);
+                    const cloudSaved = await saveToStorage();
+                    if (cloudSaved === false) throw new Error('Penyimpanan data pendukung gagal');
+                } catch (err) {
+                    card.status = 'BORROWED'; card.holderName = oldHolder; card.balance = oldBal;
+                    window.etollLogs = (window.etollLogs || []).filter(x => x.id !== newRecap.id);
+                    setEtollFormSaving(event, false);
+                    showToast('Gagal Menyimpan', 'Status pengembalian belum terkonfirmasi di Firebase. Coba lagi setelah koneksi pulih.', 'error');
+                    console.error('Gagal menyimpan pengembalian e-Toll:', err); return;
+                }
+                setEtollFormSaving(event, false);
                 closeModal('modal-return-etoll');
                 openStatDetail('etoll');
                 renderAll();
