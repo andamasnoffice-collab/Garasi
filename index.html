@@ -1773,6 +1773,25 @@
             etollLogsSplitEnabled: false,
             gateMigrationRunning: false,
 
+            // Simpan status satu kartu lewat transaksi Firestore. Didefinisikan di dalam
+            // module agar doc/runTransaction yang di-import memang berada dalam scope.
+            async saveEtollCardState(key, stateItem) {
+                if (!this.db || !this.currentUser) throw new Error('Firebase belum siap atau pengguna belum login');
+                const safeKey = String(key || '').trim();
+                if (!safeKey) throw new Error('ID kartu E-Toll kosong');
+                const ref = doc(this.db, 'garasiku_fleet', 'shared_state');
+                await runTransaction(this.db, async tx => {
+                    const snap = await tx.get(ref);
+                    const latest = snap.exists() ? (snap.data() || {}) : {};
+                    const latestState = latest.etollState && typeof latest.etollState === 'object' ? latest.etollState : {};
+                    tx.set(ref, {
+                        etollState: { ...latestState, [safeKey]: stateItem },
+                        updatedAt: new Date().toISOString()
+                    }, { merge: true });
+                });
+                return true;
+            },
+
             async initialize(customConfig = null) {
                 try {
                     if (!customConfig && localStorage.getItem('garasiku_force_local') === '1') {
@@ -4747,7 +4766,7 @@
         // push state umum yang dapat memakai baseline/cache perangkat yang sudah usang.
         async function persistEtollCardState(card) {
             const bridge = window.FirebaseBridge;
-            if (!bridge?.db || !bridge?.currentUser || !card) throw new Error('Firebase belum siap');
+            if (!bridge?.db || !bridge?.currentUser || !card) throw new Error('Firebase belum siap atau pengguna belum login');
             const key = String(card.sourceCardId || card.cardNo || card.id || '').trim();
             if (!key) throw new Error('ID kartu E-Toll tidak ditemukan');
             const stateItem = {
@@ -4759,15 +4778,8 @@
                 color: String(card.color || ''),
                 updatedAt: new Date().toISOString()
             };
-            const ref = doc(bridge.db, 'garasiku_fleet', 'shared_state');
-            await runTransaction(bridge.db, async tx => {
-                const snap = await tx.get(ref);
-                const latest = snap.exists() ? (snap.data() || {}) : {};
-                const latestState = latest.etollState && typeof latest.etollState === 'object' ? latest.etollState : {};
-                tx.set(ref, { etollState: { ...latestState, [key]: stateItem }, updatedAt: new Date().toISOString() }, { merge: true });
-            });
-            // Baseline harus mengikuti status yang baru dikonfirmasi server agar
-            // saveToStorage berikutnya tidak menganggapnya konflik dari cache lama.
+            if (typeof bridge.saveEtollCardState !== 'function') throw new Error('Modul penyimpanan e-Toll belum siap');
+            await bridge.saveEtollCardState(key, stateItem);
             bridge.stateBaseline = bridge.stateBaseline || {};
             bridge.stateBaseline.etollState = { ...(bridge.stateBaseline.etollState || {}), [key]: stateItem };
             window.cloudEtollState = { ...(window.cloudEtollState || {}), [key]: stateItem };
