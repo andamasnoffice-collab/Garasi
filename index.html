@@ -2225,28 +2225,57 @@
                     this.lastGateWriteError = 'Referensi gate_logs tidak tersedia';
                     return false;
                 }
-                let deletePromise;
                 try {
-                    deletePromise = deleteDoc(ref);
-                } catch (e) {
-                    const detail = e?.code ? `${e.code}: ${e?.message || ''}`.trim() : (e?.message || 'delete ditolak');
-                    this.lastGateWriteError = detail;
-                    this.updateStatusUI(false, `Firebase hapus gagal: ${detail}`);
-                    return false;
-                }
-                deletePromise.then(() => {
+                    // Tunggu konfirmasi server. Jangan mengembalikan sukses hanya karena
+                    // deleteDoc baru dijadwalkan oleh SDK (dapat muncul lagi saat refresh).
+                    await deleteDoc(ref);
                     this.lastGateWriteError = '';
                     this.isConnected = true;
                     this.lastSyncTime = new Date();
                     this.updateStatusUI(true, `Firebase terkonfirmasi • log ${logId} dihapus`);
                     if (typeof options.onServerConfirmed === 'function') options.onServerConfirmed();
-                }).catch((e) => {
+                    return true;
+                } catch (e) {
                     const detail = e?.code ? `${e.code}: ${e?.message || ''}`.trim() : (e?.message || 'delete ditolak');
                     this.lastGateWriteError = detail;
                     this.isConnected = false;
                     this.updateStatusUI(false, `Firebase hapus gagal: ${detail}`);
                     if (typeof options.onServerError === 'function') options.onServerError(detail);
-                });
+                    return false;
+                }
+            },
+
+            async deleteEtollLogs(ids) {
+                if (!this.db || !this.currentUser) throw new Error('Firebase/Auth belum siap');
+                const cleanIds = [...new Set((ids || []).map(x => String(x || '').trim()).filter(Boolean))];
+                if (!cleanIds.length) throw new Error('ID mutasi kosong');
+                if (this.etollLogsSplitEnabled) {
+                    // Mode koleksi terpisah: hapus dokumen sumber agar tidak dimuat kembali.
+                    for (let i = 0; i < cleanIds.length; i += 400) {
+                        const batch = writeBatch(this.db);
+                        cleanIds.slice(i, i + 400).forEach(id => {
+                            const ref = this.etollLogRef(id);
+                            if (ref) batch.delete(ref);
+                        });
+                        await batch.commit();
+                    }
+                } else {
+                    // Mode legacy: mutasi masih berada pada array shared_state.etollLogs.
+                    const sharedRef = doc(this.db, 'garasiku_fleet', 'shared_state');
+                    await runTransaction(this.db, async tx => {
+                        const snap = await tx.get(sharedRef);
+                        if (!snap.exists()) throw new Error('Dokumen sumber mutasi tidak ditemukan');
+                        const data = snap.data() || {};
+                        const logs = Array.isArray(data.etollLogs) ? data.etollLogs : [];
+                        const remaining = logs.filter((item, i) => !cleanIds.includes(String(item?.id || item?.logId || `legacy-${i}`)));
+                        if (remaining.length === logs.length) throw new Error('Mutasi tidak ditemukan di Firebase; muat ulang sebelum menghapus');
+                        tx.set(sharedRef, { etollLogs: remaining, updatedAt: new Date().toISOString() }, { merge: true });
+                    });
+                }
+                const current = Array.isArray(window.etollLogs) ? window.etollLogs : [];
+                window.etollLogs = current.filter(item => !cleanIds.includes(String(item?.id || item?.logId || '')));
+                this.etollLogsBaseline = JSON.parse(JSON.stringify(window.etollLogs));
+                try { localStorage.setItem('garasiku_etoll_logs', JSON.stringify(window.etollLogs)); } catch (e) {}
                 return true;
             },
 
@@ -5433,7 +5462,7 @@
             });
         }
 
-        function deleteEtollRecapRow(borrowId, returnId, activityId) {
+        async function deleteEtollRecapRow(borrowId, returnId, activityId) {
             if (!isAdminLoggedIn) {
                 openAdminAuthModal(() => deleteEtollRecapRow(borrowId, returnId, activityId));
                 return;
@@ -5455,6 +5484,18 @@
             const desc = selected.map(l => `${String(l.action || '').toUpperCase()} - ${l.cardName || '-'} - ${l.holderName || '-'}`).join('\n');
             if (!confirm(`Hapus mutasi E-Toll ini?\n\n${desc}\n\nJika baris berisi Penyerahan + Pengembalian, keduanya akan dihapus sekaligus.\nTindakan ini tidak dapat dibatalkan.`)) return;
 
+            // Hapus pada sumber Firebase terlebih dahulu. Jangan hanya menghapus cache lokal,
+            // karena listener/refresh akan memuat dokumen lama kembali.
+            try {
+                if (!window.FirebaseBridge || typeof window.FirebaseBridge.deleteEtollLogs !== 'function') {
+                    throw new Error('Fungsi hapus Firebase belum siap');
+                }
+                await window.FirebaseBridge.deleteEtollLogs(ids);
+            } catch (error) {
+                console.error('Gagal menghapus mutasi E-Toll:', error);
+                showToast('Gagal Hapus Mutasi', error?.message || 'Firebase menolak penghapusan. Data tidak dihapus dari tampilan.', 'error');
+                return;
+            }
             window.etollLogs = window.etollLogs.filter(l => !ids.includes(String(l.id)));
 
             // Kembalikan status kartu secara aman dari log yang tersisa.
@@ -5488,9 +5529,10 @@
                 }
             });
 
-            saveToStorage();
+            try { localStorage.setItem('garasiku_etolls', JSON.stringify(window.etolls)); } catch (e) {}
+            try { localStorage.setItem('garasiku_etoll_logs', JSON.stringify(window.etollLogs)); } catch (e) {}
             renderAll();
-            showToast("Mutasi Dihapus", "Rekap mutasi E-Toll berhasil dihapus oleh Admin.", "success");
+            showToast("Mutasi Dihapus", "Mutasi sudah dihapus dari Firebase dan cache lokal.", "success");
         }
 
         function exportEtollLogsToCSV() {
