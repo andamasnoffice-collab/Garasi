@@ -1772,12 +1772,10 @@
             gateReadMonths: 1,
             etollLogsSplitEnabled: false,
             gateMigrationRunning: false,
-            deviceRegistryCache: {},
-            deviceRegistryUnsubscriber: null,
 
             // Simpan status satu kartu lewat transaksi Firestore. Didefinisikan di dalam
             // module agar doc/runTransaction yang di-import memang berada dalam scope.
-            async saveEtollCardState(key, stateItem, expectedStatus = null) {
+            async saveEtollCardState(key, stateItem, guard = {}) {
                 if (!this.db || !this.currentUser) throw new Error('Firebase belum siap atau pengguna belum login');
                 const safeKey = String(key || '').trim();
                 if (!safeKey) throw new Error('ID kartu E-Toll kosong');
@@ -1786,15 +1784,19 @@
                     const snap = await tx.get(ref);
                     const latest = snap.exists() ? (snap.data() || {}) : {};
                     const latestState = latest.etollState && typeof latest.etollState === 'object' ? latest.etollState : {};
-                    const current = latestState[safeKey];
-                    // Status default tanpa record cloud dianggap AVAILABLE; status BORROWED
-                    // wajib benar-benar ada di server sebelum proses pengembalian diizinkan.
+                    const current = latestState[safeKey] || null;
                     const currentStatus = current?.status === 'BORROWED' ? 'BORROWED' : 'AVAILABLE';
-                    // Tolak perubahan berbasis cache usang di dalam transaksi Firestore.
-                    if (expectedStatus && currentStatus !== expectedStatus) {
+                    // Guard status server: jangan izinkan perangkat usang menimpa status terbaru.
+                    if (guard.expectedStatus && currentStatus !== guard.expectedStatus) {
                         throw new Error(currentStatus === 'BORROWED'
-                            ? 'Konflik sinkronisasi: kartu sudah dipinjam di perangkat lain. Muat ulang status kartu.'
-                            : 'Konflik sinkronisasi: kartu sudah kembali/berubah di perangkat lain. Muat ulang status kartu.');
+                            ? 'Kartu sudah dipinjam pada perangkat lain. Muat ulang data lalu coba lagi.'
+                            : 'Kartu sudah kembali tersedia pada perangkat lain. Muat ulang data lalu coba lagi.');
+                    }
+                    if (guard.expectedHolder && normalizeEtollHolderName(current?.holderName) !== normalizeEtollHolderName(guard.expectedHolder)) {
+                        throw new Error('Pemegang kartu sudah berubah di perangkat lain. Muat ulang data sebelum melanjutkan.');
+                    }
+                    if (stateItem.status === 'BORROWED' && currentStatus === 'BORROWED') {
+                        throw new Error('Kartu sudah berstatus dipinjam di Firebase. Hindari transaksi ganda.');
                     }
                     tx.set(ref, {
                         etollState: { ...latestState, [safeKey]: { ...stateItem, updatedAt: new Date().toISOString() } },
@@ -1871,7 +1873,6 @@
                         return false;
                     }
 
-                    this.startDeviceRegistrySync();
                     this.isConnected = false;
                     this.lastSyncTime = null;
                     this.gateLogsReady = false;
@@ -1910,40 +1911,6 @@
             deviceRegistryCollection() {
                 if (!this.db) return null;
                 return collection(this.db, 'garasiku_fleet', 'shared_state', 'device_registry');
-            },
-            startDeviceRegistrySync() {
-                const col = this.deviceRegistryCollection();
-                if (!col || !this.currentUser) return false;
-                if (this.deviceRegistryUnsubscriber) {
-                    try { this.deviceRegistryUnsubscriber(); } catch (_) {}
-                    this.deviceRegistryUnsubscriber = null;
-                }
-                // Listener ringan untuk daftar nama perangkat saja; tidak membaca ulang logbook.
-                this.deviceRegistryUnsubscriber = onSnapshot(col, (snap) => {
-                    const next = {};
-                    snap.forEach(d => {
-                        const data = d.data() || {};
-                        const id = String(data.deviceId || d.id || '').trim();
-                        const name = String(data.deviceName || '').trim();
-                        if (id && name) next[id] = name;
-                    });
-                    this.deviceRegistryCache = next;
-                    // Terapkan nama terbaru ke log yang sudah dimuat, termasuk nama keluar/masuk.
-                    (window.logs || []).forEach(log => {
-                        const outName = next[String(log.deviceId || '').trim()];
-                        const inName = next[String(log.checkinDeviceId || '').trim()];
-                        if (outName) log.deviceName = outName;
-                        if (inName) log.checkinDeviceName = inName;
-                    });
-                    if (typeof renderLogsTable === 'function') renderLogsTable();
-                }, (error) => {
-                    console.warn('Sinkron nama Device ID gagal:', error?.code, error?.message);
-                });
-                return true;
-            },
-            getRegisteredDeviceName(deviceId, fallback = '') {
-                const id = String(deviceId || '').trim();
-                return String(this.deviceRegistryCache?.[id] || fallback || '').trim();
             },
             async loadDeviceRegistration(deviceId) {
                 if (!this.db || !deviceId) return null;
@@ -2214,25 +2181,37 @@
                     return false;
                 }
 
-                    // Tunggu konfirmasi server. Promise Firestore harus selesai sebelum UI
-                // menyatakan transaksi tersimpan; kegagalan async tidak boleh dianggap sukses.
+                // DIRECT FIREBASE: tidak ada localStorage queue dan tidak ada serial queue.
+                // Setiap transaksi dikirim langsung ke satu dokumen Firestore. UI tidak menunggu
+                // round-trip server; Firestore SDK sendiri menangani latency compensation dan
+                // onSnapshot(metadata) di atas akan mengonfirmasi saat write benar-benar server-side.
                 this.lastGateWriteError = '';
+                let writePromise;
                 try {
-                    await setDoc(ref, { ...log }, { merge: false });
+                    writePromise = setDoc(ref, { ...log }, { merge: false });
+                } catch (e) {
+                    const detail = e?.code ? `${e.code}: ${e?.message || ''}`.trim() : (e?.message || 'write ditolak');
+                    this.lastGateWriteError = detail;
+                    this.updateStatusUI(false, `Firebase write gagal: ${detail}`);
+                    return false;
+                }
+
+                writePromise.then(() => {
                     this.lastGateWriteError = '';
                     this.isConnected = true;
                     this.lastSyncTime = new Date();
                     this.updateStatusUI(true, `Firebase terkonfirmasi • ${log.plate || log.id}`);
                     if (typeof options.onServerConfirmed === 'function') options.onServerConfirmed();
-                    return true;
-                } catch (e) {
+                }).catch((e) => {
                     const detail = e?.code ? `${e.code}: ${e?.message || ''}`.trim() : (e?.message || 'write ditolak');
                     this.lastGateWriteError = detail;
                     this.isConnected = false;
                     this.updateStatusUI(false, `Firebase write gagal: ${detail}`);
                     if (typeof options.onServerError === 'function') options.onServerError(detail);
-                    return false;
-                }
+                });
+
+                // Write sudah dikirim ke Firebase SDK; jangan menunggu server di event handler.
+                return true;
             },
 
             async deleteGateLog(logId, options = {}) {
@@ -2246,22 +2225,29 @@
                     this.lastGateWriteError = 'Referensi gate_logs tidak tersedia';
                     return false;
                 }
+                let deletePromise;
                 try {
-                    await deleteDoc(ref);
+                    deletePromise = deleteDoc(ref);
+                } catch (e) {
+                    const detail = e?.code ? `${e.code}: ${e?.message || ''}`.trim() : (e?.message || 'delete ditolak');
+                    this.lastGateWriteError = detail;
+                    this.updateStatusUI(false, `Firebase hapus gagal: ${detail}`);
+                    return false;
+                }
+                deletePromise.then(() => {
                     this.lastGateWriteError = '';
                     this.isConnected = true;
                     this.lastSyncTime = new Date();
                     this.updateStatusUI(true, `Firebase terkonfirmasi • log ${logId} dihapus`);
                     if (typeof options.onServerConfirmed === 'function') options.onServerConfirmed();
-                    return true;
-                } catch (e) {
+                }).catch((e) => {
                     const detail = e?.code ? `${e.code}: ${e?.message || ''}`.trim() : (e?.message || 'delete ditolak');
                     this.lastGateWriteError = detail;
                     this.isConnected = false;
                     this.updateStatusUI(false, `Firebase hapus gagal: ${detail}`);
                     if (typeof options.onServerError === 'function') options.onServerError(detail);
-                    return false;
-                }
+                });
+                return true;
             },
 
             async getMasterDataStatus() {
@@ -2940,7 +2926,7 @@
             let knownName = '';
             try {
                 const registry = await window.FirebaseBridge.loadDeviceRegistration(id);
-                knownName = registry?.deviceName || window.FirebaseBridge.getRegisteredDeviceName(id) || '';
+                knownName = registry?.deviceName || '';
             } catch (e) { console.warn('Nama perangkat belum dapat dibaca dari Firebase:', e); }
             nameInput.value = knownName || (id === getGarasikuDeviceId() && getGarasikuDeviceName() !== 'Perangkat Belum Dinamai' ? getGarasikuDeviceName() : '');
             modal.classList.remove('hidden');
@@ -2974,9 +2960,8 @@
                     showToast('Gagal menyimpan ke Firebase', 'Nama belum dikonfirmasi tersimpan di database. Periksa koneksi/login Firebase dan rules, lalu tekan Simpan lagi.', 'warning');
                     return;
                 }
-                // Cache hanya diperbarui setelah Firestore mengonfirmasi keberhasilan.
+                // Simpan lokal hanya setelah Firebase mengonfirmasi keberhasilan.
                 const targetId = document.getElementById('device-target-id')?.value || getGarasikuDeviceId();
-                if (window.FirebaseBridge.deviceRegistryCache) window.FirebaseBridge.deviceRegistryCache[targetId] = name;
                 if (targetId === getGarasikuDeviceId()) localStorage.setItem('garasiku_device_name', name);
                 // Perbarui nama pada logbook yang sudah termuat untuk ID yang dipilih.
                 (window.logs || []).forEach(log => {
@@ -4227,11 +4212,11 @@
                         <div class="text-[10px] text-slate-400 truncate max-w-xs">${log.purpose || '-'}</div>
                         ${log.notes ? `<div class="mt-1 px-2 py-0.5 rounded bg-amber-950/40 border border-amber-800/40 text-[10px] text-amber-300"><i class="fa-solid fa-note-sticky mr-1"></i>${log.notes}</div>` : ''}
                         <div class="admin-col ${isAdminLoggedIn ? '' : 'hidden'} mt-1 px-2 py-1 rounded bg-cyan-950/40 border border-cyan-900/50 text-[10px] text-cyan-200">
-                            <div><i class="fa-solid fa-mobile-screen-button mr-1"></i>${String(window.FirebaseBridge?.getRegisteredDeviceName(log.deviceId, log.deviceName) || 'Perangkat lama / belum dinamai').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}</div>
+                            <div><i class="fa-solid fa-mobile-screen-button mr-1"></i>${String(log.deviceName || 'Perangkat lama / belum dinamai').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}</div>
                             <div class="font-mono">Keluar: ${String(log.deviceId || '-').replace(/[&<>"']/g, '')}
                                 ${log.deviceId ? `<button type="button" onclick="openDeviceNameModal('${String(log.deviceId).replace(/[^A-Za-z0-9_-]/g, '')}')" class="ml-1 px-1.5 py-0.5 rounded border border-cyan-700 text-cyan-300 hover:bg-cyan-900/50">Namai ID</button>` : ''}
                             </div>
-                            ${log.checkinDeviceId ? `<div class="font-mono mt-1">Masuk: ${String(window.FirebaseBridge?.getRegisteredDeviceName(log.checkinDeviceId, log.checkinDeviceName) || 'Perangkat').replace(/[&<>"']/g, '')} · ${String(log.checkinDeviceId).replace(/[&<>"']/g, '')} <button type="button" onclick="openDeviceNameModal('${String(log.checkinDeviceId).replace(/[^A-Za-z0-9_-]/g, '')}')" class="ml-1 px-1.5 py-0.5 rounded border border-cyan-700 text-cyan-300 hover:bg-cyan-900/50">Namai ID</button></div>` : ''}
+                            ${log.checkinDeviceId ? `<div class="font-mono mt-1">Masuk: ${String(log.checkinDeviceName || 'Perangkat').replace(/[&<>"']/g, '')} · ${String(log.checkinDeviceId).replace(/[&<>"']/g, '')} <button type="button" onclick="openDeviceNameModal('${String(log.checkinDeviceId).replace(/[^A-Za-z0-9_-]/g, '')}')" class="ml-1 px-1.5 py-0.5 rounded border border-cyan-700 text-cyan-300 hover:bg-cyan-900/50">Namai ID</button></div>` : ''}
                         </div>
                     </td>
                     <td class="p-3 font-mono text-[11px] text-slate-300">
@@ -4802,7 +4787,7 @@
 
         // FIX: tulis status satu kartu secara atomik terlebih dahulu. Jangan menunggu
         // push state umum yang dapat memakai baseline/cache perangkat yang sudah usang.
-        async function persistEtollCardState(card, expectedStatus = null) {
+        async function persistEtollCardState(card, guard = {}) {
             const bridge = window.FirebaseBridge;
             if (!bridge?.db || !bridge?.currentUser || !card) throw new Error('Firebase belum siap atau pengguna belum login');
             const key = String(card.sourceCardId || card.cardNo || card.id || '').trim();
@@ -4817,12 +4802,14 @@
                 updatedAt: new Date().toISOString()
             };
             if (typeof bridge.saveEtollCardState !== 'function') throw new Error('Modul penyimpanan e-Toll belum siap');
-            await bridge.saveEtollCardState(key, stateItem, expectedStatus);
+            await bridge.saveEtollCardState(key, stateItem, guard);
             bridge.stateBaseline = bridge.stateBaseline || {};
             bridge.stateBaseline.etollState = { ...(bridge.stateBaseline.etollState || {}), [key]: stateItem };
             window.cloudEtollState = { ...(window.cloudEtollState || {}), [key]: stateItem };
             return true;
         }
+
+        // Reentrancy guard berbasis form tetap dipertahankan; validasi utama transaksi dilakukan di server.
 
         function setEtollFormSaving(event, saving) {
             const form = event?.currentTarget;
@@ -4878,7 +4865,6 @@
                     showToast('Kartu Tidak Tersedia', 'Kartu harus aktif dan berada di pool sebelum diserahkan.', 'warning');
                     setEtollFormSaving(event, false); return;
                 }
-                const previousCardState = { status: card.status, holderName: card.holderName, balance: card.balance };
                 card.status = 'BORROWED';
                 card.holderName = holder;
                 
@@ -4901,7 +4887,7 @@
                     // Status kartu sudah dikonfirmasi melalui transaksi Firestore di atas.
                     // Simpan cache/riwayat sebagai langkah pendukung; kegagalan sinkronisasi
                     // umum tidak boleh membatalkan status kartu yang sudah berhasil ditulis.
-                    await persistEtollCardState(card, 'AVAILABLE');
+                    await persistEtollCardState(card, { expectedStatus: 'AVAILABLE' });
                     try {
                         const cloudSaved = await saveToStorage();
                         if (cloudSaved === false) console.warn('Status kartu tersimpan, tetapi sinkronisasi data pendukung tertunda.');
@@ -4909,7 +4895,7 @@
                         console.warn('Status kartu tersimpan; sinkronisasi data pendukung tertunda:', supportErr);
                     }
                 } catch (err) {
-                    card.status = previousCardState.status; card.holderName = previousCardState.holderName; card.balance = previousCardState.balance;
+                    card.status = 'AVAILABLE'; card.holderName = null;
                     window.etollLogs = (window.etollLogs || []).filter(x => x.id !== newRecap.id);
                     setEtollFormSaving(event, false);
                     showToast('Gagal Menyimpan', (err && err.message) ? `Status kartu gagal disimpan: ${err.message}` : 'Status kartu gagal disimpan. Periksa koneksi, login, dan Firebase Rules.', 'error');
@@ -4961,7 +4947,6 @@
                 }
                 const spent = oldBal - newBal;
                 const oldHolder = card.holderName || 'Driver';
-                const previousCardState = { status: card.status, holderName: card.holderName, balance: card.balance };
 
                 card.status = 'AVAILABLE';
                 card.holderName = null;
@@ -4986,7 +4971,7 @@
                     // Status kartu sudah dikonfirmasi melalui transaksi Firestore di atas.
                     // Simpan cache/riwayat sebagai langkah pendukung; kegagalan sinkronisasi
                     // umum tidak boleh membatalkan status kartu yang sudah berhasil ditulis.
-                    await persistEtollCardState(card, 'BORROWED');
+                    await persistEtollCardState(card, { expectedStatus: 'BORROWED', expectedHolder: oldHolder });
                     try {
                         const cloudSaved = await saveToStorage();
                         if (cloudSaved === false) console.warn('Status kartu tersimpan, tetapi sinkronisasi data pendukung tertunda.');
@@ -4994,7 +4979,7 @@
                         console.warn('Status kartu tersimpan; sinkronisasi data pendukung tertunda:', supportErr);
                     }
                 } catch (err) {
-                    card.status = previousCardState.status; card.holderName = previousCardState.holderName; card.balance = previousCardState.balance;
+                    card.status = 'BORROWED'; card.holderName = oldHolder; card.balance = oldBal;
                     window.etollLogs = (window.etollLogs || []).filter(x => x.id !== newRecap.id);
                     setEtollFormSaving(event, false);
                     showToast('Gagal Menyimpan', (err && err.message) ? `Pengembalian gagal disimpan: ${err.message}` : 'Pengembalian gagal disimpan. Periksa koneksi, login, dan Firebase Rules.', 'error');
@@ -5992,7 +5977,6 @@
                 window.FirebaseBridge.unsubscribers.forEach(unsub => unsub && unsub());
                 window.FirebaseBridge.unsubscribers = [];
                 if (window.FirebaseBridge.etollStateUnsubscriber) { try { window.FirebaseBridge.etollStateUnsubscriber(); } catch (e) {} window.FirebaseBridge.etollStateUnsubscriber = null; }
-                if (window.FirebaseBridge.deviceRegistryUnsubscriber) { try { window.FirebaseBridge.deviceRegistryUnsubscriber(); } catch (_) {} window.FirebaseBridge.deviceRegistryUnsubscriber = null; }
                 window.FirebaseBridge.isConnected = false;
                 window.FirebaseBridge.lastSyncTime = null;
                 window.FirebaseBridge.db = null;
