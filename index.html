@@ -1846,12 +1846,22 @@
                     this.app = this.app || existingApp || initializeApp(config, appName);
                     this.configProjectId = config.projectId || null;
 
-                    // Biarkan Firestore memilih transportasi terbaik. Long-polling dipaksa hanya
-                    // jika browser/jaringan memang membutuhkannya; default WebChannel lebih responsif.
+                    // COMPATIBILITY FIX: beberapa perangkat/jaringan seluler memblokir atau
+                    // memutus WebChannel streaming. getFirestore() hampir tidak pernah gagal,
+                    // sehingga fallback lama ke long-polling sebenarnya tidak pernah dijalankan.
+                    // Inisialisasikan Firestore dengan auto-detect long-polling sejak awal.
+                    // Jika instance sudah dibuat pada sesi ini, gunakan instance yang ada.
                     try {
-                        this.db = getFirestore(this.app);
-                    } catch (e) {
-                        this.db = initializeFirestore(this.app, { experimentalAutoDetectLongPolling: true });
+                        this.db = initializeFirestore(this.app, {
+                            experimentalAutoDetectLongPolling: true,
+                            useFetchStreams: false
+                        });
+                    } catch (firestoreInitError) {
+                        if (firestoreInitError?.code === 'failed-precondition' || /already been initialized|initializeFirestore/i.test(firestoreInitError?.message || '')) {
+                            this.db = getFirestore(this.app);
+                        } else {
+                            throw firestoreInitError;
+                        }
                     }
 
                     this.auth = getAuth(this.app);
@@ -3204,22 +3214,34 @@
             requireAdminAction(() => openModal('modal-firebase-config'));
         }
 
-        function testConnectionNow() {
-            showToast("Menguji Koneksi...", "Memeriksa status internet dan Cloud Database.", "info");
-            if (window.FirebaseBridge) {
-                window.FirebaseBridge.initialize().then(ok => {
-                    updateGlobalConnectionIndicator();
-                    if (ok) {
-                        showToast("Cloud Terhubung", "Sinkronisasi Cloud Firebase berhasil diverifikasi.", "success");
-                    } else if (!navigator.onLine) {
-                        showToast("Offline", "Koneksi internet tidak terdeteksi.", "error");
-                    } else {
-                        showToast("Mode Lokal", "Firebase Cloud belum tersambung.", "warning");
-                    }
-                });
-            } else {
+        async function testConnectionNow() {
+            showToast("Menguji Koneksi...", "Memeriksa akses nyata ke Firebase Cloud.", "info");
+            const bridge = window.FirebaseBridge;
+            if (!bridge) {
                 updateGlobalConnectionIndicator();
+                showToast("Modul Firebase Tidak Siap", "Muat ulang halaman dan periksa apakah modul Firebase berhasil dimuat.", "error");
+                return;
             }
+            try {
+                const initialized = await bridge.initialize();
+                if (initialized && bridge.db && bridge.currentUser) {
+                    // Paksa satu pembacaan server untuk membedakan online Firebase dari
+                    // sekadar status internet/browser online.
+                    await getDocFromServer(doc(bridge.db, 'garasiku_fleet', 'shared_state'));
+                    bridge.isConnected = true;
+                    bridge.lastSyncTime = new Date();
+                    bridge.updateStatusUI(true, 'Firebase server terjangkau');
+                    showToast("Cloud Terhubung", "Firebase berhasil dijangkau oleh perangkat ini.", "success");
+                } else {
+                    showToast(!navigator.onLine ? "Offline" : "Firebase Belum Terhubung", !navigator.onLine ? "Koneksi internet perangkat tidak tersedia." : "Periksa Firebase Config, Anonymous Authentication, dan Rules.", "error");
+                }
+            } catch (error) {
+                console.error('Tes koneksi Firebase gagal:', error);
+                bridge.isConnected = false;
+                bridge.updateStatusUI(false, `Tes Firebase gagal${error?.code ? ' ['+error.code+']' : ''}: ${error?.message || 'tidak dapat menjangkau server'}`);
+                showToast("Firebase Tidak Terjangkau", `${error?.code || 'error'}: ${error?.message || 'Periksa jaringan, Auth, dan Rules.'}`, "error");
+            }
+            updateGlobalConnectionIndicator();
         }
 
         window.addEventListener('online', () => {
