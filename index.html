@@ -1582,12 +1582,12 @@
                 <div>
                     <label class="block font-semibold text-slate-200 mb-1">Firebase Web Config (Format JSON)</label>
                     <textarea id="firebase-config-json" rows="7" class="w-full px-3 py-2.5 rounded-xl border border-dark-border bg-dark-card text-slate-100 font-mono text-[11px] focus:ring-2 focus:ring-emerald-500/40">{
-  "apiKey": "AIzaSyCiWsAbEW-tU0FZ54E3A3-kuHdSuiYWAQ",
-  "authDomain": "garasiuns-73bf0.firebaseapp.com",
-  "projectId": "garasiuns-73bf0",
-  "storageBucket": "garasiuns-73bf0.firebasestorage.app",
-  "messagingSenderId": "340693292191",
-  "appId": "1:340693292191:web:a7ee1efbea7e03021a3eaa"
+  "apiKey": "AIzaSyCQbUoc6mVPDz3hAjTiRawAvN2WTNYyNkM",
+  "authDomain": "garasiku-9580a.firebaseapp.com",
+  "projectId": "garasiku-9580a",
+  "storageBucket": "garasiku-9580a.firebasestorage.app",
+  "messagingSenderId": "854283207354",
+  "appId": "1:854283207354:web:f836e125e125e8aaaeb883"
 }</textarea>
                 </div>
                 <div class="pt-2 flex items-center justify-between">
@@ -1716,14 +1716,18 @@
         window.__garasikuGetDocFromServer = getDocFromServer;
         window.__garasikuDoc = doc;
 
-        const DEFAULT_FIREBASE_CONFIG = {
-            apiKey: "AIzaSyCiWsAbEW-tU0FZ54E3A3-kuHdSuiYWAQ",
-            authDomain: "garasiuns-73bf0.firebaseapp.com",
-            projectId: "garasiuns-73bf0",
-            storageBucket: "garasiuns-73bf0.firebasestorage.app",
-            messagingSenderId: "340693292191",
-            appId: "1:340693292191:web:a7ee1efbea7e03021a3eaa"
-        };
+        // Konfigurasi default resmi GarasiKu: proyek yang sudah dikonfirmasi online.
+        // Semua instalasi baru diarahkan ke proyek ini; config lama pada localStorage
+        // tidak boleh menimpa projectId default yang sudah benar.
+        const DEFAULT_FIREBASE_CONFIG = Object.freeze({
+            apiKey: "AIzaSyCQbUoc6mVPDz3hAjTiRawAvN2WTNYyNkM",
+            authDomain: "garasiku-9580a.firebaseapp.com",
+            projectId: "garasiku-9580a",
+            storageBucket: "garasiku-9580a.firebasestorage.app",
+            messagingSenderId: "854283207354",
+            appId: "1:854283207354:web:f836e125e125e8aaaeb883"
+        });
+        window.GARASIKU_DEFAULT_FIREBASE_CONFIG = DEFAULT_FIREBASE_CONFIG;
 
         // State operasional E-Toll milik GarasiKu disimpan di Firestore.
         // Master identitas kartu tetap berasal dari RekapToll (RTDB).
@@ -1812,21 +1816,20 @@
 
             async initialize(customConfig = null) {
                 try {
-                    if (!customConfig && localStorage.getItem('garasiku_force_local') === '1') {
-                        this.isConnected = false;
-                        this.lastSyncTime = null;
-                        this.updateStatusUI(false, 'Mode Penyimpanan: Lokal');
-                        return false;
+                    // Cloud menjadi default. Abaikan config lama/flag lokal yang tersimpan
+                    // dari versi sebelumnya agar perangkat baru maupun perangkat lama
+                    // otomatis kembali memakai proyek utama GarasiKu.
+                    let config = DEFAULT_FIREBASE_CONFIG;
+                    if (customConfig && customConfig.projectId === DEFAULT_FIREBASE_CONFIG.projectId &&
+                        customConfig.apiKey === DEFAULT_FIREBASE_CONFIG.apiKey && customConfig.appId === DEFAULT_FIREBASE_CONFIG.appId) {
+                        config = DEFAULT_FIREBASE_CONFIG;
                     }
-
-                    let config = customConfig;
-                    if (!config) {
-                        const saved = localStorage.getItem('garasiku_firebase_cfg');
-                        if (saved) {
-                            try { config = JSON.parse(saved); } catch (e) { config = null; }
-                        }
+                    try {
+                        localStorage.setItem('garasiku_firebase_cfg', JSON.stringify(DEFAULT_FIREBASE_CONFIG));
+                        localStorage.removeItem('garasiku_force_local');
+                    } catch (storageError) {
+                        console.warn('Tidak dapat memperbarui cache konfigurasi Firebase:', storageError);
                     }
-                    if (!config) config = DEFAULT_FIREBASE_CONFIG;
                     if (!config.projectId || !config.apiKey || !config.appId) {
                         throw new Error('Firebase Web Config tidak lengkap.');
                     }
@@ -3497,8 +3500,9 @@
                 if (modalId === 'modal-telegram') initTelegramConfig();
                 if (modalId === 'modal-firebase-config') {
                     const cfgEl = document.getElementById('firebase-config-json');
-                    const savedCfg = localStorage.getItem('garasiku_firebase_cfg');
-                    if (cfgEl && savedCfg) cfgEl.value = savedCfg;
+                    if (cfgEl && window.GARASIKU_DEFAULT_FIREBASE_CONFIG) {
+                        cfgEl.value = JSON.stringify(window.GARASIKU_DEFAULT_FIREBASE_CONFIG, null, 2);
+                    }
                 }
             }
         }
@@ -6069,8 +6073,13 @@
                 if (!parsed.projectId || !parsed.apiKey || !parsed.appId) {
                     throw new Error('Config Firebase tidak lengkap.');
                 }
+                const mainConfig = window.GARASIKU_DEFAULT_FIREBASE_CONFIG;
+                if (!mainConfig || parsed.projectId !== mainConfig.projectId || parsed.apiKey !== mainConfig.apiKey || parsed.appId !== mainConfig.appId) {
+                    showToast('Konfigurasi Ditolak', 'GarasiKu harus memakai konfigurasi proyek utama garasiku-9580a. Konfigurasi lama/proyek lain tidak disimpan.', 'error');
+                    return;
+                }
                 localStorage.removeItem('garasiku_force_local');
-                localStorage.setItem('garasiku_firebase_cfg', JSON.stringify(parsed));
+                localStorage.setItem('garasiku_firebase_cfg', JSON.stringify(mainConfig));
                 closeModal('modal-firebase-config');
                 showToast("Menghubungkan...", "Mencoba menyambungkan ke Firestore.", "info");
                 if (window.FirebaseBridge) {
