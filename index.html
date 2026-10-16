@@ -1713,7 +1713,7 @@
         import { initializeFirestore, getFirestore, collection, doc, setDoc, getDoc, getDocs, getDocFromServer, getDocsFromServer, query, where, writeBatch, deleteDoc, deleteField, runTransaction, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const DEFAULT_FIREBASE_CONFIG = {
-            apiKey: "AIzaSyCiWsAbEW-tU0FZ54yE3A3-kuHdSuiYWAQ",
+            apiKey: "AIzaSyCiWsAbEW-tU0FZ54E3A3-kuHdSuiYWAQ",
             authDomain: "garasiuns-73bf0.firebaseapp.com",
             projectId: "garasiuns-73bf0",
             storageBucket: "garasiuns-73bf0.firebasestorage.app",
@@ -1766,7 +1766,6 @@
             isConnected: false,
             lastSyncTime: null,
             configProjectId: null,
-            lastConnectionError: null,
             writeQueue: Promise.resolve(),
             gateWriteQueue: Promise.resolve(),
             gateLogsReady: false,
@@ -1808,13 +1807,11 @@
             },
 
             async initialize(customConfig = null) {
-                this.lastConnectionError = null;
                 try {
                     if (!customConfig && localStorage.getItem('garasiku_force_local') === '1') {
                         this.isConnected = false;
                         this.lastSyncTime = null;
-                        this.lastConnectionError = 'Mode lokal dipaksa pada perangkat ini (garasiku_force_local=1).';
-                        this.updateStatusUI(false, this.lastConnectionError);
+                        this.updateStatusUI(false, 'Mode Penyimpanan: Lokal');
                         return false;
                     }
 
@@ -1875,16 +1872,14 @@
                         this.currentUser = null;
                         this.isConnected = false;
                         const code = authErr?.code ? ` [${authErr.code}]` : '';
-                        this.lastConnectionError = `Auth Firebase gagal${code}: ${authErr?.message || 'Anonymous Auth belum aktif'}`;
-                        this.updateStatusUI(false, this.lastConnectionError);
+                        this.updateStatusUI(false, `Auth Firebase gagal${code}: ${authErr?.message || 'Anonymous Auth belum aktif'}`);
                         return false;
                     }
 
                     this.currentUser = this.auth.currentUser || null;
                     if (!this.currentUser) {
                         this.isConnected = false;
-                        this.lastConnectionError = 'Firebase Auth belum login setelah proses autentikasi.';
-                        this.updateStatusUI(false, this.lastConnectionError);
+                        this.updateStatusUI(false, 'Firebase Auth belum login');
                         return false;
                     }
 
@@ -1900,8 +1895,7 @@
                 } catch (error) {
                     console.error('Firebase connection error:', error);
                     this.isConnected = false;
-                    this.lastConnectionError = `${error?.code ? '[' + error.code + '] ' : ''}${error?.message || 'Kesalahan inisialisasi Firebase tidak diketahui'}`;
-                    this.updateStatusUI(false, this.lastConnectionError);
+                    this.updateStatusUI(false, error.message);
                     if (window.updateGlobalConnectionIndicator) window.updateGlobalConnectionIndicator();
                     return false;
                 }
@@ -3239,8 +3233,7 @@
                     bridge.updateStatusUI(true, 'Firebase server terjangkau');
                     showToast("Cloud Terhubung", "Firebase berhasil dijangkau oleh perangkat ini.", "success");
                 } else {
-                    const detail = bridge.lastConnectionError || 'Inisialisasi Firebase gagal tanpa rincian. Buka konsol untuk detail teknis.';
-                    showToast(!navigator.onLine ? "Offline" : "Firebase Belum Terhubung", !navigator.onLine ? "Koneksi internet perangkat tidak tersedia." : detail, "error");
+                    showToast(!navigator.onLine ? "Offline" : "Firebase Belum Terhubung", !navigator.onLine ? "Koneksi internet perangkat tidak tersedia." : "Periksa Firebase Config, Anonymous Authentication, dan Rules.", "error");
                 }
             } catch (error) {
                 console.error('Tes koneksi Firebase gagal:', error);
