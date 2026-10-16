@@ -1766,6 +1766,7 @@
             isConnected: false,
             lastSyncTime: null,
             configProjectId: null,
+            lastConnectionError: null,
             writeQueue: Promise.resolve(),
             gateWriteQueue: Promise.resolve(),
             gateLogsReady: false,
@@ -1807,11 +1808,13 @@
             },
 
             async initialize(customConfig = null) {
+                this.lastConnectionError = null;
                 try {
                     if (!customConfig && localStorage.getItem('garasiku_force_local') === '1') {
                         this.isConnected = false;
                         this.lastSyncTime = null;
-                        this.updateStatusUI(false, 'Mode Penyimpanan: Lokal');
+                        this.lastConnectionError = 'Mode lokal dipaksa pada perangkat ini (garasiku_force_local=1).';
+                        this.updateStatusUI(false, this.lastConnectionError);
                         return false;
                     }
 
@@ -1872,14 +1875,16 @@
                         this.currentUser = null;
                         this.isConnected = false;
                         const code = authErr?.code ? ` [${authErr.code}]` : '';
-                        this.updateStatusUI(false, `Auth Firebase gagal${code}: ${authErr?.message || 'Anonymous Auth belum aktif'}`);
+                        this.lastConnectionError = `Auth Firebase gagal${code}: ${authErr?.message || 'Anonymous Auth belum aktif'}`;
+                        this.updateStatusUI(false, this.lastConnectionError);
                         return false;
                     }
 
                     this.currentUser = this.auth.currentUser || null;
                     if (!this.currentUser) {
                         this.isConnected = false;
-                        this.updateStatusUI(false, 'Firebase Auth belum login');
+                        this.lastConnectionError = 'Firebase Auth belum login setelah proses autentikasi.';
+                        this.updateStatusUI(false, this.lastConnectionError);
                         return false;
                     }
 
@@ -1895,7 +1900,8 @@
                 } catch (error) {
                     console.error('Firebase connection error:', error);
                     this.isConnected = false;
-                    this.updateStatusUI(false, error.message);
+                    this.lastConnectionError = `${error?.code ? '[' + error.code + '] ' : ''}${error?.message || 'Kesalahan inisialisasi Firebase tidak diketahui'}`;
+                    this.updateStatusUI(false, this.lastConnectionError);
                     if (window.updateGlobalConnectionIndicator) window.updateGlobalConnectionIndicator();
                     return false;
                 }
@@ -3233,7 +3239,8 @@
                     bridge.updateStatusUI(true, 'Firebase server terjangkau');
                     showToast("Cloud Terhubung", "Firebase berhasil dijangkau oleh perangkat ini.", "success");
                 } else {
-                    showToast(!navigator.onLine ? "Offline" : "Firebase Belum Terhubung", !navigator.onLine ? "Koneksi internet perangkat tidak tersedia." : "Periksa Firebase Config, Anonymous Authentication, dan Rules.", "error");
+                    const detail = bridge.lastConnectionError || 'Inisialisasi Firebase gagal tanpa rincian. Buka konsol untuk detail teknis.';
+                    showToast(!navigator.onLine ? "Offline" : "Firebase Belum Terhubung", !navigator.onLine ? "Koneksi internet perangkat tidak tersedia." : detail, "error");
                 }
             } catch (error) {
                 console.error('Tes koneksi Firebase gagal:', error);
