@@ -1711,6 +1711,10 @@
         import { initializeApp, getApps, getApp, deleteApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { initializeFirestore, getFirestore, collection, doc, setDoc, getDoc, getDocs, getDocFromServer, getDocsFromServer, query, where, writeBatch, deleteDoc, deleteField, runTransaction, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // Ekspos helper yang dipakai oleh skrip UI non-module untuk tes koneksi.
+        // Import ES module tidak otomatis tersedia pada scope window.
+        window.__garasikuGetDocFromServer = getDocFromServer;
+        window.__garasikuDoc = doc;
 
         const DEFAULT_FIREBASE_CONFIG = {
             apiKey: "AIzaSyCiWsAbEW-tU0FZ54E3A3-kuHdSuiYWAQ",
@@ -3227,7 +3231,10 @@
                 if (initialized && bridge.db && bridge.currentUser) {
                     // Paksa satu pembacaan server untuk membedakan online Firebase dari
                     // sekadar status internet/browser online.
-                    await getDocFromServer(doc(bridge.db, 'garasiku_fleet', 'shared_state'));
+                    if (typeof window.__garasikuGetDocFromServer !== 'function' || typeof window.__garasikuDoc !== 'function') {
+                        throw new Error('Helper tes koneksi Firebase belum siap. Muat ulang halaman.');
+                    }
+                    await window.__garasikuGetDocFromServer(window.__garasikuDoc(bridge.db, 'garasiku_fleet', 'shared_state'));
                     bridge.isConnected = true;
                     bridge.lastSyncTime = new Date();
                     bridge.updateStatusUI(true, 'Firebase server terjangkau');
