@@ -329,7 +329,7 @@
                     </button>
 
                     <!-- Device Registry (Mode Admin) -->
-                    <button id="btn-device-registry" onclick="openDeviceNameModal()" class="hidden px-2 sm:px-3 py-1.5 rounded-xl border border-cyan-900/60 bg-cyan-950/40 hover:bg-cyan-900/50 text-cyan-300 text-xs font-semibold items-center space-x-1.5 transition">
+                    <button id="btn-device-registry" onclick="openDeviceRegistryModal()" class="hidden px-2 sm:px-3 py-1.5 rounded-xl border border-cyan-900/60 bg-cyan-950/40 hover:bg-cyan-900/50 text-cyan-300 text-xs font-semibold items-center space-x-1.5 transition">
                         <i class="fa-solid fa-mobile-screen-button text-xs"></i>
                         <span class="hidden sm:inline">Nama Perangkat</span>
                     </button>
@@ -1687,6 +1687,31 @@
         </div>
     </div>
 
+    <!-- MODAL MANAJEMEN NAMA ID PERANGKAT -->
+    <div id="modal-device-registry" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-[69] hidden">
+        <div class="bg-dark-surface w-full max-w-3xl max-h-[90vh] rounded-3xl shadow-2xl border border-cyan-900/60 overflow-hidden flex flex-col">
+            <div class="bg-gradient-to-r from-cyan-800 to-blue-800 px-5 py-4 text-white flex items-center justify-between gap-3">
+                <div><h3 class="font-extrabold text-base"><i class="fa-solid fa-mobile-screen-button mr-2"></i>Manajemen Nama ID Perangkat</h3>
+                <p class="text-xs text-cyan-100 mt-1">Nama tersimpan di Firebase dan ditampilkan lintas perangkat.</p></div>
+                <button type="button" onclick="closeModal('modal-device-registry')" class="text-white/90 hover:text-white text-2xl" aria-label="Tutup">&times;</button>
+            </div>
+            <div class="p-4 sm:p-5 space-y-3 overflow-y-auto">
+                <div class="flex flex-wrap gap-2 justify-between items-center">
+                    <p id="device-registry-status" class="text-xs text-slate-400">Memuat daftar ID perangkat…</p>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="refreshDeviceRegistryUI()" class="px-3 py-2 rounded-xl border border-slate-600 text-slate-200 hover:bg-slate-800 text-xs font-bold"><i class="fa-solid fa-rotate mr-1"></i>Refresh</button>
+                        <button type="button" onclick="openDeviceNameModal()" class="px-3 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold"><i class="fa-solid fa-plus mr-1"></i>Namai Perangkat Ini</button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto rounded-xl border border-slate-700/70">
+                    <table class="w-full text-sm"><thead class="bg-slate-800 text-slate-300 text-xs uppercase"><tr><th class="text-left p-3">ID Device</th><th class="text-left p-3">Nama Perangkat</th><th class="text-left p-3">Terakhir Diperbarui</th><th class="text-right p-3">Aksi</th></tr></thead>
+                    <tbody id="device-registry-list" class="divide-y divide-slate-800"><tr><td colspan="4" class="p-5 text-center text-slate-400">Memuat data…</td></tr></tbody></table>
+                </div>
+                <p class="text-[11px] text-slate-500">Jika ID sudah ada di logbook tetapi belum bernama, pilih <b>Namai</b> pada baris ID tersebut. Setelah disimpan, nama akan diperbarui pada tampilan logbook di perangkat ini dan perangkat lain setelah membaca data terbaru.</p>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL NAMA PERANGKAT -->
     <div id="modal-device-name" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-[70] hidden">
         <div class="bg-dark-surface w-full max-w-md rounded-3xl shadow-2xl border border-cyan-900/60 overflow-hidden">
@@ -1935,6 +1960,21 @@
                 const snap = await getDocFromServer(ref);
                 return snap.exists() ? snap.data() : null;
             },
+            async loadDeviceRegistrations() {
+                if (!this.db || !this.currentUser) throw new Error('Firebase belum siap atau pengguna belum login.');
+                const col = this.deviceRegistryCollection();
+                if (!col) throw new Error('Koleksi registrasi perangkat belum siap.');
+                const snap = await getDocsFromServer(col);
+                const rows = snap.docs.map(d => ({ deviceId: d.id, ...(d.data() || {}) }))
+                    .filter(row => row.deviceId)
+                    .sort((a, b) => String(a.deviceName || '').localeCompare(String(b.deviceName || ''), 'id'));
+                window.garasikuDeviceNames = window.garasikuDeviceNames || {};
+                rows.forEach(row => {
+                    if (row.deviceName) window.garasikuDeviceNames[String(row.deviceId)] = String(row.deviceName);
+                });
+                try { localStorage.setItem('garasiku_device_names_cache', JSON.stringify(window.garasikuDeviceNames)); } catch (_) {}
+                return rows;
+            },
             async saveDeviceRegistration(deviceId, deviceName) {
                 if (!this.db || !deviceId || !String(deviceName || '').trim()) return false;
                 // Tunggu autentikasi Firebase siap, tanpa polling berkepanjangan.
@@ -2110,6 +2150,10 @@
                     } else {
                         await this.pushStateToCloud();
                     }
+                    // Baca registrasi nama perangkat satu kali saat startup agar nama dari
+                    // perangkat lain segera muncul pada logbook tanpa polling berulang.
+                    try { await this.loadDeviceRegistrations(); }
+                    catch (registryError) { console.warn('Daftar nama perangkat belum dapat dimuat:', registryError); }
                     this.startEtollStateRealtimeSync();
                     await this.startGateLogsRealtimeSync();
                     this.etollLogsSplitEnabled = !!(snapshot.exists() && snapshot.data()?.etollLogsMigratedAt);
@@ -2934,6 +2978,20 @@
                 return this.sync();
             }
         };
+        // Cache nama perangkat lintas perangkat. Dibaca dari Firestore saat startup/menu dibuka.
+        window.garasikuDeviceNames = window.garasikuDeviceNames || {};
+        try {
+            const cachedDeviceNames = JSON.parse(localStorage.getItem('garasiku_device_names_cache') || '{}');
+            Object.assign(window.garasikuDeviceNames, cachedDeviceNames && typeof cachedDeviceNames === 'object' ? cachedDeviceNames : {});
+        } catch (_) {}
+        function escapeDeviceText(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+        }
+        function getDisplayDeviceName(deviceId, fallback = '') {
+            const id = String(deviceId || '').trim();
+            const registered = id && window.garasikuDeviceNames ? window.garasikuDeviceNames[id] : '';
+            return registered || fallback || (id ? 'Perangkat Belum Dinamai' : 'Perangkat');
+        }
         // Identitas perangkat lokal yang stabil selama data situs tidak dihapus.
         function getGarasikuDeviceId() {
             let id = '';
@@ -2953,6 +3011,56 @@
         function getGarasikuDeviceMeta() {
             return { deviceId: getGarasikuDeviceId(), deviceName: getGarasikuDeviceName() };
         }
+        async function openDeviceRegistryModal() {
+            if (!isAdminLoggedIn) {
+                openAdminAuthModal(() => openDeviceRegistryModal());
+                return;
+            }
+            const modal = document.getElementById('modal-device-registry');
+            if (modal) modal.classList.remove('hidden');
+            await refreshDeviceRegistryUI();
+        }
+        window.openDeviceRegistryModal = openDeviceRegistryModal;
+
+        async function refreshDeviceRegistryUI() {
+            const body = document.getElementById('device-registry-list');
+            const status = document.getElementById('device-registry-status');
+            if (body) body.innerHTML = '<tr><td colspan="4" class="p-5 text-center text-slate-400">Mengambil daftar dari Firebase…</td></tr>';
+            try {
+                if (!window.FirebaseBridge?.isConnected || !window.FirebaseBridge?.db) {
+                    await window.FirebaseBridge?.initialize();
+                }
+                const rows = await window.FirebaseBridge.loadDeviceRegistrations();
+                // Tambahkan ID perangkat ini ke daftar jika belum pernah disimpan.
+                const currentId = getGarasikuDeviceId();
+                if (!rows.some(row => String(row.deviceId) === currentId)) {
+                    rows.push({ deviceId: currentId, deviceName: getGarasikuDeviceName() === 'Perangkat Belum Dinamai' ? '' : getGarasikuDeviceName(), updatedAt: '' });
+                }
+                rows.sort((a, b) => String(a.deviceName || '').localeCompare(String(b.deviceName || ''), 'id') || String(a.deviceId).localeCompare(String(b.deviceId)));
+                if (status) status.textContent = `${rows.length} ID perangkat · sumber Firebase`;
+                if (!body) return;
+                if (!rows.length) {
+                    body.innerHTML = '<tr><td colspan="4" class="p-5 text-center text-slate-400">Belum ada ID perangkat terdaftar.</td></tr>';
+                    return;
+                }
+                body.innerHTML = rows.map(row => {
+                    const id = String(row.deviceId || '');
+                    const name = String(row.deviceName || window.garasikuDeviceNames[id] || '');
+                    const date = row.updatedAt ? new Date(row.updatedAt).toLocaleString('id-ID') : '—';
+                    const safeId = escapeDeviceText(id);
+                    const label = name ? escapeDeviceText(name) : '<span class="text-amber-300">Belum dinamai</span>';
+                    const action = `<button type="button" onclick="openDeviceNameModal('${safeId}')" class="px-3 py-1.5 rounded-lg border border-cyan-700 text-cyan-300 hover:bg-cyan-900/50 text-xs font-bold">${name ? 'Ubah Nama' : 'Namai'}</button>`;
+                    return `<tr class="hover:bg-slate-800/60"><td class="p-3 font-mono text-xs text-cyan-200 whitespace-nowrap">${safeId}</td><td class="p-3 font-semibold text-slate-100">${label}</td><td class="p-3 text-xs text-slate-400 whitespace-nowrap">${escapeDeviceText(date)}</td><td class="p-3 text-right">${action}</td></tr>`;
+                }).join('');
+            } catch (error) {
+                console.error('Gagal memuat daftar ID perangkat:', error);
+                if (status) status.textContent = 'Gagal memuat daftar dari Firebase';
+                if (body) body.innerHTML = `<tr><td colspan="4" class="p-5 text-center text-rose-300">${escapeDeviceText(error?.code || error?.message || 'Koneksi Firebase gagal')}</td></tr>`;
+                showToast('Daftar ID Gagal Dimuat', error?.message || 'Periksa koneksi Firebase dan Rules.', 'error');
+            }
+        }
+        window.refreshDeviceRegistryUI = refreshDeviceRegistryUI;
+
         async function openDeviceNameModal(targetDeviceId = null) {
             const modal = document.getElementById('modal-device-name');
             const idDisplay = document.getElementById('device-id-display');
@@ -2973,6 +3081,7 @@
             try {
                 const registry = await window.FirebaseBridge.loadDeviceRegistration(id);
                 knownName = registry?.deviceName || '';
+                if (knownName) { window.garasikuDeviceNames = window.garasikuDeviceNames || {}; window.garasikuDeviceNames[id] = knownName; }
             } catch (e) { console.warn('Nama perangkat belum dapat dibaca dari Firebase:', e); }
             nameInput.value = knownName || (id === getGarasikuDeviceId() && getGarasikuDeviceName() !== 'Perangkat Belum Dinamai' ? getGarasikuDeviceName() : '');
             modal.classList.remove('hidden');
@@ -2981,14 +3090,9 @@
         // Pastikan handler tersedia global untuk onclick dan browser yang memuat halaman statis.
         window.openDeviceNameModal = openDeviceNameModal;
         window.addEventListener('DOMContentLoaded', () => {
+            // Tombol khusus membuka daftar seluruh ID, bukan hanya ID perangkat lokal.
             const button = document.getElementById('btn-device-registry');
-            if (button && !button.dataset.deviceClickBound) {
-                button.dataset.deviceClickBound = '1';
-                button.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    window.openDeviceNameModal();
-                });
-            }
+            if (button) button.onclick = (event) => { event.preventDefault(); window.openDeviceRegistryModal(); };
         });
         async function saveDeviceName(event) {
             event.preventDefault();
@@ -3008,6 +3112,9 @@
                 }
                 // Simpan lokal hanya setelah Firebase mengonfirmasi keberhasilan.
                 const targetId = document.getElementById('device-target-id')?.value || getGarasikuDeviceId();
+                window.garasikuDeviceNames = window.garasikuDeviceNames || {};
+                window.garasikuDeviceNames[targetId] = name;
+                try { localStorage.setItem('garasiku_device_names_cache', JSON.stringify(window.garasikuDeviceNames)); } catch (_) {}
                 if (targetId === getGarasikuDeviceId()) localStorage.setItem('garasiku_device_name', name);
                 // Perbarui nama pada logbook yang sudah termuat untuk ID yang dipilih.
                 (window.logs || []).forEach(log => {
@@ -3017,6 +3124,7 @@
                 closeModal('modal-device-name');
                 document.querySelectorAll('[data-device-name-label]').forEach(el => { el.textContent = name; });
                 renderLogsTable();
+                if (document.getElementById('modal-device-registry') && !document.getElementById('modal-device-registry').classList.contains('hidden')) await refreshDeviceRegistryUI();
                 showToast('Perangkat Terdaftar', `${targetId} diberi nama "${name}" dan disimpan ke Firebase.`, 'success');
             } catch (err) {
                 const detail = [err?.code, err?.message].filter(Boolean).join(': ');
@@ -4274,11 +4382,11 @@
                         <div class="text-[10px] text-slate-400 truncate max-w-xs">${log.purpose || '-'}</div>
                         ${log.notes ? `<div class="mt-1 px-2 py-0.5 rounded bg-amber-950/40 border border-amber-800/40 text-[10px] text-amber-300"><i class="fa-solid fa-note-sticky mr-1"></i>${log.notes}</div>` : ''}
                         <div class="admin-col ${isAdminLoggedIn ? '' : 'hidden'} mt-1 px-2 py-1 rounded bg-cyan-950/40 border border-cyan-900/50 text-[10px] text-cyan-200">
-                            <div><i class="fa-solid fa-mobile-screen-button mr-1"></i>${String(log.deviceName || 'Perangkat lama / belum dinamai').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}</div>
+                            <div><i class="fa-solid fa-mobile-screen-button mr-1"></i>${escapeDeviceText(getDisplayDeviceName(log.deviceId, log.deviceName || 'Perangkat lama / belum dinamai'))}</div>
                             <div class="font-mono">Keluar: ${String(log.deviceId || '-').replace(/[&<>"']/g, '')}
                                 ${log.deviceId ? `<button type="button" onclick="openDeviceNameModal('${String(log.deviceId).replace(/[^A-Za-z0-9_-]/g, '')}')" class="ml-1 px-1.5 py-0.5 rounded border border-cyan-700 text-cyan-300 hover:bg-cyan-900/50">Namai ID</button>` : ''}
                             </div>
-                            ${log.checkinDeviceId ? `<div class="font-mono mt-1">Masuk: ${String(log.checkinDeviceName || 'Perangkat').replace(/[&<>"']/g, '')} · ${String(log.checkinDeviceId).replace(/[&<>"']/g, '')} <button type="button" onclick="openDeviceNameModal('${String(log.checkinDeviceId).replace(/[^A-Za-z0-9_-]/g, '')}')" class="ml-1 px-1.5 py-0.5 rounded border border-cyan-700 text-cyan-300 hover:bg-cyan-900/50">Namai ID</button></div>` : ''}
+                            ${log.checkinDeviceId ? `<div class="font-mono mt-1">Masuk: ${escapeDeviceText(getDisplayDeviceName(log.checkinDeviceId, log.checkinDeviceName || 'Perangkat'))} · ${escapeDeviceText(log.checkinDeviceId)} <button type="button" onclick="openDeviceNameModal('${String(log.checkinDeviceId).replace(/[^A-Za-z0-9_-]/g, '')}')" class="ml-1 px-1.5 py-0.5 rounded border border-cyan-700 text-cyan-300 hover:bg-cyan-900/50">Namai ID</button></div>` : ''}
                         </div>
                     </td>
                     <td class="p-3 font-mono text-[11px] text-slate-300">
@@ -5480,9 +5588,9 @@
                     <td class="p-3 font-mono font-bold ${spent > 0 ? 'text-rose-400' : 'text-slate-500'}">${spent > 0 ? '-'+money(spent) : '-'}</td>
                     <td class="p-3 text-slate-400 text-[11px]">${note}
                         <div class="admin-col ${isAdminLoggedIn ? '' : 'hidden'} mt-1 pt-1 border-t border-cyan-900/40 text-cyan-300">
-                            <div>${esc(primary?.deviceName || 'Perangkat lama / belum dinamai')}</div>
+                            <div>${esc(getDisplayDeviceName(primary?.deviceId, primary?.deviceName || 'Perangkat lama / belum dinamai'))}</div>
                             <div class="font-mono">ID: ${esc(primary?.deviceId || '-')}</div>
-                            ${borrow && ret && ret.deviceId ? `<div class="mt-1">Pengembalian: ${esc(ret.deviceName || 'Perangkat')} · ${esc(ret.deviceId)}</div>` : ''}
+                            ${borrow && ret && ret.deviceId ? `<div class="mt-1">Pengembalian: ${esc(getDisplayDeviceName(ret.deviceId, ret.deviceName || 'Perangkat'))} · ${esc(ret.deviceId)}</div>` : ''}
                         </div>
                     </td>
                     <td class="p-3 text-center admin-col ${isAdminLoggedIn ? '' : 'hidden'}">
