@@ -2921,34 +2921,55 @@
                     const byNumber = new Map(previous.map(c => [this.normalizeNumber(c.cardNo), c]));
                     const cloudState = window.cloudEtollState || {};
 
-                    const masterCards = data
-                        .filter(c => c && (c.number || c.id))
-                        .map((sourceCard, index) => {
-                            const sourceId = String(sourceCard.id || `source-${index + 1}`);
-                            const cleanNumber = this.normalizeNumber(sourceCard.number);
-                            const old = bySourceId.get(sourceId) || byNumber.get(cleanNumber) || {};
-                            const cloud = cloudState[sourceId] || cloudState[cleanNumber] || {};
-                            const merged = Object.assign({}, old, cloud);
-                            const oldStatus = merged.status === 'BORROWED' ? 'BORROWED' : 'AVAILABLE';
+                    // Deduplicate source records by normalized card number first.
+                    // RekapToll can contain duplicate rows; counting every row made ON KPI fluctuate.
+                    const uniqueSourceCards = [];
+                    const seenCardKeys = new Set();
+                    data.filter(c => c && (c.number || c.id)).forEach((card, index) => {
+                        const normalized = this.normalizeNumber(card.number);
+                        const key = normalized ? `number:${normalized}` : `id:${String(card.id || `source-${index + 1}`)}`;
+                        if (seenCardKeys.has(key)) return;
+                        seenCardKeys.add(key);
+                        uniqueSourceCards.push(card);
+                    });
 
-                            return {
-                                id: old.id || `ET-SRC-${sourceId}`,
-                                sourceCardId: sourceId,
-                                source: 'REKAPTOLL',
-                                // Nama kartu di GarasiKu selalu mengikuti 4 digit terakhir nomor kartu.
-                                // Tidak lagi mengambil label/nama driver dari RekapToll.
-                                name: cleanNumber ? cleanNumber.slice(-4) : String(old.name || `Kartu E-Toll ${index + 1}`),
-                                nopol: String(sourceCard.nopol || merged.nopol || ''),
-                                bank: String(sourceCard.bank || merged.bank || 'Lainnya'),
-                                cardNo: String(sourceCard.number || merged.cardNo || ''),
-                                // Saldo/status/holder/ON-OFF adalah data operasional GarasiKu dan diambil dari Firebase.
-                                balance: Number.isFinite(Number(merged.balance)) ? Number(merged.balance) : 0,
-                                status: oldStatus,
-                                holderName: oldStatus === 'BORROWED' ? (merged.holderName || null) : null,
-                                active: merged.active !== false,
-                                color: sourceCard.color || merged.color || ''
-                            };
-                        });
+                    const masterCards = uniqueSourceCards.map((sourceCard, index) => {
+                        const sourceId = String(sourceCard.id || `source-${index + 1}`);
+                        const cleanNumber = this.normalizeNumber(sourceCard.number);
+                        const old = bySourceId.get(sourceId) || (cleanNumber ? byNumber.get(cleanNumber) : null) || {};
+                        // Prefer canonical sourceId state. Use number-key legacy state only if
+                        // canonical state is absent; do not let stale aliases silently override it.
+                        const canonicalCloud = cloudState[sourceId];
+                        const legacyCloud = cleanNumber ? cloudState[cleanNumber] : null;
+                        const cloud = canonicalCloud && typeof canonicalCloud === 'object'
+                            ? canonicalCloud
+                            : (legacyCloud && typeof legacyCloud === 'object' ? legacyCloud : {});
+                        const merged = Object.assign({}, old, cloud);
+                        const oldStatus = merged.status === 'BORROWED' ? 'BORROWED' : 'AVAILABLE';
+
+                        // Missing active state must not silently turn a card ON.
+                        // Preserve explicit cloud/local boolean; only genuinely new cards default OFF.
+                        let active;
+                        if (typeof cloud.active === 'boolean') active = cloud.active;
+                        else if (typeof old.active === 'boolean') active = old.active;
+                        else if (typeof sourceCard.active === 'boolean') active = sourceCard.active;
+                        else active = false;
+
+                        return {
+                            id: old.id || `ET-SRC-${sourceId}`,
+                            sourceCardId: sourceId,
+                            source: 'REKAPTOLL',
+                            name: cleanNumber ? cleanNumber.slice(-4) : String(old.name || `Kartu E-Toll ${index + 1}`),
+                            nopol: String(sourceCard.nopol || merged.nopol || ''),
+                            bank: String(sourceCard.bank || merged.bank || 'Lainnya'),
+                            cardNo: String(sourceCard.number || merged.cardNo || ''),
+                            balance: Number.isFinite(Number(merged.balance)) ? Number(merged.balance) : 0,
+                            status: oldStatus,
+                            holderName: oldStatus === 'BORROWED' ? (merged.holderName || null) : null,
+                            active,
+                            color: sourceCard.color || merged.color || ''
+                        };
+                    });
 
                     window.etolls = masterCards;
                     this.lastSuccess = new Date();
@@ -4877,12 +4898,21 @@
                 return;
             }
             requireAdminAction(async () => {
-                card.active = card.active === false ? true : false;
+                const previousActive = card.active !== false;
+                card.active = !previousActive;
                 const cloudSaved = await saveToStorage();
-                if (cloudSaved === false) { showToast('Sinkronisasi Belum Berhasil', 'Perubahan belum terkonfirmasi di cloud. Periksa koneksi Firebase sebelum melanjutkan.', 'error'); }
+                if (cloudSaved === false) {
+                    // Revert UI/cache when cloud write fails; don't show a false ON/OFF success.
+                    card.active = previousActive;
+                    try { localStorage.setItem('garasiku_etolls', JSON.stringify(window.etolls || [])); } catch (e) {}
+                    renderAll();
+                    openStatDetail('etoll');
+                    showToast('Sinkronisasi Gagal', 'Status kartu dikembalikan karena perubahan belum tersimpan ke Firebase.', 'error');
+                    return;
+                }
                 renderAll();
                 openStatDetail('etoll');
-                showToast("Status Kartu", `${card.name} kini ${card.active ? 'ON (Aktif)' : 'OFF (Nonaktif)'}.`, "info");
+                showToast("Status Kartu", `${card.name} kini ${card.active ? 'ON (Aktif)' : 'OFF (Nonaktif)'}.`, "success");
             });
         }
 
