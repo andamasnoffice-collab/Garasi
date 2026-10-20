@@ -1796,6 +1796,7 @@
             unsubscribers: [],
             gateLogsUnsubscriber: null,
             etollStateUnsubscriber: null,
+            vehicleSettingsUnsubscriber: null,
             isConnected: false,
             lastSyncTime: null,
             configProjectId: null,
@@ -1865,6 +1866,7 @@
                         this.unsubscribers.forEach(unsub => unsub && unsub());
                         this.unsubscribers = [];
                         if (this.etollStateUnsubscriber) { try { this.etollStateUnsubscriber(); } catch (e) {} this.etollStateUnsubscriber = null; }
+                        if (this.vehicleSettingsUnsubscriber) { try { this.vehicleSettingsUnsubscriber(); } catch (e) {} this.vehicleSettingsUnsubscriber = null; }
                         if (this.gateLogsUnsubscriber) {
                             try { this.gateLogsUnsubscriber(); } catch (e) {}
                             this.gateLogsUnsubscriber = null;
@@ -2136,6 +2138,25 @@
                 });
             },
 
+            // Listener khusus pengaturan ON/OFF kendaraan supaya perubahan Admin
+            // muncul di perangkat lain tanpa menunggu halaman dibuka ulang.
+            // Hanya vehicleSettings yang diterapkan; field lain tidak disentuh.
+            startVehicleSettingsRealtimeSync() {
+                if (!this.db || this.vehicleSettingsUnsubscriber) return;
+                const ref = doc(this.db, 'garasiku_fleet', 'shared_state');
+                this.vehicleSettingsUnsubscriber = onSnapshot(ref, { includeMetadataChanges: false }, (snap) => {
+                    if (!snap.exists() || snap.metadata?.hasPendingWrites) return;
+                    const data = snap.data() || {};
+                    if (!data.vehicleSettings || typeof data.vehicleSettings !== 'object') return;
+                    window.vehicleSettings = data.vehicleSettings;
+                    try { localStorage.setItem('garasiku_vehicle_settings', JSON.stringify(data.vehicleSettings)); } catch (_) {}
+                    if (typeof applyVehicleSettingsToMaster === 'function') applyVehicleSettingsToMaster();
+                    if (typeof renderAll === 'function') renderAll();
+                }, (error) => {
+                    console.warn('Listener status kendaraan gagal:', error);
+                });
+            },
+
             // MODE EFISIEN: startup membaca shared_state satu kali, lalu listener menjaga status E-Toll lintas perangkat tetap sama.
             async startRealtimeSync() {
                 if (!this.db || !this.currentUser) return;
@@ -2155,6 +2176,7 @@
                     try { await this.loadDeviceRegistrations(); }
                     catch (registryError) { console.warn('Daftar nama perangkat belum dapat dimuat:', registryError); }
                     this.startEtollStateRealtimeSync();
+                    this.startVehicleSettingsRealtimeSync();
                     await this.startGateLogsRealtimeSync();
                     this.etollLogsSplitEnabled = !!(snapshot.exists() && snapshot.data()?.etollLogsMigratedAt);
                     if (this.etollLogsSplitEnabled) await this.loadRecentEtollLogs(1);
@@ -4709,43 +4731,74 @@
             applyVehicleSettingsToMaster();
         }
 
-        function toggleVehicleActive(id) {
+        async function toggleVehicleActive(id) {
             const v = window.vehicles.find(item => item.id === id);
             if (!v) return;
             if (v.status === 'ON_TRIP') {
                 showToast("Armada Sedang Tugas", "Tidak dapat menonaktifkan unit yang berada di luar.", "warning");
                 return;
             }
-            requireAdminAction(() => {
-                const next = v.active === false;
+            requireAdminAction(async () => {
+                const key = normalizePlateKey(v.plate || v.id);
+                const previous = JSON.parse(JSON.stringify(window.vehicleSettings?.[key] || {}));
+                const previousActive = v.active !== false;
+                const next = !previousActive;
                 persistVehicleOverlay(v, { active: next });
-                saveToStorage();
                 renderAll();
-                showToast("Status Diperbarui", `${v.plate} berstatus ${v.active ? 'ON (Aktif)' : 'OFF (Nonaktif)'}.`, "info");
+                const cloudSaved = await saveToStorage();
+                if (cloudSaved === false) {
+                    window.vehicleSettings[key] = previous;
+                    applyVehicleSettingsToMaster();
+                    try { localStorage.setItem('garasiku_vehicle_settings', JSON.stringify(window.vehicleSettings || {})); } catch (_) {}
+                    renderAll();
+                    showToast('Gagal Menyimpan', 'Status kendaraan dikembalikan karena belum tersimpan ke Firebase.', 'error');
+                    return;
+                }
+                showToast("Status Diperbarui", `${v.plate} berstatus ${v.active ? 'ON (Aktif)' : 'OFF (Nonaktif)'} dan tersimpan di cloud.`, "success");
             });
         }
 
-        function toggleVehicleOperational(id) {
+        async function toggleVehicleOperational(id) {
             const v = window.vehicles.find(item => item.id === id);
             if (!v) return;
-            requireAdminAction(() => {
-                const next = v.operational === false;
-                persistVehicleOverlay(v, { operational: next });
-                saveToStorage();
+            requireAdminAction(async () => {
+                const key = normalizePlateKey(v.plate || v.id);
+                const previous = JSON.parse(JSON.stringify(window.vehicleSettings?.[key] || {}));
+                const previousOperational = v.operational !== false;
+                persistVehicleOverlay(v, { operational: !previousOperational });
                 renderAll();
-                showToast("Kondisi Diperbarui", `${v.plate} kini: ${v.operational ? 'Siap Jalan' : 'Dalam Perbaikan'}.`, "info");
+                const cloudSaved = await saveToStorage();
+                if (cloudSaved === false) {
+                    window.vehicleSettings[key] = previous;
+                    applyVehicleSettingsToMaster();
+                    try { localStorage.setItem('garasiku_vehicle_settings', JSON.stringify(window.vehicleSettings || {})); } catch (_) {}
+                    renderAll();
+                    showToast('Gagal Menyimpan', 'Kondisi kendaraan dikembalikan karena belum tersimpan ke Firebase.', 'error');
+                    return;
+                }
+                showToast("Kondisi Diperbarui", `${v.plate} kini: ${v.operational ? 'Siap Jalan' : 'Dalam Perbaikan'} dan tersimpan di cloud.`, "success");
             });
         }
 
-        function changeVehicleUsageCategory(id, value) {
+        async function changeVehicleUsageCategory(id, value) {
             const v = window.vehicles.find(item => item.id === id);
             if (!v) return;
-            requireAdminAction(() => {
+            requireAdminAction(async () => {
+                const key = normalizePlateKey(v.plate || v.id);
+                const previous = JSON.parse(JSON.stringify(window.vehicleSettings?.[key] || {}));
                 const category = value === 'PIMPINAN' ? 'PIMPINAN' : 'OPERATIONAL';
                 persistVehicleOverlay(v, { usageCategory: category });
-                saveToStorage();
                 renderAll();
-                showToast('Kategori Mobil Diperbarui', `${v.plate} sekarang kategori ${vehicleUsageLabel(v)}.`, 'success');
+                const cloudSaved = await saveToStorage();
+                if (cloudSaved === false) {
+                    window.vehicleSettings[key] = previous;
+                    applyVehicleSettingsToMaster();
+                    try { localStorage.setItem('garasiku_vehicle_settings', JSON.stringify(window.vehicleSettings || {})); } catch (_) {}
+                    renderAll();
+                    showToast('Gagal Menyimpan', 'Kategori kendaraan dikembalikan karena belum tersimpan ke Firebase.', 'error');
+                    return;
+                }
+                showToast('Kategori Mobil Diperbarui', `${v.plate} sekarang kategori ${vehicleUsageLabel(v)} dan tersimpan di cloud.`, 'success');
             });
         }
 
