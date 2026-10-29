@@ -2915,10 +2915,50 @@
         window.EtollMasterBridge = {
             sourceProjectId: 'etoll-3366c',
             sourcePath: 'cards',
-            intervalMs: 0, // FIX52: tidak polling otomatis; sync hanya saat startup/manual
+            intervalMs: 0, // tidak polling otomatis; baca saat startup/manual
             timer: null,
             syncing: false,
             lastSuccess: null,
+            monthlyTopupsByNumber: {},
+            monthlyTopupMonth: '',
+
+            getLocalMonthKey(date = new Date()) {
+                return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            },
+            async syncMonthlyTopups() {
+                const monthKey = this.getLocalMonthKey();
+                const baseUrl = `https://${this.sourceProjectId}-default-rtdb.asia-southeast1.firebasedatabase.app`;
+                const response = await fetch(`${baseUrl}/transactionsByMonth/${monthKey}.json`, { cache: 'no-store' });
+                if (!response.ok) throw new Error(`Gagal membaca transaksi pengisian ${monthKey}: HTTP ${response.status}`);
+                const data = await response.json();
+                const rows = Array.isArray(data) ? data : (data && typeof data === 'object' ? Object.values(data) : []);
+                const totals = {};
+                const seen = new Set();
+                rows.forEach(tx => {
+                    if (!tx || typeof tx !== 'object') return;
+                    const id = String(tx.id || tx.invoiceNumber || tx.invoice || '').trim();
+                    const date = String(tx.date || tx.createdAt || tx.timestamp || '').slice(0, 10);
+                    // Hanya transaksi yang tanggalnya termasuk bulan berjalan.
+                    if (!date.startsWith(monthKey)) return;
+                    const cardNo = this.normalizeNumber(tx.etollNumber || tx.cardNumber || tx.number || tx.cardNo);
+                    if (!cardNo) return;
+                    const amount = Number(tx.amount ?? tx.nominal ?? tx.topupAmount);
+                    if (!Number.isFinite(amount) || amount <= 0) return;
+                    // Cegah baris yang sama dihitung dua kali bila dataset memiliki duplikasi ID/invoice.
+                    const dedupeKey = id ? `id:${id}` : `${cardNo}|${date}|${amount}|${String(tx.invoiceNumber || tx.merchant || '')}`;
+                    if (seen.has(dedupeKey)) return;
+                    seen.add(dedupeKey);
+                    totals[cardNo] = (totals[cardNo] || 0) + amount;
+                });
+                this.monthlyTopupsByNumber = totals;
+                this.monthlyTopupMonth = monthKey;
+                (window.etolls || []).forEach(card => {
+                    const number = this.normalizeNumber(card.cardNo || card.number);
+                    card.monthlyTopupTotal = number ? (totals[number] || 0) : 0;
+                });
+                try { localStorage.setItem('garasiku_etoll_monthly_topups', JSON.stringify({ month: monthKey, totals })); } catch (_) {}
+                return true;
+            },
 
             normalizeNumber(value) {
                 return String(value || '').replace(/\D/g, '');
@@ -2995,6 +3035,20 @@
 
                     window.etolls = masterCards;
                     this.lastSuccess = new Date();
+                    // Ambil total pengisian bulan berjalan dari database RekapToll.
+                    // Jika transaksi gagal dibaca, kartu tetap tampil dan nilai tidak disamarkan sebagai saldo.
+                    try {
+                        await this.syncMonthlyTopups();
+                    } catch (topupError) {
+                        console.warn('Total pengisian E-Toll bulan ini belum dapat dibaca:', topupError);
+                        const cached = (() => { try { return JSON.parse(localStorage.getItem('garasiku_etoll_monthly_topups') || '{}'); } catch (_) { return {}; } })();
+                        const currentMonth = this.getLocalMonthKey();
+                        const totals = cached.month === currentMonth && cached.totals ? cached.totals : {};
+                        (window.etolls || []).forEach(card => {
+                            const number = this.normalizeNumber(card.cardNo || card.number);
+                            card.monthlyTopupTotal = number ? (Number(totals[number]) || 0) : 0;
+                        });
+                    }
                     try { localStorage.setItem('garasiku_etolls', JSON.stringify(window.etolls)); } catch (e) {}
                     // Perubahan operasional kartu disimpan ke Firebase melalui saveToStorage().
                     // Sinkronisasi master RekapToll tidak melakukan push periodik agar tidak membuat loop snapshot.
@@ -5999,7 +6053,7 @@
                                   '<span class="etoll-status-available px-2 py-0.5 rounded-md text-[10px] font-bold">Di Garasi • SIAP</span>')}
                             </div>
                             <div class="flex items-center space-x-3 text-[11px] text-slate-400">
-                                <span>Saldo: <strong class="text-white font-mono font-bold">Rp ${(Number(card.balance) || 0).toLocaleString('id-ID')}</strong></span>
+                                <span>Total Isi Bulan Ini: <strong class="text-emerald-300 font-mono font-bold">Rp ${(Number(card.monthlyTopupTotal) || 0).toLocaleString('id-ID')}</strong></span>
                                 <span>No: <code class="font-mono text-slate-300">${card.cardNo || '-'}</code></span>
                             </div>
                         </div>
