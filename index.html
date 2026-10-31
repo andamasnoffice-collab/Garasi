@@ -1842,14 +1842,6 @@
 
             async initialize(customConfig = null) {
                 try {
-                    // Pulihkan baseline terakhir yang telah dikonfirmasi server sebelum
-                    // rekonsiliasi perubahan lokal tertunda lintas sesi/perangkat.
-                    if (!this.stateBaseline) {
-                        try {
-                            const savedBaseline = JSON.parse(localStorage.getItem('garasiku_state_baseline') || 'null');
-                            if (savedBaseline && typeof savedBaseline === 'object') this.stateBaseline = savedBaseline;
-                        } catch (_) {}
-                    }
                     // Cloud menjadi default. Abaikan config lama/flag lokal yang tersimpan
                     // dari versi sebelumnya agar perangkat baru maupun perangkat lama
                     // otomatis kembali memakai proyek utama GarasiKu.
@@ -2176,12 +2168,6 @@
                     if (snapshot.exists()) {
                         const data = snapshot.data() || {};
                         if (window.syncFromCloud) window.syncFromCloud(data);
-                        // Rekonsiliasi perubahan lokal tertunda hanya jika baseline lama tersedia.
-                        // Ini mencegah cache lama menimpa data terbaru milik perangkat lain.
-                        const hasPendingWrite = localStorage.getItem('garasiku_pending_cloud_write') === '1';
-                        if (hasPendingWrite && this.stateBaseline) {
-                            await this.pushStateToCloud();
-                        }
                     } else {
                         await this.pushStateToCloud();
                     }
@@ -2278,25 +2264,37 @@
                     return false;
                 }
 
-                // Tunggu konfirmasi server sebelum UI menganggap log tersimpan.
-                // Ini mencegah status sukses palsu saat Firestore menolak write.
+                // DIRECT FIREBASE: tidak ada localStorage queue dan tidak ada serial queue.
+                // Setiap transaksi dikirim langsung ke satu dokumen Firestore. UI tidak menunggu
+                // round-trip server; Firestore SDK sendiri menangani latency compensation dan
+                // onSnapshot(metadata) di atas akan mengonfirmasi saat write benar-benar server-side.
                 this.lastGateWriteError = '';
+                let writePromise;
                 try {
-                    await setDoc(ref, { ...log }, { merge: false });
+                    writePromise = setDoc(ref, { ...log }, { merge: false });
+                } catch (e) {
+                    const detail = e?.code ? `${e.code}: ${e?.message || ''}`.trim() : (e?.message || 'write ditolak');
+                    this.lastGateWriteError = detail;
+                    this.updateStatusUI(false, `Firebase write gagal: ${detail}`);
+                    return false;
+                }
+
+                writePromise.then(() => {
                     this.lastGateWriteError = '';
                     this.isConnected = true;
                     this.lastSyncTime = new Date();
                     this.updateStatusUI(true, `Firebase terkonfirmasi • ${log.plate || log.id}`);
                     if (typeof options.onServerConfirmed === 'function') options.onServerConfirmed();
-                    return true;
-                } catch (e) {
+                }).catch((e) => {
                     const detail = e?.code ? `${e.code}: ${e?.message || ''}`.trim() : (e?.message || 'write ditolak');
                     this.lastGateWriteError = detail;
                     this.isConnected = false;
                     this.updateStatusUI(false, `Firebase write gagal: ${detail}`);
                     if (typeof options.onServerError === 'function') options.onServerError(detail);
-                    return false;
-                }
+                });
+
+                // Write sudah dikirim ke Firebase SDK; jangan menunggu server di event handler.
+                return true;
             },
 
             async deleteGateLog(logId, options = {}) {
@@ -2559,7 +2557,6 @@
                             }
                         });
                         this.stateBaseline = clone(writtenPayload || payload);
-                        try { localStorage.setItem('garasiku_state_baseline', JSON.stringify(this.stateBaseline)); } catch (_) {}
                         this.isConnected = true;
                         this.lastSyncTime = new Date();
                         try {
@@ -2782,67 +2779,49 @@
             timer: null,
             syncing: false,
             lastSuccess: null,
-            lastDriverSuccess: null,
-            driverLoadError: null,
             lastOdometerSent: new Map(),
-            syncPromise: null,
             async sync() {
-                if (this.syncPromise) return this.syncPromise;
+                if (this.syncing) return;
                 this.syncing = true;
-                this.syncPromise = (async () => {
-                    window.masterDataLoadState = { status: 'loading', error: null, driversStatus: 'loading', driverError: null };
-                    try {
-                        const res = await fetch(`${this.baseUrl}/${this.path}.json?ts=${Date.now()}`, {cache:'no-store'});
-                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                        const data = await res.json();
-                        const arr = data && typeof data === 'object' ? Object.entries(data).map(([key,val]) => ({...(val || {}), _fbKey:key})) : [];
-                        window.vehicles = arr.map((v, i) => ({
-                            ...v,
-                            id: v.id || v._fbKey || `IDX1-${i+1}`,
-                            plate: String(v.plate || v.id || v._fbKey || '').toUpperCase().trim(),
-                            model: String(v.model || 'Mobil Dinas').trim(),
-                            driver: String(v.driver || '').trim(),
-                            category: canonicalVehicleCategory(v.category),
-                            odometer: Number(v.currentKm ?? v.odometer ?? 0) || 0,
-                            currentKm: Number(v.currentKm ?? v.odometer ?? 0) || 0,
-                            status: v.status || 'IN_GARAGE'
-                        }));
-                        applyVehicleSettingsToMaster();
-                        window.masterDataLoadState = { status: 'ready', error: null, driversStatus: 'loading', driverError: null };
-                        this.lastSuccess = new Date();
-                        reconcileVehicleOperationalState();
-                    } catch (e) {
-                        window.vehicles = [];
-                        window.masterDataLoadState = { status: 'error', error: e?.message || 'Gagal membaca Master Kendaraan', driversStatus: 'loading', driverError: null };
-                        console.error('Gagal membaca Master Kendaraan AdminAuto dari cloud:', e);
-                        throw e;
-                    }
-                    // Driver dimuat terpisah: kegagalannya tidak boleh menghapus kendaraan yang sudah terbaca.
-                    try {
-                        await this.syncDriversOnce();
-                    } catch (e) {
-                        window.masterDataLoadState = { ...(window.masterDataLoadState || {}), status: 'ready', driversStatus: 'error', driverError: e?.message || 'Gagal membaca Master Driver' };
-                    }
+                try {
+                    const res = await fetch(`${this.baseUrl}/${this.path}.json?ts=${Date.now()}`, {cache:'no-store'});
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const data = await res.json();
+                    const arr = data && typeof data === 'object' ? Object.entries(data).map(([key,val]) => ({...(val || {}), _fbKey:key})) : [];
+                    window.vehicles = arr.map((v, i) => ({
+                        ...v,
+                        id: v.id || v._fbKey || `IDX1-${i+1}`,
+                        plate: String(v.plate || v.id || v._fbKey || '').toUpperCase().trim(),
+                        model: String(v.model || 'Mobil Dinas').trim(),
+                        driver: String(v.driver || '').trim(),
+                        category: canonicalVehicleCategory(v.category),
+                        odometer: Number(v.currentKm ?? v.odometer ?? 0) || 0,
+                        currentKm: Number(v.currentKm ?? v.odometer ?? 0) || 0,
+                        status: v.status || 'IN_GARAGE'
+                    }));
+                    applyVehicleSettingsToMaster();
+                    await this.syncDriversOnce();
+                    // Master AdminAuto hanya memasok identitas Armada/Driver dari /data_v2.
+                    // Status ON/OFF driver tetap milik GarasiKu dan tidak ditimpa master.
+                    // Status operasional Keluar/Masuk wajib mengikuti Logbook GarasiKu
+                    // agar refresh master setiap 5 detik tidak membatalkan transaksi gerbang.
+                    reconcileVehicleOperationalState();
+                    this.lastSuccess = new Date();
                     if (typeof renderAll === 'function') renderAll();
-                    return window.masterDataLoadState?.status === 'ready';
-                })();
-                try { return await this.syncPromise; }
-                finally { this.syncing = false; this.syncPromise = null; }
+                } catch (e) {
+                    console.warn('Sinkron Master Index 1 gagal:', e.message);
+                } finally {
+                    this.syncing = false;
+                }
             },
             async syncDriversOnce() {
-                window.drivers = [];
-                window.masterDataLoadState = { ...(window.masterDataLoadState || {}), driversStatus: 'loading' };
                 try {
                     const res = await fetch(`${this.baseUrl}/${this.driverPath}.json?ts=${Date.now()}`, {cache:'no-store'});
                     if (!res.ok) throw new Error(`HTTP ${res.status}`);
                     const data = await res.json();
-                    // RTDB AdminAuto dapat berupa object keyed, array, atau null.
-                    // Normalisasi beberapa variasi nama field agar tidak membuang driver valid.
-                    const rows = Array.isArray(data)
-                        ? data.map((val, idx) => ({ ...(val && typeof val === 'object' ? val : { name: String(val || '') }), _fbKey: String(idx) }))
-                        : (data && typeof data === 'object'
-                            ? Object.entries(data).map(([key, val]) => ({ ...(val && typeof val === 'object' ? val : { name: String(val || '') }), _fbKey: key }))
-                            : []);
+                    const rows = data && typeof data === 'object'
+                        ? Object.entries(data).map(([key,val]) => ({...(val || {}), _fbKey:key}))
+                        : [];
                     const localSettings = window.driverSettings || {};
                     const assignedByDriver = new Map();
                     (window.vehicles || []).forEach(v => {
@@ -2852,39 +2831,25 @@
                         assignedByDriver.get(did).push(v.id || v._fbKey || v.plate);
                     });
                     window.drivers = rows.map((d, idx) => {
-                        const id = String(d.id || d.driverId || d.uid || d._fbKey || `DRIVER-${idx+1}`);
-                        const name = String(d.name || d.nama || d.driverName || d.fullName || d.namaPengemudi || d.nama_driver || '').trim();
+                        const id = String(d.id || d._fbKey || `DRIVER-${idx+1}`);
+                        const name = String(d.name || '').trim();
                         const key = normalizeDriverKey(name || id);
-                        const setting = localSettings[key] || localSettings[normalizeDriverKey(id)] || {};
-                        const rawType = String(d.type || d.category || d.kategori || d.jenis || d.role || 'Operasional').toLowerCase();
+                        const setting = localSettings[key] || {};
+                        const rawType = String(d.type || d.category || 'Operasional').toLowerCase();
                         const category = rawType.includes('pimpinan') || rawType.includes('executive') ? 'EXECUTIVE' : 'OPERATIONAL';
                         const assigned = assignedByDriver.get(id) || assignedByDriver.get(String(d._fbKey || '')) || [];
                         return {
                             id, masterKey: String(d._fbKey || id), source: 'ADMINAUTO_DATA_V2',
                             name, category, active: setting.active !== false,
-                            masterStatus: String(d.status || d.aktif || d.active || 'AKTIF').toUpperCase(),
-                            status: 'AVAILABLE', sim: '', phone: String(d.phone || d.cp || d.telepon || d.noHp || d.no_hp || ''),
+                            masterStatus: String(d.status || 'AKTIF').toUpperCase(),
+                            status: 'AVAILABLE', sim: '', phone: String(d.phone || d.cp || ''),
                             assignedVehicleIds: assigned, assignedVehicleCount: assigned.length,
-                            notes: String(d.notes || d.keterangan || '')
+                            notes: String(d.notes || '')
                         };
                     }).filter(d => d.name);
-                    if (!window.drivers.length) {
-                        // Array kosong hanya dianggap sah jika respons cloud benar-benar kosong.
-                        this.lastDriverSuccess = new Date();
-                        this.driverLoadError = null;
-                    } else {
-                        this.lastDriverSuccess = new Date();
-                        this.driverLoadError = null;
-                    }
-                    window.masterDataLoadState = { ...(window.masterDataLoadState || {}), driversStatus: 'ready' };
                     if (typeof renderAll === 'function') renderAll();
-                    return true;
                 } catch (e) {
-                    window.drivers = [];
-                    this.driverLoadError = e?.message || 'Gagal membaca Master Driver';
-                    window.masterDataLoadState = { ...(window.masterDataLoadState || {}), status: 'ready', driversStatus: 'error', driverError: this.driverLoadError };
-                    console.error('Gagal membaca Master Driver dari cloud:', e);
-                    throw e;
+                    console.warn('Sinkron Master Driver AdminAuto /data_v2 gagal:', e.message);
                 }
             },
 
@@ -2915,14 +2880,7 @@
                 this.timer = null;
                 this.sync();
             },
-            async refreshNow() {
-                if (this.syncing) {
-                    await new Promise(resolve => {
-                        const waitForCurrentRead = () => this.syncing ? setTimeout(waitForCurrentRead, 100) : resolve();
-                        waitForCurrentRead();
-                    });
-                    return window.masterDataLoadState?.status === 'ready';
-                }
+            refreshNow() {
                 return this.sync();
             }
         };
@@ -2940,14 +2898,13 @@
             }
         }
 
-        // Data operasional tidak pernah dimuat dari cache perangkat.
-        // Sumber kendaraan/driver adalah Master Index1; pengaturan berasal dari Firestore.
-        window.vehicles = [];
-        window.driverSettings = {};
-        window.vehicleSettings = {};
+        window.vehicles = loadLocalJson('garasiku_vehicles', INITIAL_VEHICLES);
+        window.driverSettings = loadLocalJson('garasiku_driver_settings', {});
+        window.vehicleSettings = loadLocalJson('garasiku_vehicle_settings', {});
         window.drivers = [];
-        window.masterDataLoadState = { status: 'loading', error: null, driversStatus: 'loading' };
-        window.etolls = [];
+        applyVehicleSettingsToMaster();
+        applyDriverSettingsToMasterDrivers();
+        window.etolls = loadLocalJson('garasiku_etolls', INITIAL_ETOLL);
 
         // ============================================================
         // MASTER KARTU E-TOLL: REKAPTOLL (SUMBER TUNGGAL)
@@ -3300,16 +3257,20 @@
         let checkoutSaveInProgress = false;
         let checkinSaveInProgress = false;
 
-        async function saveToStorage(options = {}) {
-            // Tidak menyimpan data operasional ke localStorage. Firebase wajib mengonfirmasi.
-            if (!navigator.onLine) {
-                showToast('Gagal Menyimpan', 'Perangkat sedang offline. Tidak ada perubahan yang disimpan.', 'error');
-                return false;
+        function saveToStorage(options = {}) {
+            // localStorage hanya untuk cache konfigurasi/non-logbook. Transaksi Logbook tidak disimpan di localStorage.
+            try {
+                localStorage.setItem('garasiku_vehicles', JSON.stringify(window.vehicles));
+                localStorage.setItem('garasiku_driver_settings', JSON.stringify(collectDriverSettings()));
+                localStorage.setItem('garasiku_vehicle_settings', JSON.stringify(collectVehicleSettings()));
+                localStorage.setItem('garasiku_etolls', JSON.stringify(window.etolls));
+                localStorage.setItem('garasiku_etoll_logs', JSON.stringify(window.etollLogs));
+                localStorage.setItem('garasiku_admin_pin', window.adminPin);
+                localStorage.setItem('garasiku_telegram', JSON.stringify(window.telegramConfig));
+            } catch (error) {
+                console.warn('Cache lokal tidak dapat diperbarui:', error);
             }
-            if (!window.FirebaseBridge || !window.FirebaseBridge.db || !window.FirebaseBridge.currentUser || !window.FirebaseBridge.isConnected) {
-                showToast('Cloud Belum Siap', 'Firebase belum terhubung. Perubahan belum disimpan.', 'error');
-                return false;
-            }
+
             localWriteAt = Date.now();
             try { localStorage.setItem('garasiku_pending_cloud_write', '1'); } catch (e) {}
             clearTimeout(cloudSaveTimer);
@@ -3327,19 +3288,14 @@
                 return cloudOk !== false;
             };
 
-            // Semua penyimpanan harus menunggu hasil server. Tidak ada sukses tertunda.
-            try {
-                const ok = await pushCloud();
-                if (!ok) {
-                    showToast('GAGAL DISIMPAN', 'Firebase tidak mengonfirmasi penyimpanan. Periksa koneksi lalu coba lagi.', 'error');
-                    return false;
-                }
-                return true;
-            } catch (error) {
-                console.error('Penyimpanan cloud gagal:', error);
-                showToast('GAGAL DISIMPAN', error?.message || 'Firebase menolak penyimpanan.', 'error');
-                return false;
-            }
+            // Secara default data langsung dikirim ke Firebase. Gunakan defer:true hanya
+            // untuk perubahan UI/preferensi yang tidak kritis.
+            if (options.defer !== true) return pushCloud();
+
+            cloudSaveTimer = setTimeout(() => {
+                pushCloud().catch(err => console.warn('Sinkronisasi Cloud tertunda gagal:', err));
+            }, 200);
+            return Promise.resolve(true);
         }
 
         window.syncFromCloud = function(cloudData) {
@@ -3347,24 +3303,10 @@
             const cloudTime = cloudData.updatedAt ? Date.parse(cloudData.updatedAt) : 0;
             const lastLocalCloudWrite = Number(localStorage.getItem('garasiku_last_cloud_write') || 0);
             const pendingLocalWrite = localStorage.getItem('garasiku_pending_cloud_write') === '1';
-            if (pendingLocalWrite) {
-                // Pertahankan data lokal yang belum tersimpan. Gunakan baseline lama
-                // untuk membedakan perubahan lokal dari perubahan baru di server.
-                let savedBaseline = null;
-                try { savedBaseline = JSON.parse(localStorage.getItem('garasiku_state_baseline') || 'null'); } catch (_) {}
-                if (savedBaseline && typeof savedBaseline === 'object' && window.FirebaseBridge) {
-                    window.FirebaseBridge.stateBaseline = savedBaseline;
-                } else if (window.FirebaseBridge) {
-                    window.FirebaseBridge.updateStatusUI(false, 'Ada perubahan lokal tertunda; baseline belum tersedia. Data cloud tidak ditimpa otomatis.');
-                }
-                return;
-            }
+            if (pendingLocalWrite) return;
             if (cloudTime && Math.max(localWriteAt, lastLocalCloudWrite) && cloudTime < Math.max(localWriteAt, lastLocalCloudWrite)) return;
             if (window.FirebaseBridge) {
-                try {
-                    window.FirebaseBridge.stateBaseline = JSON.parse(JSON.stringify(cloudData));
-                    localStorage.setItem('garasiku_state_baseline', JSON.stringify(cloudData));
-                } catch (e) {}
+                try { window.FirebaseBridge.stateBaseline = JSON.parse(JSON.stringify(cloudData)); } catch (e) {}
             }
             if (cloudData.vehicleSettings && typeof cloudData.vehicleSettings === 'object') {
                 window.vehicleSettings = cloudData.vehicleSettings;
@@ -3524,7 +3466,7 @@
         });
 
         window.addEventListener('offline', () => {
-            showToast('Koneksi Terputus', 'Perangkat offline. Data cloud tidak dapat dibaca atau disimpan sampai koneksi pulih.', 'error');
+            showToast("Koneksi Terputus", "Perangkat offline. Data tersimpan aman di lokal.", "warning");
             updateGlobalConnectionIndicator();
         });
 
@@ -4130,25 +4072,11 @@
         }
 
         // Checkout / Checkin Handlers
-        async function prepareCheckoutOptions() {
+        function prepareCheckoutOptions() {
             setDriverMode('registered');
             const vehSelect = document.getElementById('checkout-vehicle-id');
             const drvSelect = document.getElementById('checkout-driver-id');
-            if (drvSelect) drvSelect.innerHTML = '<option value="">Memuat daftar driver dari cloud...</option>';
 
-            // Jika master belum berhasil dibaca pada perangkat ini, coba baca ulang dari server.
-            if (window.masterDataLoadState?.status !== 'ready' || window.masterDataLoadState?.driversStatus !== 'ready') {
-                try { await window.Index1MasterBridge.refreshNow(); } catch (_) {}
-            }
-            if (window.masterDataLoadState?.status !== 'ready') {
-                if (vehSelect) vehSelect.innerHTML = '<option value="">Gagal memuat kendaraan dari cloud</option>';
-                if (drvSelect) drvSelect.innerHTML = '<option value="">Gagal memuat Master Driver dari cloud</option>';
-                return;
-            }
-            if (window.masterDataLoadState?.driversStatus !== 'ready') {
-                if (drvSelect) drvSelect.innerHTML = `<option value="">GAGAL MEMUAT DRIVER: ${String(window.masterDataLoadState?.driverError || 'koneksi/data cloud').replace(/[&<>"']/g, '')}</option>`;
-                return;
-            }
             const readyVehicles = window.vehicles.filter(v => v.status === 'IN_GARAGE' && v.operational !== false && v.active !== false);
             readyVehicles.sort((a, b) => (a.unitNo || 999) - (b.unitNo || 999));
 
@@ -4159,9 +4087,8 @@
                 const ca = a.category === 'EXECUTIVE' ? 1 : 0, cb = b.category === 'EXECUTIVE' ? 1 : 0;
                 return ca - cb || a.name.localeCompare(b.name, 'id');
             });
-            drvSelect.innerHTML = readyDrivers.length
-                ? '<option value="">-- Pilih Driver Dari Master --</option>' + readyDrivers.map(d => `<option value="${d.id}">${d.name} - ${d.category === 'EXECUTIVE' ? 'Pimpinan' : 'Operasional'}</option>`).join('')
-                : '<option value="">Master Driver cloud berhasil dibaca, tetapi belum ada driver aktif</option>';
+            drvSelect.innerHTML = '<option value="">-- Pilih Driver Dari Master --</option>' +
+                readyDrivers.map(d => `<option value="${d.id}">${d.name} - ${d.category === 'EXECUTIVE' ? 'Pimpinan' : 'Operasional'}</option>`).join('');
 
             document.getElementById('checkout-km-start').value = '';
             document.getElementById('checkout-destination').value = '';
