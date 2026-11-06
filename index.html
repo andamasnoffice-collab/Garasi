@@ -260,7 +260,118 @@
         .etoll-status-available { background: rgba(6,78,59,.95) !important; border-color: rgba(52,211,153,.85) !important; color: #a7f3d0 !important; }
         .etoll-status-borrowed { background: rgba(124,45,18,.95) !important; border-color: rgba(251,146,60,.90) !important; color: #fed7aa !important; }
         .etoll-status-off { background: rgba(15,23,42,.98) !important; border-color: rgba(100,116,139,.80) !important; color: #cbd5e1 !important; }
-    </style>
+    
+
+        /* GarasiKu responsive usability: mobile-first inventory and dialogs */
+        #modal-stat-detail > div {
+            width: min(100%, 44rem);
+        }
+        #stat-modal-body {
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+        }
+        #stat-modal-body > div {
+            min-width: 0;
+        }
+        @media (max-width: 640px) {
+            #modal-stat-detail {
+                align-items: flex-end;
+                padding: 0 !important;
+            }
+            #modal-stat-detail > div {
+                width: 100%;
+                max-width: none;
+                max-height: 94dvh;
+                border-radius: 1.25rem 1.25rem 0 0;
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+            #stat-modal-header {
+                padding: 0.85rem 1rem;
+            }
+            #modal-stat-detail .p-3\.5.sm\:p-4 {
+                padding: 0.65rem;
+                gap: 0.5rem;
+            }
+            #stat-modal-body {
+                padding: 0.65rem;
+                gap: 0.65rem;
+            }
+            #stat-modal-body > div {
+                padding: 0.75rem;
+                gap: 0.65rem;
+            }
+            #stat-modal-body .etoll-card-name-fix51 {
+                font-size: clamp(1.9rem, 9vw, 2.65rem);
+                min-width: 0;
+                letter-spacing: 0.12em;
+            }
+            #stat-modal-body .etoll-card-available,
+            #stat-modal-body .etoll-card-borrowed,
+            #stat-modal-body .etoll-card-off {
+                display: flex;
+                flex-direction: column;
+                align-items: stretch;
+            }
+            #stat-modal-body .etoll-card-available > div:first-child,
+            #stat-modal-body .etoll-card-borrowed > div:first-child,
+            #stat-modal-body .etoll-card-off > div:first-child {
+                min-width: 0;
+                width: 100%;
+            }
+            #stat-modal-body .etoll-card-available > div:first-child > div,
+            #stat-modal-body .etoll-card-borrowed > div:first-child > div,
+            #stat-modal-body .etoll-card-off > div:first-child > div {
+                flex-wrap: wrap;
+                row-gap: 0.4rem;
+            }
+            #stat-modal-body .etoll-card-available > div:nth-child(2),
+            #stat-modal-body .etoll-card-borrowed > div:nth-child(2),
+            #stat-modal-body .etoll-card-off > div:nth-child(2) {
+                width: 100%;
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: stretch;
+                align-items: center;
+                gap: 0.5rem;
+            }
+            #stat-modal-body button {
+                min-height: 38px;
+            }
+            #stat-modal-body button[title="ON / OFF Kartu"] {
+                min-height: 28px;
+                height: 28px;
+                width: auto;
+                flex: 0 0 auto;
+                padding: 0.25rem 0.45rem;
+            }
+            #stat-modal-body button[onclick*="openBorrowEtollModal"] {
+                flex: 1 1 9rem;
+                min-height: 44px;
+                justify-content: center;
+                font-size: 0.9rem;
+            }
+            #stat-modal-body button[onclick*="openSwapEtollModal"] {
+                flex: 0 1 auto;
+                min-height: 34px;
+                justify-content: center;
+            }
+            #modal-stat-detail .flex.items-center.justify-between.gap-3 {
+                flex-wrap: wrap;
+            }
+            #stat-modal-search {
+                min-height: 40px;
+                font-size: 14px;
+            }
+        }
+        @media (min-width: 641px) {
+            #stat-modal-body > div {
+                transition: transform .15s ease, border-color .15s ease;
+            }
+            #stat-modal-body > div:hover {
+                transform: translateY(-1px);
+            }
+        }
+</style>
 <style id="fix51-etoll-name-size">
 /* FIX51: 4 digit identitas E-Toll dibuat sangat besar agar mudah dibaca. */
 @media (max-width: 639px) {
@@ -6203,17 +6314,17 @@
                                     <span>Kembalikan</span>
                                 </button>
                             ` : (!isOff ? `
-                                <button onclick="openSwapEtollModal('${card.id}')" class="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center space-x-1 shadow-sm" title="Tukar kartu ini dengan kartu cadangan yang OFF">
+                                <button onclick="openSwapEtollModal('${card.id}')" class="px-1.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[9px] leading-none flex items-center space-x-1 shadow-sm shrink-0 min-h-[28px]" title="Tukar kartu ini dengan kartu cadangan yang OFF">
                                     <i class="fa-solid fa-repeat"></i>
                                     <span>Tukar ON⇄OFF</span>
                                 </button>
-                                <button onclick="openBorrowEtollModal('${card.id}')" class="px-3 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs flex items-center space-x-1 shadow-sm">
+                                <button onclick="openBorrowEtollModal('${card.id}')" class="px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-extrabold text-sm flex items-center space-x-1.5 shadow-md shrink-0">
                                     <i class="fa-solid fa-hand-holding-hand"></i>
                                     <span>Serahkan</span>
                                 </button>
                             ` : '')}
                             ${isAdminLoggedIn ? `
-                                <button onclick="toggleEtollActive('${card.id}')" title="ON / OFF Kartu" class="px-2.5 py-1.5 rounded-xl border border-dark-border text-xs font-bold ${
+                                <button onclick="toggleEtollActive('${card.id}')" title="ON / OFF Kartu" class="px-1.5 py-1 rounded-md border border-dark-border text-[9px] leading-none font-bold min-w-[34px] h-7 inline-flex items-center justify-center ${
                                     isOff ? 'bg-emerald-950 text-emerald-300 hover:bg-emerald-900' : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
                                 }">
                                     ${isOff ? 'Nyalakan (ON)' : 'OFF'}
