@@ -666,6 +666,10 @@
                     </div>
                 </div>
 
+                <div class="flex items-center justify-between gap-2 text-xs text-slate-400 mb-2">
+                    <span id="driver-master-status" role="status">Menunggu sinkronisasi master driver Firestore…</span>
+                    <button type="button" onclick="refreshGarasiKuDrivers()" class="px-3 py-1.5 rounded-lg border border-indigo-700 text-indigo-300">↻ Muat Ulang Driver</button>
+                </div>
                 <div id="drivers-cards-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-4"></div>
             </div>
         </div>
@@ -741,8 +745,8 @@
                     <table class="w-full text-left text-xs border-collapse">
                         <thead class="bg-dark-card border-b border-dark-border text-slate-400 uppercase tracking-wider font-semibold">
                             <tr>
+                                <th class="p-3">Nomor Kartu E-Toll</th>
                                 <th class="p-3">Waktu Kejadian</th>
-                                <th class="p-3">Kartu E-Toll</th>
                                 <th class="p-3">Aktivitas</th>
                                 <th class="p-3">Pengemudi / Pemegang</th>
                                 <th class="p-3">Saldo Awal</th>
@@ -1201,15 +1205,16 @@
             <div class="bg-indigo-600 px-5 sm:px-6 py-4 text-white flex items-center justify-between">
                 <div>
                     <h3 class="font-extrabold text-base"><i class="fa-solid fa-user-pen mr-2"></i>Edit Pengaturan Driver</h3>
-                    <p class="text-[10px] text-white/80 mt-0.5">Nama driver tetap mengikuti Master Index 1.</p>
+                    <p class="text-[10px] text-white/80 mt-0.5">Master driver mandiri milik GarasiKu.</p>
                 </div>
                 <button onclick="closeModal('modal-edit-driver')" class="text-white/80 hover:text-white text-xl font-bold"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <form id="form-edit-driver" onsubmit="handleEditDriver(event)" class="p-5 sm:p-6 space-y-4 text-xs">
                 <input type="hidden" id="edit-driver-key">
+                <input type="hidden" id="edit-driver-id">
                 <div>
                     <label class="block font-semibold text-slate-200 mb-1">Nama Driver</label>
-                    <input type="text" id="edit-driver-name" readonly class="w-full px-3 py-2 rounded-xl border border-dark-border bg-slate-950/60 text-slate-300 font-semibold">
+                    <input type="text" id="edit-driver-name" required maxlength="100" class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-100 font-semibold">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
@@ -1227,8 +1232,12 @@
                         </select>
                     </div>
                 </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block font-semibold text-slate-200 mb-1">Jenis SIM</label><select id="edit-driver-sim" class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-100"><option value="SIM A">SIM A</option><option value="SIM B1">SIM B1</option><option value="SIM B2">SIM B2</option><option value="SIM C">SIM C</option></select></div>
+                    <div><label class="block font-semibold text-slate-200 mb-1">Nomor Telepon / WA</label><input type="text" id="edit-driver-phone" maxlength="30" class="w-full px-3 py-2 rounded-xl border border-dark-border bg-dark-card text-slate-100"></div>
+                </div>
                 <div class="p-3 rounded-xl bg-cyan-950/30 border border-cyan-800/40 text-[11px] text-cyan-200">
-                    <i class="fa-solid fa-circle-info mr-1"></i> Pengaturan ini independen dari Index 1 dan disimpan di Firebase GarasiKu agar berlaku di semua perangkat.
+                    <i class="fa-solid fa-circle-info mr-1"></i> Data driver disimpan terpisah pada koleksi Firebase GarasiKu dan tidak mengambil nama dari Index 1.
                 </div>
                 <div class="pt-2 flex justify-end gap-2">
                     <button type="button" onclick="closeModal('modal-edit-driver')" class="px-4 py-2 rounded-xl border border-dark-border text-slate-300">Batal</button>
@@ -1242,7 +1251,7 @@
     <div id="modal-add-driver" class="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 hidden">
         <div class="bg-dark-surface w-full max-w-md rounded-3xl shadow-2xl border border-dark-border overflow-hidden">
             <div class="bg-indigo-600 px-5 sm:px-6 py-4 text-white flex items-center justify-between">
-                <h3 class="font-extrabold text-base"><i class="fa-solid fa-user-plus mr-2"></i>Tambah Driver</h3>
+                <div><h3 class="font-extrabold text-base"><i class="fa-solid fa-user-plus mr-2"></i>Tambah Driver</h3><p class="text-[10px] text-white/80 mt-0.5">Data baru disimpan di master driver GarasiKu.</p></div>
                 <button onclick="closeModal('modal-add-driver')" class="text-white/80 hover:text-white text-xl font-bold">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
@@ -1634,10 +1643,10 @@
 
                     <div class="p-4 rounded-2xl border border-indigo-900/60 bg-indigo-950/20">
                         <div class="flex items-start justify-between gap-3">
-                            <div><h4 class="font-bold text-white">Master Driver</h4><p class="text-[11px] text-slate-400 mt-1">driverSettings pada Firestore. Sumber master driver lokal/Index 1 tetap tidak disentuh.</p></div>
+                            <div><h4 class="font-bold text-white">Master Driver</h4><p class="text-[11px] text-slate-400 mt-1">Master driver tersimpan pada koleksi Firestore garasiku_drivers.</p></div>
                             <i class="fa-solid fa-user-tie text-indigo-400"></i>
                         </div>
-                        <button type="button" onclick="deleteFirebaseMasterSection('driverSettings')" class="mt-3 w-full py-2 rounded-xl bg-rose-950/70 hover:bg-rose-900 border border-rose-800/60 text-rose-300 font-bold">Hapus Pengaturan Driver di Firebase</button>
+                        <button type="button" onclick="deleteFirebaseMasterSection('driverSettings')" class="mt-3 w-full py-2 rounded-xl bg-rose-950/70 hover:bg-rose-900 border border-rose-800/60 text-rose-300 font-bold">Hapus Pengaturan Driver Lama (legacy)</button>
                     </div>
 
                     <div class="p-4 rounded-2xl border border-amber-900/60 bg-amber-950/20">
@@ -1797,6 +1806,7 @@
             gateLogsUnsubscriber: null,
             etollStateUnsubscriber: null,
             vehicleSettingsUnsubscriber: null,
+            driverMasterUnsubscriber: null,
             isConnected: false,
             lastSyncTime: null,
             configProjectId: null,
@@ -1950,6 +1960,55 @@
                         : `<span class="text-rose-400 font-medium"><i class="fa-solid fa-circle-exclamation mr-1"></i>${text}</span>`;
                 }
                 if (window.updateGlobalConnectionIndicator) window.updateGlobalConnectionIndicator();
+            },
+
+            // Master driver independen GarasiKu: gunakan koleksi Firestore mandiri garasiku_drivers (bukan Index 1 /data_v2/drivers).
+            driverMasterCollection() {
+                if (!this.db) return null;
+                return collection(this.db, 'garasiku_drivers');
+            },
+            async loadDriverMaster() {
+                if (!this.db || !this.currentUser) return false;
+                const col = this.driverMasterCollection();
+                const snap = await getDocsFromServer(col);
+                window.drivers = snap.docs.map(item => ({ id: item.id, ...(item.data() || {}), source: 'GARASIKU' }))
+                    .filter(d => String(d.name || '').trim())
+                    .sort((a,b) => String(a.name).localeCompare(String(b.name), 'id'));
+                try { localStorage.setItem('garasiku_driver_master_cache', JSON.stringify(window.drivers)); } catch (_) {}
+                const el = document.getElementById('driver-master-status');
+                if (el) el.textContent = window.drivers.length + ' driver dimuat dari Firestore garasiku_drivers';
+                if (typeof renderAll === 'function') renderAll();
+                return true;
+            },
+            startDriverMasterRealtimeSync() {
+                if (!this.db || this.driverMasterUnsubscriber) return;
+                const col = this.driverMasterCollection();
+                this.driverMasterUnsubscriber = onSnapshot(col, { includeMetadataChanges: false }, snap => {
+                    if (snap.metadata?.hasPendingWrites) return;
+                    window.drivers = snap.docs.map(item => ({ id: item.id, ...(item.data() || {}), source: 'GARASIKU' }))
+                        .filter(d => String(d.name || '').trim())
+                        .sort((a,b) => String(a.name).localeCompare(String(b.name), 'id'));
+                    try { localStorage.setItem('garasiku_driver_master_cache', JSON.stringify(window.drivers)); } catch (_) {}
+                    const el = document.getElementById('driver-master-status');
+                    if (el) el.textContent = window.drivers.length + ' driver tersinkron dari Firestore';
+                    if (typeof renderAll === 'function') renderAll();
+                }, error => {
+                    console.warn('Listener master driver GarasiKu gagal:', error);
+                    const el = document.getElementById('driver-master-status');
+                    if (el) el.textContent = 'Sinkronisasi driver gagal: ' + (error?.message || String(error));
+                });
+            },
+            async saveDriverMaster(driver) {
+                if (!this.db || !this.currentUser) throw new Error('Firebase belum siap / Auth belum aktif');
+                const id = String(driver.id || `DRV-${Date.now()}-${Math.random().toString(36).slice(2,8)}`);
+                const payload = { ...driver, id, source: 'GARASIKU', updatedAt: new Date().toISOString() };
+                await setDoc(doc(this.driverMasterCollection(), id), payload, { merge: true });
+                return id;
+            },
+            async deleteDriverMaster(id) {
+                if (!this.db || !this.currentUser) throw new Error('Firebase belum siap / Auth belum aktif');
+                await deleteDoc(doc(this.driverMasterCollection(), String(id)));
+                return true;
             },
 
             deviceRegistryCollection() {
@@ -2177,6 +2236,12 @@
                     catch (registryError) { console.warn('Daftar nama perangkat belum dapat dimuat:', registryError); }
                     this.startEtollStateRealtimeSync();
                     this.startVehicleSettingsRealtimeSync();
+                    try { await this.loadDriverMaster(); this.startDriverMasterRealtimeSync(); }
+                    catch (driverError) {
+                        console.warn('Master driver GarasiKu belum dapat dimuat:', driverError);
+                        const el = document.getElementById('driver-master-status');
+                        if (el) el.textContent = 'Gagal membaca Firestore: ' + (driverError?.message || String(driverError));
+                    }
                     await this.startGateLogsRealtimeSync();
                     this.etollLogsSplitEnabled = !!(snapshot.exists() && snapshot.data()?.etollLogsMigratedAt);
                     if (this.etollLogsSplitEnabled) await this.loadRecentEtollLogs(1);
@@ -2681,29 +2746,9 @@
             if (raw.includes('pick up') || raw.includes('pickup') || raw.includes('pick-up') || raw.includes('box')) return 'PickUP';
             return value ? String(value).trim() : 'MPV';
         }
-        function applyDriverSettingsToMasterDrivers() {
-            const seen = new Map();
-            (window.vehicles || []).forEach(v => {
-                const name = String(v.driver || '').trim().replace(/\s+/g, ' ');
-                if (!name || /^undefined$/i.test(name) || /^null$/i.test(name)) return;
-                const key = normalizeDriverKey(name);
-                if (!seen.has(key)) seen.set(key, name);
-            });
-            window.drivers = Array.from(seen.entries()).map(([key, name], idx) => {
-                const setting = window.driverSettings?.[key] || {};
-                return {
-                    id: `IDX1-${btoa(unescape(encodeURIComponent(key))).replace(/[^a-z0-9]/gi,'').slice(0,18)}-${idx}`,
-                    masterKey: key,
-                    source: 'INDEX1',
-                    name,
-                    category: setting.category === 'EXECUTIVE' ? 'EXECUTIVE' : 'OPERATIONAL',
-                    active: setting.active !== false,
-                    status: 'AVAILABLE',
-                    sim: '',
-                    phone: ''
-                };
-            });
-        }
+        // Dipertahankan sebagai no-op kompatibilitas. Daftar driver kini bersumber
+        // eksklusif dari koleksi Firestore GarasiKu, bukan dari kendaraan/Index 1.
+        function applyDriverSettingsToMasterDrivers() { return; }
         function applyVehicleSettingsToMaster() {
             (window.vehicles || []).forEach(v => {
                 const key = normalizePlateKey(v.plate || v.id);
@@ -2800,9 +2845,9 @@
                         status: v.status || 'IN_GARAGE'
                     }));
                     applyVehicleSettingsToMaster();
-                    await this.syncDriversOnce();
-                    // Master AdminAuto hanya memasok identitas Armada/Driver dari /data_v2.
-                    // Status ON/OFF driver tetap milik GarasiKu dan tidak ditimpa master.
+                    // Daftar driver tidak diambil dari Index 1. Master driver mandiri
+                    // dimuat dari Firestore GarasiKu melalui driver_master/drivers.
+                    // Status kendaraan tetap mengikuti logbook GarasiKu.
                     // Status operasional Keluar/Masuk wajib mengikuti Logbook GarasiKu
                     // agar refresh master setiap 5 detik tidak membatalkan transaksi gerbang.
                     reconcileVehicleOperationalState();
@@ -2901,7 +2946,7 @@
         window.vehicles = loadLocalJson('garasiku_vehicles', INITIAL_VEHICLES);
         window.driverSettings = loadLocalJson('garasiku_driver_settings', {});
         window.vehicleSettings = loadLocalJson('garasiku_vehicle_settings', {});
-        window.drivers = [];
+        window.drivers = loadLocalJson('garasiku_driver_master_cache', []);
         applyVehicleSettingsToMaster();
         applyDriverSettingsToMasterDrivers();
         window.etolls = loadLocalJson('garasiku_etolls', INITIAL_ETOLL);
@@ -3554,7 +3599,11 @@
                 if (btnMasterData) btnMasterData.classList.remove('hidden');
                 if (btnDeviceRegistry) btnDeviceRegistry.classList.remove('hidden');
                 if (btnAddVeh) btnAddVeh.classList.add('hidden');
-                if (btnAddDrv) btnAddDrv.classList.add('hidden');
+                // Master driver dikelola mandiri di GarasiKu: tampilkan tombol tambah saat Admin aktif.
+                if (btnAddDrv) {
+                    btnAddDrv.classList.remove('hidden');
+                    btnAddDrv.classList.add('inline-flex');
+                }
                 if (btnCloudModal) btnCloudModal.classList.remove('hidden');
                 if (btnStatAddEtoll) btnStatAddEtoll.classList.add('hidden');
                 document.querySelectorAll('.admin-col').forEach(el => el.classList.remove('hidden'));
@@ -3568,7 +3617,10 @@
                 if (btnMasterData) btnMasterData.classList.add('hidden');
                 if (btnDeviceRegistry) btnDeviceRegistry.classList.add('hidden');
                 if (btnAddVeh) btnAddVeh.classList.add('hidden');
-                if (btnAddDrv) btnAddDrv.classList.add('hidden');
+                if (btnAddDrv) {
+                    btnAddDrv.classList.add('hidden');
+                    btnAddDrv.classList.remove('inline-flex');
+                }
                 if (btnCloudModal) btnCloudModal.classList.add('hidden');
                 if (btnStatAddEtoll) btnStatAddEtoll.classList.add('hidden');
                 document.querySelectorAll('.admin-col').forEach(el => el.classList.add('hidden'));
@@ -4897,7 +4949,7 @@
                     <div>
                         <div class="flex items-center justify-between">
                             <h4 class="font-bold text-sm text-white">${d.name}</h4>
-                            <span class="px-2 py-0.5 rounded-md bg-slate-950 border border-slate-800 text-slate-400 text-[10px] font-bold"><i class="fa-solid fa-database mr-1"></i>Index 1</span>
+                            <span class="px-2 py-0.5 rounded-md bg-indigo-950 border border-indigo-800 text-indigo-300 text-[10px] font-bold"><i class="fa-solid fa-database mr-1"></i>GarasiKu</span>
                         </div>
                         <div class="mt-1 flex items-center space-x-1.5">
                             <span class="px-2 py-0.5 rounded-md text-[10px] font-bold ${isExecutive ? 'bg-purple-950 text-purple-300 border border-purple-800/60' : 'bg-cyan-950 text-cyan-300 border border-cyan-800/60'}">
@@ -4905,7 +4957,7 @@
                                 ${isExecutive ? 'Driver Pimpinan' : 'Driver Operasional'}
                             </span>
                         </div>
-                        <p class="text-xs text-slate-400 mt-2"><i class="fa-solid fa-link mr-1.5 text-slate-500"></i>Nama mengikuti data kendaraan Index 1</p>
+                        <p class="text-xs text-slate-400 mt-2"><i class="fa-solid fa-phone mr-1.5 text-slate-500"></i>${d.phone || 'Nomor kontak belum diisi'} <span class="mx-1 text-slate-600">•</span>${d.sim || 'SIM belum diisi'}</p>
                         <div class="mt-2.5">
                             ${activeTrip ? `
                                 <div class="p-2 rounded-xl bg-amber-950/40 border border-amber-800/40 text-amber-300 text-[11px] font-semibold">
@@ -4931,67 +4983,118 @@
                         </div>
                     </div>
                     <div class="mt-4 pt-2.5 border-t border-dark-border flex items-center justify-end space-x-2 admin-col ${isAdminLoggedIn ? '' : 'hidden'}">
-                        <button onclick="openEditDriverModal('${d.id}')" class="px-3 py-1.5 rounded-lg border border-indigo-800/60 bg-indigo-950/40 text-indigo-300 hover:bg-indigo-900/50 text-[10px] font-bold inline-flex items-center gap-1.5">
-                            <i class="fa-solid fa-pen"></i>Edit Pengaturan
-                        </button>
+                        <button onclick="openEditDriverModal('${d.id}')" class="px-3 py-1.5 rounded-lg border border-indigo-800/60 bg-indigo-950/40 text-indigo-300 hover:bg-indigo-900/50 text-[10px] font-bold inline-flex items-center gap-1.5"><i class="fa-solid fa-pen"></i>Edit</button>
+                        <button onclick="deleteDriver('${d.id}')" class="px-3 py-1.5 rounded-lg border border-rose-800/60 bg-rose-950/40 text-rose-300 hover:bg-rose-900/50 text-[10px] font-bold inline-flex items-center gap-1.5"><i class="fa-solid fa-trash"></i>Hapus</button>
                     </div>
                 `;
                 grid.appendChild(card);
             });
         }
 
-        function toggleDriverActive(id) {
+        async function toggleDriverActive(id) {
             const d = window.drivers.find(item => item.id === id);
             if (!d) return;
             const activeTrip = window.logs.find(l => l.driverId === d.id && l.status === 'ACTIVE');
-            if (activeTrip) {
-                showToast("Driver Bertugas", "Driver sedang mengemudikan kendaraan di jalan.", "warning");
-                return;
-            }
-            requireAdminAction(() => {
-                d.active = d.active === false ? true : false;
-                saveToStorage();
-                renderAll();
-                showToast("Status Pengemudi", `${d.name} kini ${d.active ? 'ON (Aktif)' : 'OFF (Cuti)'}.`, "info");
+            if (activeTrip) { showToast("Driver Bertugas", "Driver sedang mengemudikan kendaraan di jalan.", "warning"); return; }
+            requireAdminAction(async () => {
+                const previous = d.active !== false;
+                try {
+                    await window.FirebaseBridge.saveDriverMaster({ ...d, active: !previous });
+                    d.active = !previous; renderAll();
+                    showToast("Status Pengemudi", `${d.name} kini ${d.active ? 'ON (Aktif)' : 'OFF (Cuti)'}.`, "success");
+                } catch (error) { showToast('Gagal Menyimpan Driver', error.message || 'Periksa koneksi Firebase.', 'error'); }
             });
         }
 
-        function handleAddDriver(event) {
-            if (event) event.preventDefault();
-            closeModal('modal-add-driver');
-            showToast('Master Driver Index 1', 'Tambah driver dilakukan di Index 1 melalui data pengemudi kendaraan.', 'info');
+        async function refreshGarasiKuDrivers() {
+            const el = document.getElementById('driver-master-status');
+            if (el) el.textContent = 'Membaca koleksi garasiku_drivers…';
+            try {
+                if (!window.FirebaseBridge?.currentUser) throw new Error('Autentikasi Firebase belum aktif.');
+                await window.FirebaseBridge.loadDriverMaster();
+            } catch (error) {
+                if (el) el.textContent = 'Gagal membaca: ' + (error?.message || String(error));
+                showToast('Gagal Membaca Driver', error?.message || String(error), 'error');
+            }
         }
 
-        function deleteDriver(id) {
-            showToast('Master Driver Index 1', 'Hapus driver dilakukan di Index 1. Pengaturan ON/OFF dan kategori saja yang dikelola di sini.', 'info');
+        async function handleAddDriver(event) {
+            if (event) event.preventDefault();
+            if (!isAdminLoggedIn) { openAdminAuthModal(() => openModal('modal-add-driver')); return; }
+            const name = document.getElementById('drv-name').value.trim();
+            if (!name) return;
+            if (window.drivers.some(d => normalizeDriverKey(d.name) === normalizeDriverKey(name))) {
+                showToast('Nama Sudah Terdaftar', 'Gunakan nama berbeda atau edit data driver yang sudah ada.', 'warning'); return;
+            }
+            const id = `DRV-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+            const driver = {
+                id, name, category: document.getElementById('drv-category').value === 'EXECUTIVE' ? 'EXECUTIVE' : 'OPERATIONAL',
+                sim: document.getElementById('drv-sim').value,
+                phone: document.getElementById('drv-phone').value.trim(), active: true,
+                status: 'AVAILABLE', createdAt: new Date().toISOString()
+            };
+            try {
+                await window.FirebaseBridge.saveDriverMaster(driver);
+                document.getElementById('form-add-driver').reset();
+                closeModal('modal-add-driver');
+                await window.FirebaseBridge.loadDriverMaster();
+                renderAll();
+                showToast('Driver Ditambahkan', `${name} tersimpan di database driver GarasiKu.`, 'success');
+            } catch (error) { showToast('Gagal Menambah Driver', error.message || 'Periksa koneksi Firebase.', 'error'); }
+        }
+
+        async function deleteDriver(id) {
+            if (!isAdminLoggedIn) { openAdminAuthModal(() => deleteDriver(id)); return; }
+            const d = window.drivers.find(item => item.id === id);
+            if (!d) return;
+            const activeTrip = window.logs.find(l => l.driverId === d.id && l.status === 'ACTIVE');
+            if (activeTrip) { showToast('Tidak Dapat Menghapus', 'Driver masih tercatat sedang bertugas. Selesaikan perjalanan terlebih dahulu.', 'warning'); return; }
+            if (!confirm(`Hapus driver "${d.name}" dari database GarasiKu? Riwayat logbook lama tidak ikut dihapus.`)) return;
+            try {
+                await window.FirebaseBridge.deleteDriverMaster(id);
+                window.drivers = window.drivers.filter(item => item.id !== id);
+                renderAll(); showToast('Driver Dihapus', `${d.name} dihapus dari master driver GarasiKu.`, 'success');
+            } catch (error) { showToast('Gagal Menghapus Driver', error.message || 'Periksa koneksi Firebase.', 'error'); }
         }
 
         function openEditDriverModal(id) {
             if (!isAdminLoggedIn) { openAdminAuthModal(() => openEditDriverModal(id)); return; }
             const d = window.drivers.find(item => item.id === id);
             if (!d) return;
-            document.getElementById('edit-driver-key').value = d.masterKey || normalizeDriverKey(d.name);
-            document.getElementById('edit-driver-name').value = d.name;
+            document.getElementById('edit-driver-id').value = d.id;
+            document.getElementById('edit-driver-key').value = d.id;
+            document.getElementById('edit-driver-name').value = d.name || '';
             document.getElementById('edit-driver-category').value = d.category === 'EXECUTIVE' ? 'EXECUTIVE' : 'OPERATIONAL';
             document.getElementById('edit-driver-active').value = d.active === false ? 'OFF' : 'ON';
+            document.getElementById('edit-driver-sim').value = d.sim || 'SIM A';
+            document.getElementById('edit-driver-phone').value = d.phone || '';
             openModal('modal-edit-driver');
         }
 
-        function handleEditDriver(event) {
+        async function handleEditDriver(event) {
             event.preventDefault();
             if (!isAdminLoggedIn) return;
-            const key = document.getElementById('edit-driver-key').value;
-            const d = window.drivers.find(item => (item.masterKey || normalizeDriverKey(item.name)) === key);
-            if (!d) return;
-            window.driverSettings[key] = {
+            const id = document.getElementById('edit-driver-id').value;
+            const old = window.drivers.find(item => item.id === id);
+            if (!old) return;
+            const name = document.getElementById('edit-driver-name').value.trim();
+            if (!name) { showToast('Nama Wajib Diisi', 'Masukkan nama driver.', 'warning'); return; }
+            if (window.drivers.some(d => d.id !== id && normalizeDriverKey(d.name) === normalizeDriverKey(name))) {
+                showToast('Nama Sudah Terdaftar', 'Nama driver tersebut sudah digunakan.', 'warning'); return;
+            }
+            const updated = { ...old, name,
+                category: document.getElementById('edit-driver-category').value === 'EXECUTIVE' ? 'EXECUTIVE' : 'OPERATIONAL',
                 active: document.getElementById('edit-driver-active').value === 'ON',
-                category: document.getElementById('edit-driver-category').value === 'EXECUTIVE' ? 'EXECUTIVE' : 'OPERATIONAL'
+                sim: document.getElementById('edit-driver-sim').value,
+                phone: document.getElementById('edit-driver-phone').value.trim()
             };
-            applyDriverSettingsToMasterDrivers();
-            saveToStorage();
-            closeModal('modal-edit-driver');
-            renderAll();
-            showToast('Pengaturan Driver Disimpan', `${d.name} diperbarui dan tersimpan di Firebase.`, 'success');
+            try {
+                await window.FirebaseBridge.saveDriverMaster(updated);
+                closeModal('modal-edit-driver');
+                await window.FirebaseBridge.loadDriverMaster();
+                renderAll();
+                showToast('Driver Diperbarui', `${name} berhasil disimpan.`, 'success');
+            } catch (error) { showToast('Gagal Menyimpan Driver', error.message || 'Periksa koneksi Firebase.', 'error'); }
         }
 
         // ==========================================
@@ -5593,51 +5696,77 @@
 
         function buildEtollRecapRows() {
             const logs = Array.isArray(window.etollLogs) ? [...window.etollLogs] : [];
-            // Urutkan kronologis agar penyerahan dan pengembalian dapat dipasangkan.
             logs.sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
 
-            const openBorrows = new Map();
+            const openBorrows = [];
             const rows = [];
+            const norm = value => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+            const cardAliases = log => {
+                const aliases = [];
+                if (log?.etollId) aliases.push('id:' + norm(log.etollId));
+                if (log?.cardNo) aliases.push('no:' + norm(log.cardNo));
+                if (log?.cardNumber) aliases.push('no:' + norm(log.cardNumber));
+                if (log?.cardName) {
+                    aliases.push('name:' + norm(log.cardName));
+                    const digits = String(log.cardName).replace(/\\D/g, '');
+                    if (digits.length >= 4) aliases.push('last4:' + digits.slice(-4));
+                }
+                const card = (window.etolls || []).find(c =>
+                    (log?.etollId && String(c.id) === String(log.etollId)) ||
+                    (log?.cardName && norm(c.name) === norm(log.cardName)) ||
+                    (log?.cardNo && norm(c.cardNo) === norm(log.cardNo)) ||
+                    (log?.cardNumber && norm(c.cardNo) === norm(log.cardNumber))
+                );
+                if (card) {
+                    aliases.push('id:' + norm(card.id));
+                    if (card.cardNo) {
+                        aliases.push('no:' + norm(card.cardNo));
+                        const digits = String(card.cardNo).replace(/\\D/g, '');
+                        if (digits.length >= 4) aliases.push('last4:' + digits.slice(-4));
+                    }
+                    if (card.name) aliases.push('name:' + norm(card.name));
+                }
+                return [...new Set(aliases.filter(x => !x.endsWith(':')))];
+            };
+            const sharesCard = (a, b) => {
+                const aa = new Set(cardAliases(a));
+                return cardAliases(b).some(x => aa.has(x));
+            };
 
             logs.forEach(log => {
                 const action = String(log.action || '').toUpperCase();
-                const key = String(log.etollId || log.cardName || '');
-
                 if (action === 'BORROW') {
-                    const item = { borrow: log, return: null };
-                    if (!openBorrows.has(key)) openBorrows.set(key, []);
-                    openBorrows.get(key).push(item);
-                    rows.push(item);
+                    const row = { borrow: log, return: null, activity: null };
+                    openBorrows.push(row);
+                    rows.push(row);
                     return;
                 }
-
                 if (action === 'RETURN') {
-                    const queue = openBorrows.get(key) || [];
-                    // Cari penyerahan yang paling cocok: driver sama bila tersedia.
+                    // Pasangkan dengan penyerahan terakhir untuk kartu yang sama.
+                    // Nama pemegang tidak dijadikan syarat karena driver dapat berubah/tercatat berbeda.
                     let idx = -1;
-                    for (let j = 0; j < queue.length; j++) {
-                        if (String(queue[j].borrow.holderName || '') === String(log.holderName || '')) {
+                    for (let j = openBorrows.length - 1; j >= 0; j--) {
+                        if (!openBorrows[j].return && sharesCard(openBorrows[j].borrow, log)) {
                             idx = j;
                             break;
                         }
                     }
-                    if (idx < 0 && queue.length) idx = 0;
-
                     if (idx >= 0) {
-                        queue[idx].return = log;
-                        queue.splice(idx, 1);
+                        openBorrows[idx].return = log;
+                        openBorrows.splice(idx, 1);
                     } else {
-                        // Data lama yang tidak punya penyerahan pasangan tetap ditampilkan.
-                        rows.push({ borrow: null, return: log });
+                        rows.push({ borrow: null, return: log, activity: null });
                     }
                     return;
                 }
-
-                // SWAP / aktivitas lain tetap menjadi satu baris tersendiri.
                 rows.push({ borrow: null, return: null, activity: log });
             });
 
-            return rows.reverse();
+            return rows.sort((a, b) => {
+                const at = new Date((a.return || a.borrow || a.activity)?.timestamp || 0).getTime();
+                const bt = new Date((b.return || b.borrow || b.activity)?.timestamp || 0).getTime();
+                return bt - at;
+            });
         }
 
         function renderEtollRecapTable() {
@@ -5700,6 +5829,12 @@
                 const start = borrow ? (Number(borrow.balanceStart) || 0) : (Number(primary?.balanceStart) || 0);
                 const end = ret ? (Number(ret.balanceEnd) || 0) : (primary?.balanceEnd != null ? (Number(primary.balanceEnd) || 0) : null);
                 const cardName = ret && !borrow ? ret.cardName : (borrow?.cardName || primary?.cardName || '-');
+                const cardRecord = (window.etolls || []).find(c =>
+                    (primary?.etollId && String(c.id) === String(primary.etollId)) ||
+                    (primary?.cardName && String(c.name || '').toLowerCase() === String(primary.cardName || '').toLowerCase())
+                );
+                const cardDigits = String(cardRecord?.cardNo || primary?.cardNo || primary?.cardNumber || cardName || '').replace(/\\D/g, '');
+                const cardNumberDisplay = cardDigits.length >= 4 ? cardDigits.slice(-4) : cardName;
                 const holder = borrow && ret
                     ? `${esc(borrow.holderName || '-')} <span class="text-slate-500 mx-1">→</span> ${esc(ret.holderName || borrow.holderName || '-')}`
                     : esc(primary?.holderName || '-');
@@ -5716,8 +5851,8 @@
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-dark-cardHover transition align-top";
                 tr.innerHTML = `
+                    <td class="p-3 font-mono font-bold text-white">${esc(cardNumberDisplay)}</td>
                     <td class="p-3 font-mono text-slate-300 text-[11px]">${timeCell}</td>
-                    <td class="p-3 font-bold text-white">${esc(cardName)}</td>
                     <td class="p-3">${activityCell}</td>
                     <td class="p-3 font-semibold text-slate-200">${holder}</td>
                     <td class="p-3 font-mono text-slate-300">${money(start)}</td>
