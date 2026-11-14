@@ -3350,17 +3350,17 @@
         }
 
 
-        window.etollLogs = loadLocalJson('garasiku_etoll_logs', []);
+        // Data konfigurasi dan histori operasional dimuat dari Firestore, bukan cache browser.
+        window.etollLogs = [];
         window.logs = []; // Logbook bersumber dari Firestore gate_logs; tidak dipersist sebagai antrean lokal.
-        window.adminPin = localStorage.getItem('garasiku_admin_pin') || "1234";
-
-        window.telegramConfig = loadLocalJson('garasiku_telegram', {
+        window.adminPin = "1234"; // Akan ditimpa konfigurasi server setelah shared_state terbaca.
+        window.telegramConfig = {
             botToken: '',
             chatId: '',
             notifyCheckout: true,
             notifyCheckin: true,
             notifyEtoll: true
-        });
+        };
 
         let isAdminLoggedIn = false;
         let pendingAdminCallback = null;
