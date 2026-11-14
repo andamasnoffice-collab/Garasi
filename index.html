@@ -2931,7 +2931,6 @@
         window.Index1MasterBridge = {
             baseUrl: 'https://uns-fleet-service-default-rtdb.asia-southeast1.firebasedatabase.app',
             path: 'artifacts/uns-fleet-service/public/data_v2/vehicles',
-            driverPath: 'artifacts/uns-fleet-service/public/data_v2/drivers',
             timer: null,
             syncing: false,
             lastSuccess: null,
@@ -2970,45 +2969,6 @@
                     this.syncing = false;
                 }
             },
-            async syncDriversOnce() {
-                try {
-                    const res = await fetch(`${this.baseUrl}/${this.driverPath}.json?ts=${Date.now()}`, {cache:'no-store'});
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    const data = await res.json();
-                    const rows = data && typeof data === 'object'
-                        ? Object.entries(data).map(([key,val]) => ({...(val || {}), _fbKey:key}))
-                        : [];
-                    const localSettings = window.driverSettings || {};
-                    const assignedByDriver = new Map();
-                    (window.vehicles || []).forEach(v => {
-                        const did = String(v.driverId || '').trim();
-                        if (!did) return;
-                        if (!assignedByDriver.has(did)) assignedByDriver.set(did, []);
-                        assignedByDriver.get(did).push(v.id || v._fbKey || v.plate);
-                    });
-                    window.drivers = rows.map((d, idx) => {
-                        const id = String(d.id || d._fbKey || `DRIVER-${idx+1}`);
-                        const name = String(d.name || '').trim();
-                        const key = normalizeDriverKey(name || id);
-                        const setting = localSettings[key] || {};
-                        const rawType = String(d.type || d.category || 'Operasional').toLowerCase();
-                        const category = rawType.includes('pimpinan') || rawType.includes('executive') ? 'EXECUTIVE' : 'OPERATIONAL';
-                        const assigned = assignedByDriver.get(id) || assignedByDriver.get(String(d._fbKey || '')) || [];
-                        return {
-                            id, masterKey: String(d._fbKey || id), source: 'ADMINAUTO_DATA_V2',
-                            name, category, active: setting.active !== false,
-                            masterStatus: String(d.status || 'AKTIF').toUpperCase(),
-                            status: 'AVAILABLE', sim: '', phone: String(d.phone || d.cp || ''),
-                            assignedVehicleIds: assigned, assignedVehicleCount: assigned.length,
-                            notes: String(d.notes || '')
-                        };
-                    }).filter(d => d.name);
-                    if (typeof renderAll === 'function') renderAll();
-                } catch (e) {
-                    console.warn('Sinkron Master Driver AdminAuto /data_v2 gagal:', e.message);
-                }
-            },
-
             async syncOdometersToIndex1() {
                 const list = Array.isArray(window.vehicles) ? window.vehicles : [];
                 await Promise.all(list.map(async v => {
