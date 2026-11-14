@@ -2942,7 +2942,12 @@
                     const res = await fetch(`${this.baseUrl}/${this.path}.json?ts=${Date.now()}`, {cache:'no-store'});
                     if (!res.ok) throw new Error(`HTTP ${res.status}`);
                     const data = await res.json();
-                    const arr = data && typeof data === 'object' ? Object.entries(data).map(([key,val]) => ({...(val || {}), _fbKey:key})) : [];
+                    if (data == null) throw new Error('Node master kendaraan kosong/null; cache dipertahankan.');
+                    if (typeof data !== 'object' || (Array.isArray(data) && data.length === 0)) {
+                        throw new Error('Format master kendaraan tidak sesuai; cache dipertahankan.');
+                    }
+                    const arr = Object.entries(data).map(([key,val]) => ({...(val || {}), _fbKey:key}));
+                    if (!arr.length) throw new Error('Tidak ada record kendaraan valid; cache dipertahankan.');
                     window.vehicles = arr.map((v, i) => ({
                         ...v,
                         id: v.id || v._fbKey || `IDX1-${i+1}`,
@@ -2961,10 +2966,13 @@
                     // Status operasional Keluar/Masuk wajib mengikuti Logbook GarasiKu
                     // agar refresh master setiap 5 detik tidak membatalkan transaksi gerbang.
                     reconcileVehicleOperationalState();
+                    try { localStorage.setItem('garasiku_vehicles', JSON.stringify(window.vehicles)); } catch (cacheError) {
+                        console.warn('Cache master kendaraan tidak dapat diperbarui:', cacheError);
+                    }
                     this.lastSuccess = new Date();
                     if (typeof renderAll === 'function') renderAll();
                 } catch (e) {
-                    console.warn('Sinkron Master Index 1 gagal:', e.message);
+                    console.warn('Sinkron Master Index 1 gagal; fallback dipertahankan:', e.message);
                 } finally {
                     this.syncing = false;
                 }
@@ -3014,15 +3022,16 @@
             }
         }
 
-        // Firebase/RTDB menjadi sumber utama. Cache localStorage hanya arsip bantu,
-        // tidak dipakai untuk menginisialisasi data operasional yang dapat kedaluwarsa.
-        // Armada dimuat dari Index 1 RTDB, driver dan overlay dari Firestore,
-        // sedangkan master kartu E-Toll dimuat dari RTDB RekapToll.
-        window.vehicles = [];
-        window.driverSettings = {};
-        window.vehicleSettings = {};
-        window.drivers = [];
-        window.etolls = [];
+        // Firebase tetap menjadi sumber utama. Cache lokal hanya fallback tampilan
+        // ketika server gagal diakses; cache tidak dikirim otomatis untuk menimpa cloud.
+        // Armada: Index 1 RTDB. Driver: Firestore GarasiKu. E-Toll: RTDB RekapToll.
+        window.vehicles = loadLocalJson('garasiku_vehicles', INITIAL_VEHICLES);
+        window.driverSettings = loadLocalJson('garasiku_driver_settings', {});
+        window.vehicleSettings = loadLocalJson('garasiku_vehicle_settings', {});
+        window.drivers = loadLocalJson('garasiku_driver_master_cache', []);
+        window.etolls = loadLocalJson('garasiku_etolls', INITIAL_ETOLL);
+        applyVehicleSettingsToMaster();
+        applyDriverSettingsToMasterDrivers();
 
         // ============================================================
         // MASTER KARTU E-TOLL: REKAPTOLL (SUMBER TUNGGAL)
@@ -3093,7 +3102,10 @@
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
                     const data = await response.json();
                     if (!Array.isArray(data)) {
-                        throw new Error('Format master kartu RekapToll bukan array.');
+                        throw new Error('Format master kartu RekapToll bukan array; cache dipertahankan.');
+                    }
+                    if (data.length === 0 && Array.isArray(window.etolls) && window.etolls.length > 0) {
+                        throw new Error('Master kartu RekapToll kosong; cache sebelumnya dipertahankan.');
                     }
 
                     const previous = Array.isArray(window.etolls) ? window.etolls : [];
@@ -3152,6 +3164,9 @@
                     });
 
                     window.etolls = masterCards;
+                    try { localStorage.setItem('garasiku_etolls', JSON.stringify(window.etolls)); } catch (cacheError) {
+                        console.warn('Cache master E-Toll tidak dapat diperbarui:', cacheError);
+                    }
                     this.lastSuccess = new Date();
                     // Ambil total pengisian bulan berjalan dari database RekapToll.
                     // Jika transaksi gagal dibaca, kartu tetap tampil dan nilai tidak disamarkan sebagai saldo.
