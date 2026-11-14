@@ -1928,6 +1928,24 @@
             etollLogsSplitEnabled: false,
             gateMigrationRunning: false,
 
+            // Hentikan seluruh listener Firestore sebelum disconnect/reconnect.
+            stopRealtimeListeners() {
+                const stops = [
+                    ...(Array.isArray(this.unsubscribers) ? this.unsubscribers : []),
+                    this.gateLogsUnsubscriber,
+                    this.etollStateUnsubscriber,
+                    this.vehicleSettingsUnsubscriber,
+                    this.driverMasterUnsubscriber
+                ];
+                stops.forEach(stop => { if (typeof stop === 'function') { try { stop(); } catch (e) { console.warn('Gagal menghentikan listener Firebase:', e); } } });
+                this.unsubscribers = [];
+                this.gateLogsUnsubscriber = null;
+                this.etollStateUnsubscriber = null;
+                this.vehicleSettingsUnsubscriber = null;
+                this.driverMasterUnsubscriber = null;
+                this.gateLogsReady = false;
+            },
+
             // Simpan status satu kartu lewat transaksi Firestore. Didefinisikan di dalam
             // module agar doc/runTransaction yang di-import memang berada dalam scope.
             async saveEtollCardState(key, stateItem, guard = {}) {
@@ -1984,14 +2002,7 @@
                     const appName = `garasiku-${String(config.projectId).replace(/[^a-zA-Z0-9_-]/g, '-')}`;
                     const existingApp = getApps().find(app => app.name === appName);
                     if (this.app && this.configProjectId && this.configProjectId !== config.projectId) {
-                        this.unsubscribers.forEach(unsub => unsub && unsub());
-                        this.unsubscribers = [];
-                        if (this.etollStateUnsubscriber) { try { this.etollStateUnsubscriber(); } catch (e) {} this.etollStateUnsubscriber = null; }
-                        if (this.vehicleSettingsUnsubscriber) { try { this.vehicleSettingsUnsubscriber(); } catch (e) {} this.vehicleSettingsUnsubscriber = null; }
-                        if (this.gateLogsUnsubscriber) {
-                            try { this.gateLogsUnsubscriber(); } catch (e) {}
-                            this.gateLogsUnsubscriber = null;
-                        }
+                        this.stopRealtimeListeners();
                         try { await deleteApp(this.app); } catch (e) { console.warn('Gagal menutup Firebase app lama:', e); }
                         this.app = null;
                         this.db = null;
@@ -2042,6 +2053,7 @@
                     this.lastSyncTime = null;
                     this.gateLogsReady = false;
                     this.updateStatusUI(false, `Menghubungkan (${config.projectId})...`);
+                    this.stopRealtimeListeners();
                     this.startRealtimeSync();
                     // Master E-Toll dibaca satu kali oleh EtollMasterBridge.start() saat load.
                     // Hindari pembacaan ganda pada startup.
@@ -2440,37 +2452,25 @@
                     return false;
                 }
 
-                // DIRECT FIREBASE: tidak ada localStorage queue dan tidak ada serial queue.
-                // Setiap transaksi dikirim langsung ke satu dokumen Firestore. UI tidak menunggu
-                // round-trip server; Firestore SDK sendiri menangani latency compensation dan
-                // onSnapshot(metadata) di atas akan mengonfirmasi saat write benar-benar server-side.
+                // Firebase adalah sumber utama: tunggu ACK server sebelum mengembalikan sukses.
+                // Jika offline/ditolak Rules, UI tidak boleh mengubah status lokal atau menyatakan berhasil.
                 this.lastGateWriteError = '';
-                let writePromise;
                 try {
-                    writePromise = setDoc(ref, { ...log }, { merge: false });
-                } catch (e) {
-                    const detail = e?.code ? `${e.code}: ${e?.message || ''}`.trim() : (e?.message || 'write ditolak');
-                    this.lastGateWriteError = detail;
-                    this.updateStatusUI(false, `Firebase write gagal: ${detail}`);
-                    return false;
-                }
-
-                writePromise.then(() => {
+                    await setDoc(ref, { ...log }, { merge: false });
                     this.lastGateWriteError = '';
                     this.isConnected = true;
                     this.lastSyncTime = new Date();
                     this.updateStatusUI(true, `Firebase terkonfirmasi • ${log.plate || log.id}`);
                     if (typeof options.onServerConfirmed === 'function') options.onServerConfirmed();
-                }).catch((e) => {
+                    return true;
+                } catch (e) {
                     const detail = e?.code ? `${e.code}: ${e?.message || ''}`.trim() : (e?.message || 'write ditolak');
                     this.lastGateWriteError = detail;
                     this.isConnected = false;
                     this.updateStatusUI(false, `Firebase write gagal: ${detail}`);
                     if (typeof options.onServerError === 'function') options.onServerError(detail);
-                });
-
-                // Write sudah dikirim ke Firebase SDK; jangan menunggu server di event handler.
-                return true;
+                    return false;
+                }
             },
 
             async deleteGateLog(logId, options = {}) {
@@ -3014,13 +3014,15 @@
             }
         }
 
-        window.vehicles = loadLocalJson('garasiku_vehicles', INITIAL_VEHICLES);
-        window.driverSettings = loadLocalJson('garasiku_driver_settings', {});
-        window.vehicleSettings = loadLocalJson('garasiku_vehicle_settings', {});
-        window.drivers = loadLocalJson('garasiku_driver_master_cache', []);
-        applyVehicleSettingsToMaster();
-        applyDriverSettingsToMasterDrivers();
-        window.etolls = loadLocalJson('garasiku_etolls', INITIAL_ETOLL);
+        // Firebase/RTDB menjadi sumber utama. Cache localStorage hanya arsip bantu,
+        // tidak dipakai untuk menginisialisasi data operasional yang dapat kedaluwarsa.
+        // Armada dimuat dari Index 1 RTDB, driver dan overlay dari Firestore,
+        // sedangkan master kartu E-Toll dimuat dari RTDB RekapToll.
+        window.vehicles = [];
+        window.driverSettings = {};
+        window.vehicleSettings = {};
+        window.drivers = [];
+        window.etolls = [];
 
         // ============================================================
         // MASTER KARTU E-TOLL: REKAPTOLL (SUMBER TUNGGAL)
@@ -6500,9 +6502,7 @@
             localStorage.setItem('garasiku_force_local', '1');
             localStorage.removeItem('garasiku_firebase_cfg');
             if (window.FirebaseBridge) {
-                window.FirebaseBridge.unsubscribers.forEach(unsub => unsub && unsub());
-                window.FirebaseBridge.unsubscribers = [];
-                if (window.FirebaseBridge.etollStateUnsubscriber) { try { window.FirebaseBridge.etollStateUnsubscriber(); } catch (e) {} window.FirebaseBridge.etollStateUnsubscriber = null; }
+                window.FirebaseBridge.stopRealtimeListeners();
                 window.FirebaseBridge.isConnected = false;
                 window.FirebaseBridge.lastSyncTime = null;
                 window.FirebaseBridge.db = null;
