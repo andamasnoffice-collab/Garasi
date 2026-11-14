@@ -1928,24 +1928,6 @@
             etollLogsSplitEnabled: false,
             gateMigrationRunning: false,
 
-            // Hentikan seluruh listener Firestore sebelum disconnect/reconnect.
-            stopRealtimeListeners() {
-                const stops = [
-                    ...(Array.isArray(this.unsubscribers) ? this.unsubscribers : []),
-                    this.gateLogsUnsubscriber,
-                    this.etollStateUnsubscriber,
-                    this.vehicleSettingsUnsubscriber,
-                    this.driverMasterUnsubscriber
-                ];
-                stops.forEach(stop => { if (typeof stop === 'function') { try { stop(); } catch (e) { console.warn('Gagal menghentikan listener Firebase:', e); } } });
-                this.unsubscribers = [];
-                this.gateLogsUnsubscriber = null;
-                this.etollStateUnsubscriber = null;
-                this.vehicleSettingsUnsubscriber = null;
-                this.driverMasterUnsubscriber = null;
-                this.gateLogsReady = false;
-            },
-
             // Simpan status satu kartu lewat transaksi Firestore. Didefinisikan di dalam
             // module agar doc/runTransaction yang di-import memang berada dalam scope.
             async saveEtollCardState(key, stateItem, guard = {}) {
@@ -2002,7 +1984,14 @@
                     const appName = `garasiku-${String(config.projectId).replace(/[^a-zA-Z0-9_-]/g, '-')}`;
                     const existingApp = getApps().find(app => app.name === appName);
                     if (this.app && this.configProjectId && this.configProjectId !== config.projectId) {
-                        this.stopRealtimeListeners();
+                        this.unsubscribers.forEach(unsub => unsub && unsub());
+                        this.unsubscribers = [];
+                        if (this.etollStateUnsubscriber) { try { this.etollStateUnsubscriber(); } catch (e) {} this.etollStateUnsubscriber = null; }
+                        if (this.vehicleSettingsUnsubscriber) { try { this.vehicleSettingsUnsubscriber(); } catch (e) {} this.vehicleSettingsUnsubscriber = null; }
+                        if (this.gateLogsUnsubscriber) {
+                            try { this.gateLogsUnsubscriber(); } catch (e) {}
+                            this.gateLogsUnsubscriber = null;
+                        }
                         try { await deleteApp(this.app); } catch (e) { console.warn('Gagal menutup Firebase app lama:', e); }
                         this.app = null;
                         this.db = null;
@@ -2053,7 +2042,6 @@
                     this.lastSyncTime = null;
                     this.gateLogsReady = false;
                     this.updateStatusUI(false, `Menghubungkan (${config.projectId})...`);
-                    this.stopRealtimeListeners();
                     this.startRealtimeSync();
                     // Master E-Toll dibaca satu kali oleh EtollMasterBridge.start() saat load.
                     // Hindari pembacaan ganda pada startup.
@@ -2452,25 +2440,37 @@
                     return false;
                 }
 
-                // Firebase adalah sumber utama: tunggu ACK server sebelum mengembalikan sukses.
-                // Jika offline/ditolak Rules, UI tidak boleh mengubah status lokal atau menyatakan berhasil.
+                // DIRECT FIREBASE: tidak ada localStorage queue dan tidak ada serial queue.
+                // Setiap transaksi dikirim langsung ke satu dokumen Firestore. UI tidak menunggu
+                // round-trip server; Firestore SDK sendiri menangani latency compensation dan
+                // onSnapshot(metadata) di atas akan mengonfirmasi saat write benar-benar server-side.
                 this.lastGateWriteError = '';
+                let writePromise;
                 try {
-                    await setDoc(ref, { ...log }, { merge: false });
+                    writePromise = setDoc(ref, { ...log }, { merge: false });
+                } catch (e) {
+                    const detail = e?.code ? `${e.code}: ${e?.message || ''}`.trim() : (e?.message || 'write ditolak');
+                    this.lastGateWriteError = detail;
+                    this.updateStatusUI(false, `Firebase write gagal: ${detail}`);
+                    return false;
+                }
+
+                writePromise.then(() => {
                     this.lastGateWriteError = '';
                     this.isConnected = true;
                     this.lastSyncTime = new Date();
                     this.updateStatusUI(true, `Firebase terkonfirmasi • ${log.plate || log.id}`);
                     if (typeof options.onServerConfirmed === 'function') options.onServerConfirmed();
-                    return true;
-                } catch (e) {
+                }).catch((e) => {
                     const detail = e?.code ? `${e.code}: ${e?.message || ''}`.trim() : (e?.message || 'write ditolak');
                     this.lastGateWriteError = detail;
                     this.isConnected = false;
                     this.updateStatusUI(false, `Firebase write gagal: ${detail}`);
                     if (typeof options.onServerError === 'function') options.onServerError(detail);
-                    return false;
-                }
+                });
+
+                // Write sudah dikirim ke Firebase SDK; jangan menunggu server di event handler.
+                return true;
             },
 
             async deleteGateLog(logId, options = {}) {
@@ -2942,12 +2942,7 @@
                     const res = await fetch(`${this.baseUrl}/${this.path}.json?ts=${Date.now()}`, {cache:'no-store'});
                     if (!res.ok) throw new Error(`HTTP ${res.status}`);
                     const data = await res.json();
-                    if (data == null) throw new Error('Node master kendaraan kosong/null; cache dipertahankan.');
-                    if (typeof data !== 'object' || (Array.isArray(data) && data.length === 0)) {
-                        throw new Error('Format master kendaraan tidak sesuai; cache dipertahankan.');
-                    }
-                    const arr = Object.entries(data).map(([key,val]) => ({...(val || {}), _fbKey:key}));
-                    if (!arr.length) throw new Error('Tidak ada record kendaraan valid; cache dipertahankan.');
+                    const arr = data && typeof data === 'object' ? Object.entries(data).map(([key,val]) => ({...(val || {}), _fbKey:key})) : [];
                     window.vehicles = arr.map((v, i) => ({
                         ...v,
                         id: v.id || v._fbKey || `IDX1-${i+1}`,
@@ -2966,13 +2961,10 @@
                     // Status operasional Keluar/Masuk wajib mengikuti Logbook GarasiKu
                     // agar refresh master setiap 5 detik tidak membatalkan transaksi gerbang.
                     reconcileVehicleOperationalState();
-                    try { localStorage.setItem('garasiku_vehicles', JSON.stringify(window.vehicles)); } catch (cacheError) {
-                        console.warn('Cache master kendaraan tidak dapat diperbarui:', cacheError);
-                    }
                     this.lastSuccess = new Date();
                     if (typeof renderAll === 'function') renderAll();
                 } catch (e) {
-                    console.warn('Sinkron Master Index 1 gagal; fallback dipertahankan:', e.message);
+                    console.warn('Sinkron Master Index 1 gagal:', e.message);
                 } finally {
                     this.syncing = false;
                 }
@@ -3022,16 +3014,13 @@
             }
         }
 
-        // Firebase tetap menjadi sumber utama. Cache lokal hanya fallback tampilan
-        // ketika server gagal diakses; cache tidak dikirim otomatis untuk menimpa cloud.
-        // Armada: Index 1 RTDB. Driver: Firestore GarasiKu. E-Toll: RTDB RekapToll.
         window.vehicles = loadLocalJson('garasiku_vehicles', INITIAL_VEHICLES);
         window.driverSettings = loadLocalJson('garasiku_driver_settings', {});
         window.vehicleSettings = loadLocalJson('garasiku_vehicle_settings', {});
         window.drivers = loadLocalJson('garasiku_driver_master_cache', []);
-        window.etolls = loadLocalJson('garasiku_etolls', INITIAL_ETOLL);
         applyVehicleSettingsToMaster();
         applyDriverSettingsToMasterDrivers();
+        window.etolls = loadLocalJson('garasiku_etolls', INITIAL_ETOLL);
 
         // ============================================================
         // MASTER KARTU E-TOLL: REKAPTOLL (SUMBER TUNGGAL)
@@ -3102,10 +3091,7 @@
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
                     const data = await response.json();
                     if (!Array.isArray(data)) {
-                        throw new Error('Format master kartu RekapToll bukan array; cache dipertahankan.');
-                    }
-                    if (data.length === 0 && Array.isArray(window.etolls) && window.etolls.length > 0) {
-                        throw new Error('Master kartu RekapToll kosong; cache sebelumnya dipertahankan.');
+                        throw new Error('Format master kartu RekapToll bukan array.');
                     }
 
                     const previous = Array.isArray(window.etolls) ? window.etolls : [];
@@ -3164,9 +3150,6 @@
                     });
 
                     window.etolls = masterCards;
-                    try { localStorage.setItem('garasiku_etolls', JSON.stringify(window.etolls)); } catch (cacheError) {
-                        console.warn('Cache master E-Toll tidak dapat diperbarui:', cacheError);
-                    }
                     this.lastSuccess = new Date();
                     // Ambil total pengisian bulan berjalan dari database RekapToll.
                     // Jika transaksi gagal dibaca, kartu tetap tampil dan nilai tidak disamarkan sebagai saldo.
@@ -3365,17 +3348,17 @@
         }
 
 
-        // Data konfigurasi dan histori operasional dimuat dari Firestore, bukan cache browser.
-        window.etollLogs = [];
+        window.etollLogs = loadLocalJson('garasiku_etoll_logs', []);
         window.logs = []; // Logbook bersumber dari Firestore gate_logs; tidak dipersist sebagai antrean lokal.
-        window.adminPin = "1234"; // Akan ditimpa konfigurasi server setelah shared_state terbaca.
-        window.telegramConfig = {
+        window.adminPin = localStorage.getItem('garasiku_admin_pin') || "1234";
+
+        window.telegramConfig = loadLocalJson('garasiku_telegram', {
             botToken: '',
             chatId: '',
             notifyCheckout: true,
             notifyCheckin: true,
             notifyEtoll: true
-        };
+        });
 
         let isAdminLoggedIn = false;
         let pendingAdminCallback = null;
@@ -6517,7 +6500,9 @@
             localStorage.setItem('garasiku_force_local', '1');
             localStorage.removeItem('garasiku_firebase_cfg');
             if (window.FirebaseBridge) {
-                window.FirebaseBridge.stopRealtimeListeners();
+                window.FirebaseBridge.unsubscribers.forEach(unsub => unsub && unsub());
+                window.FirebaseBridge.unsubscribers = [];
+                if (window.FirebaseBridge.etollStateUnsubscriber) { try { window.FirebaseBridge.etollStateUnsubscriber(); } catch (e) {} window.FirebaseBridge.etollStateUnsubscriber = null; }
                 window.FirebaseBridge.isConnected = false;
                 window.FirebaseBridge.lastSyncTime = null;
                 window.FirebaseBridge.db = null;
