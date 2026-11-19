@@ -1851,6 +1851,29 @@
     <!-- TOAST NOTIFICATION CONTAINER -->
     <div id="toast-container" class="fixed bottom-16 sm:bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
+    <!-- Konfigurasi RTDB global harus tersedia sebelum script klasik berjalan. -->
+    <script>
+        window.INDEX1_FIREBASE_CONFIG = Object.freeze({
+            apiKey: "AIzaSyAi0Ucng_tl7jSC9gZtr0JItCBUtkt-vvU",
+            authDomain: "uns-fleet-service.firebaseapp.com",
+            databaseURL: "https://uns-fleet-service-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "uns-fleet-service",
+            storageBucket: "uns-fleet-service.firebasestorage.app",
+            messagingSenderId: "881806830475",
+            appId: "1:881806830475:web:8dcf991ec95ae93b625d8e",
+            measurementId: "G-REWR64QLNH"
+        });
+        window.REKAPTOLL_FIREBASE_CONFIG = Object.freeze({
+            apiKey: "AIzaSyA3Gtz2w1erDlP_FtTPTHOes1YZoQ56jJU",
+            authDomain: "rekaptoll-production.firebaseapp.com",
+            databaseURL: "https://rekaptoll-production-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "rekaptoll-production",
+            storageBucket: "rekaptoll-production.firebasestorage.app",
+            messagingSenderId: "441481183431",
+            appId: "1:441481183431:web:d6490b7f1269a6334bfee2"
+        });
+    </script>
+
     <!-- Firebase SDK Modules -->
     <script type="module">
         import { initializeApp, getApps, getApp, deleteApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -3498,12 +3521,12 @@
             notifyEtoll: true
         });
 
-        let isAdminLoggedIn = false;
+        var isAdminLoggedIn = false;
         let pendingAdminCallback = null;
-        let selectedCategoryFilter = "Semua";
+        var selectedCategoryFilter = "Semua";
         let selectedSortMode = "frequent";
         var fleetSearchTerm = "";
-        let activeStatType = "total";
+        var activeStatType = "total";
         let driverInputMode = "registered";
         let swapMode = "off_swap";
         let cloudSaveTimer = null;
