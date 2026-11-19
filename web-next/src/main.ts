@@ -36,17 +36,24 @@ const fmt = (value: number) => new Intl.NumberFormat("id-ID").format(value);
 function renderStats(data: DashboardData): void {
   const active = activeTrips();
   const activeIds = new Set(active.map((trip) => trip.vehicleId));
-  const available = data.vehicles.filter((v) => v.active && v.operational && !activeIds.has(v.id));
+  const available = data.vehicles.filter((v) =>
+    v.active && v.operational && v.usageCategory === "OPERATIONAL" && v.status === "IN_GARAGE" &&
+    !activeIds.has(v.id) && !active.some((trip) => trip.plate.toUpperCase() === v.plate.toUpperCase()),
+  );
+  const activeFleet = data.vehicles.filter((v) => v.active !== false).length;
+  const activeEtolls = data.etollCards.filter((card) => card.active !== false);
+  const readyEtolls = activeEtolls.filter((card) => card.status === "AVAILABLE").length;
+  const etollBalance = activeEtolls.reduce((sum, card) => sum + (Number(card.balance) || 0), 0);
   const operationalDrivers = data.drivers.filter((d) => d.active && !["PIMPINAN", "EXECUTIVE"].includes(d.category));
   const busyDriverIds = new Set(active.map((trip) => trip.driverId));
   const readyDrivers = operationalDrivers.filter((driver) => !busyDriverIds.has(driver.id));
   const total = data.vehicles.filter((v) => v.active).length;
   const stats = [
-    ["Total Armada", total, "Unit terdaftar", "cyan"],
+    ["Total Armada", `${activeFleet} / ${total}`, "Unit aktif / seluruh terdaftar", "cyan"],
     ["Di Garasi (Ready)", available.length, "Siap ditugaskan", "green"],
     ["Sedang Keluar", active.length, "Di luar garasi", "amber"],
     ["Driver Operasional Ready", readyDrivers.length, "Aktif dan tidak bertugas", "violet"],
-    ["Kartu E-Toll", data.rekapConnected ? `${data.etollCards.filter((card) => card.active).length} / ${data.etollCards.length}` : "—", !data.rekapConnected ? "Sumber RekapToll belum terbaca" : data.monthlyTopupTotal === null ? "Total top up belum terbaca" : `Top up bulan ini Rp ${fmt(data.monthlyTopupTotal)}`, "rose"],
+    ["Kartu E-Toll", data.rekapConnected ? `${readyEtolls} / ${activeEtolls.length}` : "—", !data.rekapConnected ? "Sumber RekapToll belum terbaca" : `Total saldo aktif Rp ${fmt(etollBalance)}`, "rose"],
   ];
   const el = $("stats");
   if (el) el.innerHTML = stats.map(([label, value, note, tone]) =>
