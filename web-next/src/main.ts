@@ -100,6 +100,8 @@ function renderStats(data: DashboardData): void {
     `<article class="stat-card ${tone}"><div class="stat-top"><span>${label}</span><i>●</i></div><strong>${value}</strong><small>${note}</small></article>`,
   ).join("");
   $("active-count")!.textContent = `${active.length} Unit`;
+  const activeSection = $("active-section");
+  if (activeSection) activeSection.classList.toggle("has-no-trips", active.length === 0);
   $("active-caption")!.textContent = `${active.length} perjalanan berstatus ACTIVE dari Firestore`;
 }
 
@@ -116,25 +118,62 @@ function renderTrips(trips: GateTrip[]): void {
   ).join("");
 }
 
-function renderVehicles(vehicles: Vehicle[]): void {
+let selectedCategory = "Semua";
+function renderCategoryFilters(vehicles: Vehicle[]): void {
+  const host = $("category-filters");
+  if (!host) return;
+  const categories = ["Semua", "MPV", "Sedan", "Bus", "Hiace", "PickUP"];
+  host.innerHTML = categories.map((category) => {
+    const count = category === "Semua" ? vehicles.filter((v) => v.active).length
+      : vehicles.filter((v) => v.active && v.category.toLowerCase() === category.toLowerCase()).length;
+    if (!count && category !== "Semua") return "";
+    return `<button type="button" class="filter-chip ${selectedCategory === category ? "active" : ""}" data-category="${esc(category)}">${esc(category)} <span>${count}</span></button>`;
+  }).join("");
+  host.querySelectorAll<HTMLButtonElement>("[data-category]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedCategory = button.dataset.category || "Semua";
+      if (snapshot) renderVehicleCards("monitoring-vehicles-grid", snapshot.vehicles, "monitor-search", true);
+    });
+  });
+}
+function renderVehicleCards(containerId: string, vehicles: Vehicle[], searchId: string, monitoring = false): void {
   const active = activeTrips();
   const activeIds = new Set(active.map((trip) => trip.vehicleId));
   const activePlates = new Set(active.map((trip) => trip.plate.toUpperCase()));
-  const term = ($<HTMLInputElement>("search")?.value || "").trim().toLowerCase();
-  const list = vehicles.filter((v) => v.active && !activeIds.has(v.id) && !activePlates.has(v.plate.toUpperCase()))
-    .filter((v) => [v.plate,v.model,v.category,v.unitNo,v.odometer].join(" ").toLowerCase().includes(term))
-    .sort((a,b) => (a.unitNo || 999) - (b.unitNo || 999));
-  const el = $("vehicle-grid");
+  const term = ($<HTMLInputElement>(searchId)?.value || "").trim().toLowerCase();
+  let list = vehicles.filter((v) => v.active !== false)
+    .filter((v) => !monitoring || selectedCategory === "Semua" || v.category.toLowerCase() === selectedCategory.toLowerCase())
+    .filter((v) => [v.plate,v.model,v.category,v.unitNo,v.odometer].join(" ").toLowerCase().includes(term));
+  const sort = monitoring ? ($<HTMLSelectElement>("vehicle-sort")?.value || "frequent") : "unit";
+  if (sort === "plate") list.sort((a,b) => a.plate.localeCompare(b.plate));
+  else if (sort === "km-asc") list.sort((a,b) => a.odometer-b.odometer);
+  else if (sort === "km-desc") list.sort((a,b) => b.odometer-a.odometer);
+  else if (sort === "category") list.sort((a,b) => a.category.localeCompare(b.category));
+  else if (sort === "ops") list.sort((a,b) => Number(b.usageCategory === "OPERATIONAL")-Number(a.usageCategory === "OPERATIONAL"));
+  else if (sort === "pimpinan") list.sort((a,b) => Number(b.usageCategory === "PIMPINAN")-Number(a.usageCategory === "PIMPINAN"));
+  else if (sort === "garage") list.sort((a,b) => Number(b.status === "IN_GARAGE")-Number(a.status === "IN_GARAGE"));
+  else list.sort((a,b) => (a.unitNo || 999)-(b.unitNo || 999));
+  const el = $(containerId);
   if (!el) return;
-  el.innerHTML = list.length ? list.map((v) => `
-    <article class="vehicle-card"><div class="vehicle-top"><b>${esc(v.plate)}</b><span class="ready">DI GARASI</span></div>
-      <h3>${esc(v.model)}</h3><div class="tags"><span>${esc(v.category)}</span><span>${v.usageCategory === "PIMPINAN" ? "Pimpinan" : "Operasional"}</span></div>
-      <div class="km">ODO <b>${fmt(v.odometer)} KM</b></div>
-      <small>Unit ${esc(v.unitNo ?? "—")} • ${v.operational ? "Operasional" : "Dalam perbaikan"}</small>
-    </article>`,
-  ).join("") : '<div class="empty">Tidak ada kendaraan yang cocok dengan pencarian.</div>';
+  el.innerHTML = list.length ? list.map((v) => {
+    const trip = active.find((item) => item.vehicleId === v.id || item.plate.toUpperCase() === v.plate.toUpperCase());
+    const isOut = Boolean(trip || activeIds.has(v.id) || activePlates.has(v.plate.toUpperCase()));
+    const stateClass = isOut ? "vehicle-card-out" : v.operational ? "vehicle-card-in" : "vehicle-card-maintenance";
+    const stateLabel = isOut ? "SEDANG BERTUGAS" : v.operational ? "DI GARASI" : "NON-OPERASIONAL";
+    return `<article class="vehicle-card ${stateClass}">
+      <div class="vehicle-top"><b>${esc(v.plate)}</b><span class="vehicle-status-badge">${stateLabel}</span></div>
+      <h3>${esc(v.model)}</h3>
+      <div class="tags"><span>${esc(v.category)}</span><span>${v.usageCategory === "PIMPINAN" ? "Pimpinan" : "Operasional"}</span></div>
+      <div class="km"><span>ODO</span><b>${fmt(v.odometer)} KM</b></div>
+      <small>${trip ? "👤 " + esc(trip.driverName) + " • 📍 " + esc(trip.destination || "-") : "Unit " + esc(v.unitNo ?? "—") + " • " + (v.operational ? "Siap operasional" : "Dalam perbaikan")}</small>
+    </article>`;
+  }).join("") : '<div class="empty">Tidak ada kendaraan yang sesuai dengan pencarian.</div>';
 }
-
+function renderVehicles(vehicles: Vehicle[]): void {
+  renderCategoryFilters(vehicles);
+  renderVehicleCards("monitoring-vehicles-grid", vehicles, "monitor-search", true);
+  renderVehicleCards("vehicle-grid", vehicles, "search", false);
+}
 function renderTables(data: DashboardData): void {
   const logRows = $("logbook-rows");
   if (logRows) logRows.innerHTML = [...data.trips].sort((a,b) => Date.parse(b.timeOut || "") - Date.parse(a.timeOut || "")).map((trip) =>
@@ -190,10 +229,12 @@ document.querySelectorAll<HTMLAnchorElement>("[data-view]").forEach((link) => {
     const target = link.dataset.view || "dashboard";
     document.querySelectorAll<HTMLElement>(".view").forEach((view) => view.classList.add("hidden"));
     document.getElementById(`${target}-view`)?.classList.remove("hidden");
-    document.querySelectorAll<HTMLAnchorElement>("[data-view]").forEach((item) => item.classList.toggle("selected", item === link));
+    document.querySelectorAll<HTMLAnchorElement>("[data-view]").forEach((item) => item.classList.toggle("active", item === link));
     if (snapshot && target === "vehicles") renderVehicles(snapshot.vehicles);
   });
 });
 $("refresh")?.addEventListener("click", () => void refresh());
-$("search")?.addEventListener("input", () => { if (snapshot) renderVehicles(snapshot.vehicles); });
+$("search")?.addEventListener("input", () => { if (snapshot) renderVehicleCards("vehicle-grid", snapshot.vehicles, "search", false); });
+$("monitor-search")?.addEventListener("input", () => { if (snapshot) renderVehicleCards("monitoring-vehicles-grid", snapshot.vehicles, "monitor-search", true); });
+$("vehicle-sort")?.addEventListener("change", () => { if (snapshot) renderVehicleCards("monitoring-vehicles-grid", snapshot.vehicles, "monitor-search", true); });
 void refresh();
