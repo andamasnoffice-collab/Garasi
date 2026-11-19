@@ -45,9 +45,12 @@ function renderStats(data: DashboardData): void {
   const readyEtolls = activeEtolls.filter((card) => card.status === "AVAILABLE").length;
   const etollBalance = activeEtolls.reduce((sum, card) => sum + (Number(card.balance) || 0), 0);
   const operationalDrivers = data.drivers.filter((d) => d.active && !["PIMPINAN", "EXECUTIVE"].includes(d.category));
-  const busyDriverIds = new Set(active.map((trip) => trip.driverId));
-  const readyDrivers = operationalDrivers.filter((driver) => !busyDriverIds.has(driver.id));
-  const total = data.vehicles.filter((v) => v.active).length;
+  const busyDriverIds = new Set(active.map((trip) => trip.driverId).filter(Boolean));
+  const busyDriverNames = new Set(active.map((trip) => trip.driverName.trim().toLowerCase()).filter(Boolean));
+  const readyDrivers = operationalDrivers.filter((driver) =>
+    !busyDriverIds.has(driver.id) && !busyDriverNames.has(driver.name.trim().toLowerCase()),
+  );
+  const total = data.vehicles.length;
   const stats = [
     ["Total Armada", `${activeFleet} / ${total}`, "Unit aktif / seluruh terdaftar", "cyan"],
     ["Di Garasi (Ready)", available.length, "Siap ditugaskan", "green"],
