@@ -1879,7 +1879,6 @@
             appId: "1:854283207354:web:f836e125e125e8aaaeb883"
         });
         window.GARASIKU_DEFAULT_FIREBASE_CONFIG = DEFAULT_FIREBASE_CONFIG;
-        window.INDEX1_FIREBASE_CONFIG = INDEX1_FIREBASE_CONFIG;
 
         // Index1 adalah sumber master kendaraan dan odometer. Koneksi terpisah
         // memakai Anonymous Auth; izin tulis dibatasi Rules pada currentKm.
@@ -1903,8 +1902,10 @@
             projectId: "rekaptoll-production",
             storageBucket: "rekaptoll-production.firebasestorage.app",
             messagingSenderId: "441481183431",
-            appId: "1:441481183431:web:d6490b7f1269a6334bfee2"
         });
+        window.INDEX1_FIREBASE_CONFIG = INDEX1_FIREBASE_CONFIG;
+
+        const REKAPTOLL_FIREBASE_CONFIG = Object.freeze({
         window.REKAPTOLL_FIREBASE_CONFIG = REKAPTOLL_FIREBASE_CONFIG;
 
         // State operasional E-Toll milik GarasiKu disimpan di Firestore.
@@ -3501,7 +3502,7 @@
         let pendingAdminCallback = null;
         let selectedCategoryFilter = "Semua";
         let selectedSortMode = "frequent";
-        let fleetSearchTerm = "";
+        var fleetSearchTerm = "";
         let activeStatType = "total";
         let driverInputMode = "registered";
         let swapMode = "off_swap";
