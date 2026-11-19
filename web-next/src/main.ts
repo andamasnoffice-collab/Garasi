@@ -81,6 +81,9 @@ function renderStats(data: DashboardData): void {
   const activeEtolls = data.etollCards.filter((card) => card.active !== false);
   const readyEtolls = activeEtolls.filter((card) => card.status === "AVAILABLE").length;
   const etollBalance = activeEtolls.reduce((sum, card) => sum + (Number(card.balance) || 0), 0);
+  const etollNote = !data.rekapConnected ? "Sumber RekapToll belum terbaca"
+    : data.etollCards.length === 0 ? "Master kartu terbaca: 0 record (periksa path cards)"
+    : `${activeEtolls.length} kartu ON dari ${data.etollCards.length} kartu master • Saldo Rp ${fmt(etollBalance)}`;
   const operationalDrivers = data.drivers.filter((d) => d.active && !["PIMPINAN", "EXECUTIVE"].includes(d.category));
   const busyDriverIds = new Set(active.map((trip) => trip.driverId).filter(Boolean));
   const busyDriverNames = new Set(active.map((trip) => trip.driverName.trim().toLowerCase()).filter(Boolean));
@@ -93,7 +96,7 @@ function renderStats(data: DashboardData): void {
     ["Di Garasi (Ready)", available.length, "Siap ditugaskan", "green"],
     ["Sedang Keluar", active.length, "Di luar garasi", "amber"],
     ["Driver Operasional Ready", readyDrivers.length, "Aktif dan tidak bertugas", "violet"],
-    ["Kartu E-Toll", data.rekapConnected ? `${readyEtolls} / ${activeEtolls.length}` : "—", !data.rekapConnected ? "Sumber RekapToll belum terbaca" : `Total saldo aktif Rp ${fmt(etollBalance)}`, "rose"],
+    ["Kartu E-Toll", data.rekapConnected ? `${readyEtolls} / ${activeEtolls.length}` : "—", etollNote, "rose"],
   ];
   const glyphs: Record<string, string> = { cyan: "🚘", green: "P", amber: "↗", violet: "♟", rose: "▣" };
   const el = $("stats");
