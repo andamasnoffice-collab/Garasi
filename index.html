@@ -1874,6 +1874,18 @@
         });
         window.GARASIKU_DEFAULT_FIREBASE_CONFIG = DEFAULT_FIREBASE_CONFIG;
 
+        // RekapToll adalah proyek terpisah. GarasiKu hanya memakai Anonymous Auth
+        // untuk membaca RTDB sesuai Rules RekapToll; tidak ada operasi tulis.
+        const REKAPTOLL_FIREBASE_CONFIG = Object.freeze({
+            apiKey: "AIzaSyA3Gtz2w1erDlP_FtTPTHOes1YZoQ56jJU",
+            authDomain: "rekaptoll-production.firebaseapp.com",
+            databaseURL: "https://rekaptoll-production-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "rekaptoll-production",
+            storageBucket: "rekaptoll-production.firebasestorage.app",
+            messagingSenderId: "441481183431",
+            appId: "1:441481183431:web:d6490b7f1269a6334bfee2"
+        });
+
         // State operasional E-Toll milik GarasiKu disimpan di Firestore.
         // Master identitas kartu tetap berasal dari RekapToll (RTDB).
         window.cloudEtollState = {};
@@ -3054,6 +3066,10 @@
         window.EtollMasterBridge = {
             sourceProjectId: 'rekaptoll-production',
             sourcePath: 'cards',
+            databaseUrl: REKAPTOLL_FIREBASE_CONFIG.databaseURL,
+            authApp: null,
+            auth: null,
+            authReady: null,
             intervalMs: 0, // tidak polling otomatis; baca saat startup/manual
             timer: null,
             syncing: false,
@@ -3061,15 +3077,39 @@
             monthlyTopupsByNumber: {},
             monthlyTopupMonth: '',
 
+            async getReadToken() {
+                if (!this.authReady) {
+                    this.authReady = (async () => {
+                        const appName = 'garasiku-rekaptoll-reader';
+                        this.authApp = getApps().find(app => app.name === appName)
+                            || initializeApp(REKAPTOLL_FIREBASE_CONFIG, appName);
+                        this.auth = getAuth(this.authApp);
+                        if (!this.auth.currentUser) {
+                            await signInAnonymously(this.auth);
+                        }
+                        if (!this.auth.currentUser) throw new Error('Anonymous Auth RekapToll belum berhasil.');
+                    })().catch(error => {
+                        this.authReady = null;
+                        throw error;
+                    });
+                }
+                await this.authReady;
+                return this.auth.currentUser.getIdToken();
+            },
+
             getLocalMonthKey(date = new Date()) {
                 return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
             },
             async readSourceJson(path) {
-                // Pola baca mengikuti dashboard RekapToll: REST RTDB read-only tanpa
-                // menanam API key proyek sumber ke repository GarasiKu.
-                const baseUrl = `https://${this.sourceProjectId}-default-rtdb.asia-southeast1.firebasedatabase.app`;
-                const response = await fetch(`${baseUrl}/${path}.json`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
-                if (!response.ok) throw new Error(`Gagal membaca RekapToll ${path}: HTTP ${response.status}`);
+                // RTDB menolak akses anonim tanpa token meskipun Rules mengizinkan
+                // provider anonymous. Token diperoleh dari proyek RekapToll terpisah.
+                const token = await this.getReadToken();
+                const cleanPath = String(path || '').replace(/^\\/+|\\/+$/g, '');
+                const response = await fetch(`${this.databaseUrl}/${cleanPath}.json?auth=${encodeURIComponent(token)}`, {
+                    cache: 'no-store',
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!response.ok) throw new Error(`Gagal membaca RekapToll ${cleanPath}: HTTP ${response.status}`);
                 return response.json();
             },
             async syncMonthlyTopups() {
