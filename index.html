@@ -2461,17 +2461,18 @@
                             // Cek juga perjalanan ACTIVE lama yang dibuat sebelum mekanisme
                             // lock tersedia, agar migrasi tidak membuka celah penugasan ganda.
                             const activeCol = this.gateLogsCollection();
-                            const activeQueries = [];
-                            if (log.vehicleId) activeQueries.push({ kind: 'kendaraan', snapshot: await tx.get(query(activeCol, where('vehicleId', '==', log.vehicleId))) });
-                            if (log.driverId) activeQueries.push({ kind: 'driver', snapshot: await tx.get(query(activeCol, where('driverId', '==', log.driverId))) });
+                            // Satu query status ACTIVE untuk seluruh armada (umumnya hanya
+                            // beberapa dokumen), bukan membaca histori per kendaraan/driver.
+                            const activeSnap = await tx.get(query(activeCol, where('status', '==', 'ACTIVE')));
                             if (currentSnap.exists() && currentSnap.data()?.status === 'ACTIVE') {
                                 throw new Error('Transaksi kendaraan ini sudah aktif. Muat ulang logbook.');
                             }
-                            for (const active of activeQueries) {
-                                const conflict = active.snapshot.docs.find(d => d.id !== log.id && !String(d.id).startsWith('__LOCK_'));
-                                if (conflict) throw new Error(active.kind === 'kendaraan'
-                                    ? 'Kendaraan masih memiliki perjalanan aktif. Muat ulang logbook.'
-                                    : 'Driver masih memiliki perjalanan aktif. Muat ulang logbook.');
+                            const activeTrips = activeSnap.docs.filter(d => d.id !== log.id && !String(d.id).startsWith('__LOCK_'));
+                            if (log.vehicleId && activeTrips.some(d => d.data()?.vehicleId === log.vehicleId)) {
+                                throw new Error('Kendaraan masih memiliki perjalanan aktif. Muat ulang logbook.');
+                            }
+                            if (log.driverId && activeTrips.some(d => d.data()?.driverId === log.driverId)) {
+                                throw new Error('Driver masih memiliki perjalanan aktif. Muat ulang logbook.');
                             }
                             for (const lock of lockSnaps) {
                                 if (lock.snap.exists() && lock.snap.data()?.tripId !== log.id) {
