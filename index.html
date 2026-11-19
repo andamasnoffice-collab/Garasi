@@ -1909,6 +1909,7 @@
         window.FirebaseBridge = {
             stateBaseline: null,
             stateWriteInFlight: null,
+            stateWriteRequested: false,
             app: null,
             db: null,
             auth: null,
@@ -1988,6 +1989,7 @@
                         this.unsubscribers = [];
                         if (this.etollStateUnsubscriber) { try { this.etollStateUnsubscriber(); } catch (e) {} this.etollStateUnsubscriber = null; }
                         if (this.vehicleSettingsUnsubscriber) { try { this.vehicleSettingsUnsubscriber(); } catch (e) {} this.vehicleSettingsUnsubscriber = null; }
+                        if (this.driverMasterUnsubscriber) { try { this.driverMasterUnsubscriber(); } catch (e) {} this.driverMasterUnsubscriber = null; }
                         if (this.gateLogsUnsubscriber) {
                             try { this.gateLogsUnsubscriber(); } catch (e) {}
                             this.gateLogsUnsubscriber = null;
@@ -2440,37 +2442,66 @@
                     return false;
                 }
 
-                // DIRECT FIREBASE: tidak ada localStorage queue dan tidak ada serial queue.
-                // Setiap transaksi dikirim langsung ke satu dokumen Firestore. UI tidak menunggu
-                // round-trip server; Firestore SDK sendiri menangani latency compensation dan
-                // onSnapshot(metadata) di atas akan mengonfirmasi saat write benar-benar server-side.
-                this.lastGateWriteError = '';
-                let writePromise;
-                try {
-                    writePromise = setDoc(ref, { ...log }, { merge: false });
-                } catch (e) {
-                    const detail = e?.code ? `${e.code}: ${e?.message || ''}`.trim() : (e?.message || 'write ditolak');
-                    this.lastGateWriteError = detail;
-                    this.updateStatusUI(false, `Firebase write gagal: ${detail}`);
-                    return false;
-                }
+                // Kunci transaksi ditempatkan di koleksi gate_logs yang sama agar tidak
+                // memerlukan perubahan Rules/subkoleksi baru. Dokumen LOCK tidak ikut
+                // terbaca query logbook karena tidak memiliki timeOut/status ACTIVE.
+                const lockId = value => String(value || '').trim().replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 120);
+                const lockRefs = [];
+                if (log.vehicleId) lockRefs.push({ kind: 'kendaraan', ref: this.gateLogRef('__LOCK_VEHICLE__' + lockId(log.vehicleId)) });
+                if (log.driverId) lockRefs.push({ kind: 'driver', ref: this.gateLogRef('__LOCK_DRIVER__' + lockId(log.driverId)) });
 
-                writePromise.then(() => {
+                this.lastGateWriteError = '';
+                try {
+                    await runTransaction(this.db, async tx => {
+                        const currentSnap = await tx.get(ref);
+                        const lockSnaps = [];
+                        for (const lock of lockRefs) lockSnaps.push({ ...lock, snap: await tx.get(lock.ref) });
+
+                        if (log.status === 'ACTIVE') {
+                            if (currentSnap.exists() && currentSnap.data()?.status === 'ACTIVE') {
+                                throw new Error('Transaksi kendaraan ini sudah aktif. Muat ulang logbook.');
+                            }
+                            for (const lock of lockSnaps) {
+                                if (lock.snap.exists() && lock.snap.data()?.tripId !== log.id) {
+                                    throw new Error(lock.kind === 'kendaraan'
+                                        ? 'Kendaraan sedang digunakan pada perangkat lain. Muat ulang data.'
+                                        : 'Driver sedang bertugas pada perangkat lain. Muat ulang data.');
+                                }
+                            }
+                            tx.set(ref, { ...log }, { merge: false });
+                            lockSnaps.forEach(lock => tx.set(lock.ref, {
+                                type: 'ACTIVE_TRIP_LOCK', tripId: log.id, vehicleId: log.vehicleId || null,
+                                driverId: log.driverId || null, updatedAt: new Date().toISOString()
+                            }, { merge: false }));
+                            return;
+                        }
+
+                        if (log.status === 'COMPLETED') {
+                            if (!currentSnap.exists()) throw new Error('Logbook asal tidak ditemukan di server. Muat ulang sebelum mencatat kendaraan masuk.');
+                            if (currentSnap.data()?.status !== 'ACTIVE') throw new Error('Perjalanan sudah diselesaikan atau berubah pada perangkat lain.');
+                            tx.set(ref, { ...log }, { merge: false });
+                            lockSnaps.forEach(lock => {
+                                if (lock.snap.exists() && lock.snap.data()?.tripId === log.id) tx.delete(lock.ref);
+                            });
+                            return;
+                        }
+
+                        tx.set(ref, { ...log }, { merge: false });
+                    });
                     this.lastGateWriteError = '';
                     this.isConnected = true;
                     this.lastSyncTime = new Date();
                     this.updateStatusUI(true, `Firebase terkonfirmasi • ${log.plate || log.id}`);
                     if (typeof options.onServerConfirmed === 'function') options.onServerConfirmed();
-                }).catch((e) => {
+                    return true;
+                } catch (e) {
                     const detail = e?.code ? `${e.code}: ${e?.message || ''}`.trim() : (e?.message || 'write ditolak');
                     this.lastGateWriteError = detail;
                     this.isConnected = false;
                     this.updateStatusUI(false, `Firebase write gagal: ${detail}`);
                     if (typeof options.onServerError === 'function') options.onServerError(detail);
-                });
-
-                // Write sudah dikirim ke Firebase SDK; jangan menunggu server di event handler.
-                return true;
+                    return false;
+                }
             },
 
             async deleteGateLog(logId, options = {}) {
@@ -2623,8 +2654,16 @@
                     this.updateStatusUI(false, 'Firebase belum siap / Auth belum aktif');
                     return false;
                 }
-                // Gabungkan pemanggilan beruntun agar tidak mengirim write identik paralel.
-                if (this.stateWriteInFlight) return this.stateWriteInFlight;
+                // Jika ada perubahan ketika transaksi berjalan, tandai agar satu
+                // putaran susulan mengirim snapshot terbaru setelah transaksi aktif selesai.
+                if (this.stateWriteInFlight) {
+                    this.stateWriteRequested = true;
+                    return this.stateWriteInFlight.then(result => {
+                        if (!this.stateWriteRequested) return result;
+                        this.stateWriteRequested = false;
+                        return this.pushStateToCloud();
+                    });
+                }
                 this.stateWriteInFlight = (async () => {
                     try {
                         const syncDoc = doc(this.db, 'garasiku_fleet', 'shared_state');
@@ -2942,7 +2981,11 @@
                     const res = await fetch(`${this.baseUrl}/${this.path}.json?ts=${Date.now()}`, {cache:'no-store'});
                     if (!res.ok) throw new Error(`HTTP ${res.status}`);
                     const data = await res.json();
+                    if (!data || typeof data !== 'object' || Array.isArray(data) && data.length === 0 || !Object.keys(data).length) {
+                        throw new Error('Master kendaraan Index 1 kosong/tidak valid; data yang sedang tampil dipertahankan.');
+                    }
                     const arr = data && typeof data === 'object' ? Object.entries(data).map(([key,val]) => ({...(val || {}), _fbKey:key})) : [];
+                    if (!arr.length) throw new Error('Master kendaraan Index 1 tidak berisi record valid; data lokal tidak ditimpa.');
                     window.vehicles = arr.map((v, i) => ({
                         ...v,
                         id: v.id || v._fbKey || `IDX1-${i+1}`,
