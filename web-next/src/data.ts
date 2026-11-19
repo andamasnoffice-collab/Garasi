@@ -17,7 +17,7 @@ export interface Driver { id: string; name: string; category: string; active: bo
 export interface GateTrip {
   id: string; vehicleId: string; driverId?: string; plate: string; model: string;
   driverName: string; destination?: string; timeOut?: string; timeIn?: string;
-  kmStart?: number; status: string;
+  kmStart?: number; kmEnd?: number; purpose?: string; status: string;
 }
 export interface EtollCard {
   id: string; number: string; last4: string; active: boolean;
@@ -60,7 +60,7 @@ function mapTrip(id: string, raw: DocumentData): GateTrip {
     plate: normalizePlate(raw.plate), model: String(raw.model || "Mobil Dinas"),
     driverName: String(raw.driverName || "-"), destination: String(raw.destination || ""),
     timeOut: String(raw.timeOut || ""), timeIn: String(raw.timeIn || ""),
-    kmStart: Number(raw.kmStart) || 0, status: String(raw.status || ""),
+    kmStart: Number(raw.kmStart) || 0, kmEnd: Number(raw.kmEnd) || 0, purpose: String(raw.purpose || ""), status: String(raw.status || ""),
   };
 }
 
