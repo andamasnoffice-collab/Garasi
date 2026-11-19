@@ -140,16 +140,23 @@ function renderCategoryFilters(vehicles: Vehicle[]): void {
     });
   });
 }
+function vehiclesTripCount(vehicle: Vehicle, trips: GateTrip[]): number {
+  return trips.filter((trip) => trip.vehicleId === vehicle.id || trip.plate.toUpperCase() === vehicle.plate.toUpperCase()).length;
+}
 function renderVehicleCards(containerId: string, vehicles: Vehicle[], searchId: string, monitoring = false): void {
   const active = activeTrips();
   const activeIds = new Set(active.map((trip) => trip.vehicleId));
   const activePlates = new Set(active.map((trip) => trip.plate.toUpperCase()));
   const term = ($<HTMLInputElement>(searchId)?.value || "").trim().toLowerCase();
   let list = vehicles.filter((v) => v.active !== false)
+    .filter((v) => !monitoring || (!activeIds.has(v.id) && !activePlates.has(v.plate.toUpperCase())))
     .filter((v) => !monitoring || selectedCategory === "Semua" || v.category.toLowerCase() === selectedCategory.toLowerCase())
     .filter((v) => [v.plate,v.model,v.category,v.unitNo,v.odometer].join(" ").toLowerCase().includes(term));
   const sort = monitoring ? ($<HTMLSelectElement>("vehicle-sort")?.value || "frequent") : "unit";
-  if (sort === "plate") list.sort((a,b) => a.plate.localeCompare(b.plate));
+  if (sort === "frequent") list.sort((a,b) =>
+    vehiclesTripCount(b, active) - vehiclesTripCount(a, active) || (a.unitNo || 999) - (b.unitNo || 999),
+  );
+  else if (sort === "plate") list.sort((a,b) => a.plate.localeCompare(b.plate));
   else if (sort === "km-asc") list.sort((a,b) => a.odometer-b.odometer);
   else if (sort === "km-desc") list.sort((a,b) => b.odometer-a.odometer);
   else if (sort === "category") list.sort((a,b) => a.category.localeCompare(b.category));
