@@ -95,9 +95,10 @@ function renderStats(data: DashboardData): void {
     ["Driver Operasional Ready", readyDrivers.length, "Aktif dan tidak bertugas", "violet"],
     ["Kartu E-Toll", data.rekapConnected ? `${readyEtolls} / ${activeEtolls.length}` : "—", !data.rekapConnected ? "Sumber RekapToll belum terbaca" : `Total saldo aktif Rp ${fmt(etollBalance)}`, "rose"],
   ];
+  const glyphs: Record<string, string> = { cyan: "🚘", green: "P", amber: "↗", violet: "♟", rose: "▣" };
   const el = $("stats");
   if (el) el.innerHTML = stats.map(([label, value, note, tone]) =>
-    `<article class="stat-card ${tone}"><div class="stat-top"><span>${label}</span><i>●</i></div><strong>${value}</strong><small>${note}</small></article>`,
+    `<article class="stat-card ${tone}"><div class="stat-top"><span>${label}</span><i>${glyphs[tone] || "●"}</i></div><strong>${value}</strong><small>${note}</small></article>`,
   ).join("");
   $("active-count")!.textContent = `${active.length} Unit`;
   const activeSection = $("active-section");
