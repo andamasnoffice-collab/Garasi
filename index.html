@@ -3104,7 +3104,7 @@
                 // RTDB menolak akses anonim tanpa token meskipun Rules mengizinkan
                 // provider anonymous. Token diperoleh dari proyek RekapToll terpisah.
                 const token = await this.getReadToken();
-                const cleanPath = String(path || '').replace(/^\\/+|\\/+$/g, '');
+                const cleanPath = String(path || '').split('/').filter(Boolean).join('/');
                 const response = await fetch(`${this.databaseUrl}/${cleanPath}.json?auth=${encodeURIComponent(token)}`, {
                     cache: 'no-store',
                     headers: { 'Accept': 'application/json' }
