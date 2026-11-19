@@ -1,0 +1,15 @@
+# Web build artifacts and local environment
+node_modules/
+web-next/node_modules/
+web-next/dist/
+web-next/.env
+web-next/.env.*
+!web-next/.env.example
+
+# Android local build and signing material
+.gradle/
+**/build/
+local.properties
+*.jks
+*.keystore
+android-native/app/google-services.json
