@@ -46,7 +46,7 @@ function renderStats(data: DashboardData): void {
     ["Di Garasi (Ready)", available.length, "Siap ditugaskan", "green"],
     ["Sedang Keluar", active.length, "Di luar garasi", "amber"],
     ["Driver Operasional Ready", readyDrivers.length, "Aktif dan tidak bertugas", "violet"],
-    ["Kartu E-Toll", `${data.etollCards.filter((card) => card.active).length} / ${data.etollCards.length}`, data.monthlyTopupTotal === null ? "Total top up belum terbaca" : `Top up bulan ini Rp ${fmt(data.monthlyTopupTotal)}`, "rose"],
+    ["Kartu E-Toll", data.rekapConnected ? `${data.etollCards.filter((card) => card.active).length} / ${data.etollCards.length}` : "—", !data.rekapConnected ? "Sumber RekapToll belum terbaca" : data.monthlyTopupTotal === null ? "Total top up belum terbaca" : `Top up bulan ini Rp ${fmt(data.monthlyTopupTotal)}`, "rose"],
   ];
   const el = $("stats");
   if (el) el.innerHTML = stats.map(([label, value, note, tone]) =>
