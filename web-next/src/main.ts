@@ -8,14 +8,19 @@ root.innerHTML = `
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand"><div class="brand-mark">G</div><div><b>GarasiKu</b><small>GATE PRO • NEXT</small></div></div>
-      <nav><a class="selected">▦ <span>Monitoring Garasi</span></a><a>▤ <span>Logbook Gerbang</span></a><a>🚘 <span>Daftar Armada</span></a><a>♟ <span>Daftar Driver</span></a><a>▣ <span>Rekap E-Toll</span></a></nav>
+      <nav><a class="selected" href="#dashboard" data-view="dashboard">▦ <span>Monitoring Garasi</span></a><a href="#logbook" data-view="logbook">▤ <span>Logbook Gerbang</span></a><a href="#vehicles" data-view="vehicles">🚘 <span>Daftar Armada</span></a><a href="#drivers" data-view="drivers">♟ <span>Daftar Driver</span></a><a href="#etoll" data-view="etoll">▣ <span>Rekap E-Toll</span></a></nav>
       <div class="sidebar-foot">Versi baru • Preview paralel</div>
     </aside>
     <main class="main">
       <header class="topbar"><div><h1>Monitoring Garasi</h1><p>Ringkasan operasional armada secara langsung</p></div><div class="top-actions"><span id="cloud-status" class="cloud">● Menghubungkan</span><button id="refresh" class="secondary">↻ Refresh</button></div></header>
-      <section id="stats" class="stats"><div class="stat">Memuat data…</div></section>
-      <section class="section"><div class="section-head"><div><h2>Armada Sedang Bertugas di Luar</h2><p id="active-caption">Memuat perjalanan aktif</p></div><span id="active-count" class="pill">—</span></div><div id="active-trips" class="trip-grid"></div></section>
-      <section class="section"><div class="section-head"><div><h2>Status Seluruh Armada</h2><p>Kendaraan nonaktif tidak ditampilkan</p></div><input id="search" placeholder="Cari plat, unit, model…"/></div><div id="vehicle-grid" class="vehicle-grid"></div></section>
+      <div id="dashboard-view" class="view">
+        <section id="stats" class="stats"><div class="stat">Memuat data…</div></section>
+        <section class="section"><div class="section-head"><div><h2>Armada Sedang Bertugas di Luar</h2><p id="active-caption">Memuat perjalanan aktif</p></div><span id="active-count" class="pill">—</span></div><div id="active-trips" class="trip-grid"></div></section>
+      </div>
+      <section id="vehicles-view" class="section view hidden"><div class="section-head"><div><h2>Status Seluruh Armada</h2><p>Kendaraan nonaktif tidak ditampilkan</p></div><input id="search" placeholder="Cari plat, unit, model…"/></div><div id="vehicle-grid" class="vehicle-grid"></div></section>
+      <section id="logbook-view" class="section view hidden"><div class="section-head"><div><h2>Logbook Gerbang</h2><p>Riwayat satu bulan terakhir dan semua perjalanan ACTIVE</p></div></div><div class="table-wrap"><table><thead><tr><th>Waktu Keluar</th><th>Kendaraan</th><th>Driver</th><th>Tujuan</th><th>KM Awal</th><th>Status</th></tr></thead><tbody id="logbook-rows"></tbody></table></div></section>
+      <section id="drivers-view" class="section view hidden"><div class="section-head"><div><h2>Daftar Driver</h2><p>Master driver dari Firestore GarasiKu</p></div></div><div class="table-wrap"><table><thead><tr><th>Nama</th><th>Kategori</th><th>Kontak</th><th>Status</th></tr></thead><tbody id="driver-rows"></tbody></table></div></section>
+      <section id="etoll-view" class="section view hidden"><div class="section-head"><div><h2>Rekap Kartu E-Toll</h2><p>Master kartu dari RekapToll • status operasional dari Firestore GarasiKu</p></div></div><div class="table-wrap"><table><thead><tr><th>Kartu</th><th>Nomor Akhir</th><th>Nopol</th><th>Status</th><th>Pemegang</th><th>Saldo</th></tr></thead><tbody id="etoll-rows"></tbody></table></div><p id="topup-total" class="table-note"></p></section>
       <footer>GarasiKu Next • Data dibaca langsung dari Firebase Server • Mode read-only</footer>
     </main>
   </div>`;
@@ -83,11 +88,29 @@ function renderVehicles(vehicles: Vehicle[]): void {
   ).join("") : '<div class="empty">Tidak ada kendaraan yang cocok dengan pencarian.</div>';
 }
 
+function renderTables(data: DashboardData): void {
+  const logRows = $("logbook-rows");
+  if (logRows) logRows.innerHTML = [...data.trips].sort((a,b) => Date.parse(b.timeOut || "") - Date.parse(a.timeOut || "")).map((trip) =>
+    `<tr><td>${esc(trip.timeOut ? new Date(trip.timeOut).toLocaleString("id-ID") : "—")}</td><td><b>${esc(trip.plate)}</b><small>${esc(trip.model)}</small></td><td>${esc(trip.driverName)}</td><td>${esc(trip.destination || "-")}</td><td>${fmt(trip.kmStart || 0)}</td><td><span class="state ${trip.status === "ACTIVE" ? "state-active" : "state-done"}">${esc(trip.status)}</span></td></tr>`,
+  ).join("") || '<tr><td colspan="6" class="empty-cell">Belum ada data logbook pada rentang baca.</td></tr>';
+  const driverRows = $("driver-rows");
+  if (driverRows) driverRows.innerHTML = data.drivers.map((driver) =>
+    `<tr><td><b>${esc(driver.name)}</b></td><td>${esc(driver.category)}</td><td>${esc(driver.cp || "-")}</td><td>${driver.active ? "Aktif" : "Nonaktif"}</td></tr>`,
+  ).join("") || '<tr><td colspan="4" class="empty-cell">Master driver kosong.</td></tr>';
+  const etollRows = $("etoll-rows");
+  if (etollRows) etollRows.innerHTML = data.etollCards.map((card) =>
+    `<tr><td><b>${esc(card.last4 ? `Kartu •••• ${card.last4}` : card.id)}</b></td><td>${esc(card.last4 || "-")}</td><td>${esc(card.nopol || "-")}</td><td><span class="state ${card.active ? "state-active" : "state-muted"}">${card.active ? "ON" : "OFF"} • ${card.status}</span></td><td>${esc(card.holderName || "-")}</td><td>Rp ${fmt(card.balance)}</td></tr>`,
+  ).join("") || '<tr><td colspan="6" class="empty-cell">Master kartu E-Toll tidak terbaca.</td></tr>';
+  const topup = $("topup-total");
+  if (topup) topup.textContent = data.monthlyTopupTotal === null ? "Total top up bulan berjalan belum dapat dibaca dari RekapToll." : `Total top up bulan berjalan: Rp ${fmt(data.monthlyTopupTotal)}`;
+}
+
 function render(data: DashboardData): void {
   snapshot = data;
   renderStats(data);
   renderTrips(activeTrips());
   renderVehicles(data.vehicles);
+  renderTables(data);
   const status = $("cloud-status");
   if (status) {
     status.className = "cloud online";
@@ -114,6 +137,16 @@ async function refresh(): Promise<void> {
     if (button) { button.disabled = false; button.textContent = "↻ Refresh"; }
   }
 }
+document.querySelectorAll<HTMLAnchorElement>("[data-view]").forEach((link) => {
+  link.addEventListener("click", (event) => {
+    event.preventDefault();
+    const target = link.dataset.view || "dashboard";
+    document.querySelectorAll<HTMLElement>(".view").forEach((view) => view.classList.add("hidden"));
+    document.getElementById(`${target}-view`)?.classList.remove("hidden");
+    document.querySelectorAll<HTMLAnchorElement>("[data-view]").forEach((item) => item.classList.toggle("selected", item === link));
+    if (snapshot && target === "vehicles") renderVehicles(snapshot.vehicles);
+  });
+});
 $("refresh")?.addEventListener("click", () => void refresh());
 $("search")?.addEventListener("input", () => { if (snapshot) renderVehicles(snapshot.vehicles); });
 void refresh();
