@@ -3042,12 +3042,14 @@
 
             async syncOdometersToIndex1() {
                 const list = Array.isArray(window.vehicles) ? window.vehicles : [];
+                const failures = [];
+                let updated = 0;
                 let token;
                 try {
                     token = await this.getReadWriteToken();
                 } catch (e) {
                     console.warn('Autentikasi Index1 gagal; odometer tidak dikirim:', e.message);
-                    return;
+                    return { ok: false, updated, failures: [{ plate: 'Autentikasi Index1', message: e.message }] };
                 }
                 await Promise.all(list.map(async v => {
                     const key = v._fbKey || v.id || normalizePlateKey(v.plate);
@@ -3065,10 +3067,13 @@
                         if (!response.ok) throw new Error(`HTTP ${response.status}`);
                         this.lastOdometerSent.set(String(key), km);
                         v.currentKm = km;
+                        updated += 1;
                     } catch (e) {
                         console.warn('Gagal update ODO Index 1:', v.plate, e.message);
+                        failures.push({ plate: v.plate || key, message: e.message });
                     }
                 }));
+                return { ok: failures.length === 0, updated, failures };
             },
 
             start() {
@@ -3081,6 +3086,21 @@
                 return this.sync();
             }
         };
+
+        async function syncIndex1OdometerAfterLogbook() {
+            if (!window.Index1MasterBridge?.syncOdometersToIndex1) return;
+            const result = await window.Index1MasterBridge.syncOdometersToIndex1();
+            if (!result?.ok) {
+                const failed = (result?.failures || []).slice(0, 3)
+                    .map(item => item.plate || 'Kendaraan').join(', ');
+                const more = (result?.failures?.length || 0) > 3 ? ' dan lainnya' : '';
+                showToast(
+                    'Logbook Tersimpan, ODO Belum Sinkron',
+                    `Data logbook sudah tersimpan di Firestore, tetapi odometer Index1 gagal diperbarui: ${failed || 'periksa koneksi/auth'}${more}. Coba refresh setelah koneksi pulih.`,
+                    'warning'
+                );
+            }
+        }
 
         // Global State & Settings
         function loadLocalJson(key, fallback) {
@@ -4470,7 +4490,7 @@
             vehicle.odometer = kmStart;
             window.logs = [newLog, ...window.logs.filter(l => l.id !== newLog.id)];
             try { localStorage.setItem('garasiku_vehicles', JSON.stringify(window.vehicles)); } catch (e) {}
-            if (window.Index1MasterBridge?.syncOdometersToIndex1) window.Index1MasterBridge.syncOdometersToIndex1().catch(() => {});
+            syncIndex1OdometerAfterLogbook().catch(e => console.warn('Sinkron odometer pasca-logbook gagal:', e));
 
             closeModal('modal-checkout');
             document.getElementById('form-checkout').reset();
@@ -4616,7 +4636,7 @@
                 if (kmEnd !== null) vehicle.odometer = kmEnd;
             }
             try { localStorage.setItem('garasiku_vehicles', JSON.stringify(window.vehicles)); } catch (e) {}
-            if (window.Index1MasterBridge?.syncOdometersToIndex1) window.Index1MasterBridge.syncOdometersToIndex1().catch(() => {});
+            syncIndex1OdometerAfterLogbook().catch(e => console.warn('Sinkron odometer pasca-logbook gagal:', e));
 
             closeModal('modal-checkin');
             document.getElementById('form-checkin').reset();
@@ -4854,7 +4874,7 @@
                 }
             }
             try { localStorage.setItem('garasiku_vehicles', JSON.stringify(window.vehicles)); } catch (e) {}
-            if (window.Index1MasterBridge?.syncOdometersToIndex1) window.Index1MasterBridge.syncOdometersToIndex1().catch(() => {});
+            syncIndex1OdometerAfterLogbook().catch(e => console.warn('Sinkron odometer pasca-logbook gagal:', e));
             closeModal('modal-edit-logbook');
             renderAll();
             showToast('Logbook Diperbarui', 'Perubahan logbook langsung dikirim ke Firebase Firestore.', 'success');
@@ -4911,7 +4931,7 @@
                 }
             }
             try { localStorage.setItem('garasiku_vehicles', JSON.stringify(window.vehicles)); } catch (e) {}
-            if (window.Index1MasterBridge?.syncOdometersToIndex1) window.Index1MasterBridge.syncOdometersToIndex1().catch(() => {});
+            syncIndex1OdometerAfterLogbook().catch(e => console.warn('Sinkron odometer pasca-logbook gagal:', e));
             renderAll();
             showToast('Logbook Dihapus', 'Catatan logbook langsung dihapus dari Firebase Firestore.', 'success');
         }
