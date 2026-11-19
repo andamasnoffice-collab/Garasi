@@ -3246,14 +3246,10 @@
                     try {
                         await this.syncMonthlyTopups();
                     } catch (topupError) {
-                        console.warn('Total pengisian E-Toll bulan ini belum dapat dibaca:', topupError);
-                        const cached = (() => { try { return JSON.parse(localStorage.getItem('garasiku_etoll_monthly_topups') || '{}'); } catch (_) { return {}; } })();
-                        const currentMonth = this.getLocalMonthKey();
-                        const totals = cached.month === currentMonth && cached.totals ? cached.totals : {};
-                        (window.etolls || []).forEach(card => {
-                            const number = this.normalizeNumber(card.cardNo || card.number);
-                            card.monthlyTopupTotal = number ? (Number(totals[number]) || 0) : 0;
-                        });
+                        console.warn('Total pengisian E-Toll bulan ini belum dapat dibaca dari RekapToll:', topupError);
+                        // Jangan tampilkan cache lokal sebagai angka resmi terbaru.
+                        // Nilai null membuat UI menandai total sebagai belum tersinkron.
+                        (window.etolls || []).forEach(card => { card.monthlyTopupTotal = null; });
                     }
                     try { localStorage.setItem('garasiku_etolls', JSON.stringify(window.etolls)); } catch (e) {}
                     // Perubahan operasional kartu disimpan ke Firebase melalui saveToStorage().
@@ -6349,7 +6345,7 @@
                                   '<span class="etoll-status-available px-2 py-0.5 rounded-md text-[10px] font-bold">Di Garasi • SIAP</span>')}
                             </div>
                             <div class="flex items-center space-x-3 text-[11px] text-slate-400">
-                                <span>Total Isi Bulan Ini: <strong class="text-emerald-300 font-mono font-bold">Rp ${(Number(card.monthlyTopupTotal) || 0).toLocaleString('id-ID')}</strong></span>
+                                <span>Total Isi Bulan Ini: <strong class="text-emerald-300 font-mono font-bold">${card.monthlyTopupTotal == null ? 'Belum tersinkron' : 'Rp ' + Number(card.monthlyTopupTotal || 0).toLocaleString('id-ID')}</strong></span>
                                 <span>No: <code class="font-mono text-slate-300">${card.cardNo || '-'}</code></span>
                             </div>
                         </div>
