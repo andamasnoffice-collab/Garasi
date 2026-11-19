@@ -42,7 +42,7 @@ const asRecord = (value: unknown): Record<string, unknown> =>
 function mapVehicle(id: string, raw: Record<string, unknown>, settings: Record<string, unknown>): Vehicle {
   const plate = normalizePlate(raw.plate || raw.id || id);
   // Samakan persis dengan normalizePlateKey pada aplikasi produksi: hapus spasi, pertahankan tanda hubung.
-  const key = plate.trim().toUpperCase().replace(/\\s+/g, "");
+  const key = plate.trim().toUpperCase().replace(/\s+/g, "");
   const setting = asRecord(settings[key]);
   const km = Number(raw.currentKm ?? raw.odometer ?? 0) || 0;
   return {
