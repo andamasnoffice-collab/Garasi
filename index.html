@@ -1874,41 +1874,40 @@
         });
         window.GARASIKU_DEFAULT_FIREBASE_CONFIG = DEFAULT_FIREBASE_CONFIG;
 
+        // Index1 adalah sumber master kendaraan dan odometer. Koneksi terpisah
+        // memakai Anonymous Auth; izin tulis dibatasi Rules pada currentKm.
+        const INDEX1_FIREBASE_CONFIG = Object.freeze({
+            apiKey: "AIzaSyAi0Ucng_tl7jSC9gZtr0JItCBUtkt-vvU",
+            authDomain: "uns-fleet-service.firebaseapp.com",
+            databaseURL: "https://uns-fleet-service-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "uns-fleet-service",
+            storageBucket: "uns-fleet-service.firebasestorage.app",
+            messagingSenderId: "881806830475",
+            appId: "1:881806830475:web:8dcf991ec95ae93b625d8e",
+            measurementId: "G-REWR64QLNH"
+        });
+
+        // RekapToll adalah proyek terpisah. GarasiKu hanya memakai Anonymous Auth
+        // untuk membaca RTDB sesuai Rules RekapToll; tidak ada operasi tulis.
+        const REKAPTOLL_FIREBASE_CONFIG = Object.freeze({
+            apiKey: "AIzaSyA3Gtz2w1erDlP_FtTPTHOes1YZoQ56jJU",
+            authDomain: "rekaptoll-production.firebaseapp.com",
+            databaseURL: "https://rekaptoll-production-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "rekaptoll-production",
+            storageBucket: "rekaptoll-production.firebasestorage.app",
+            messagingSenderId: "441481183431",
+            appId: "1:441481183431:web:d6490b7f1269a6334bfee2"
+        });
+
         // State operasional E-Toll milik GarasiKu disimpan di Firestore.
         // Master identitas kartu tetap berasal dari RekapToll (RTDB).
         window.cloudEtollState = {};
         window.cloudAppSettings = {};
 
-        function firestoreRestValue(value) {
-            if (value === null || value === undefined) return { nullValue: null };
-            if (typeof value === 'boolean') return { booleanValue: value };
-            if (typeof value === 'number') {
-                return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
-            }
-            if (typeof value === 'string') return { stringValue: value };
-            if (Array.isArray(value)) return { arrayValue: { values: value.map(firestoreRestValue) } };
-            if (value instanceof Date) return { timestampValue: value.toISOString() };
-            if (typeof value === 'object') {
-                const fields = {};
-                Object.entries(value).forEach(([k, v]) => { fields[k] = firestoreRestValue(v); });
-                return { mapValue: { fields } };
-            }
-            return { stringValue: String(value) };
-        }
-
-        function firestoreRestDocumentFields(data) {
-            const fields = {};
-            Object.entries(data || {}).forEach(([k, v]) => { fields[k] = firestoreRestValue(v); });
-            return fields;
-        }
-
-        function firestoreRestErrorMessage(payload, status) {
-            return payload?.error?.message || payload?.error?.status || `HTTP ${status}`;
-        }
-
         window.FirebaseBridge = {
             stateBaseline: null,
             stateWriteInFlight: null,
+            stateWriteRequested: false,
             app: null,
             db: null,
             auth: null,
@@ -1988,6 +1987,7 @@
                         this.unsubscribers = [];
                         if (this.etollStateUnsubscriber) { try { this.etollStateUnsubscriber(); } catch (e) {} this.etollStateUnsubscriber = null; }
                         if (this.vehicleSettingsUnsubscriber) { try { this.vehicleSettingsUnsubscriber(); } catch (e) {} this.vehicleSettingsUnsubscriber = null; }
+                        if (this.driverMasterUnsubscriber) { try { this.driverMasterUnsubscriber(); } catch (e) {} this.driverMasterUnsubscriber = null; }
                         if (this.gateLogsUnsubscriber) {
                             try { this.gateLogsUnsubscriber(); } catch (e) {}
                             this.gateLogsUnsubscriber = null;
@@ -2389,6 +2389,24 @@
                     window.logs = [...byId.values()].sort((a, b) =>
                         new Date(b.timeOut || b.timeIn || 0) - new Date(a.timeOut || a.timeIn || 0)
                     );
+                    // Seed lock dokumen untuk perjalanan ACTIVE yang sudah ada sebelum
+                    // mekanisme lock lintas perangkat diterapkan. Hanya membaca/menulis
+                    // dokumen lock per perjalanan aktif; tidak memindai histori lama.
+                    for (const trip of window.logs.filter(item => item.status === 'ACTIVE')) {
+                        const safe = value => String(value || '').trim().replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 120);
+                        const refs = [];
+                        if (trip.vehicleId) refs.push({ ref: this.gateLogRef('__LOCK_VEHICLE__' + safe(trip.vehicleId)), kind: 'vehicle' });
+                        if (trip.driverId) refs.push({ ref: this.gateLogRef('__LOCK_DRIVER__' + safe(trip.driverId)), kind: 'driver' });
+                        for (const item of refs) {
+                            await runTransaction(this.db, async tx => {
+                                const lockSnap = await tx.get(item.ref);
+                                if (!lockSnap.exists()) tx.set(item.ref, {
+                                    type: 'ACTIVE_TRIP_LOCK', tripId: trip.id, vehicleId: trip.vehicleId || null,
+                                    driverId: trip.driverId || null, updatedAt: new Date().toISOString()
+                                }, { merge: false });
+                            });
+                        }
+                    }
                     this.gateLogsReady = true;
                     this.isConnected = true;
                     this.lastSyncTime = new Date();
@@ -2440,37 +2458,68 @@
                     return false;
                 }
 
-                // DIRECT FIREBASE: tidak ada localStorage queue dan tidak ada serial queue.
-                // Setiap transaksi dikirim langsung ke satu dokumen Firestore. UI tidak menunggu
-                // round-trip server; Firestore SDK sendiri menangani latency compensation dan
-                // onSnapshot(metadata) di atas akan mengonfirmasi saat write benar-benar server-side.
-                this.lastGateWriteError = '';
-                let writePromise;
-                try {
-                    writePromise = setDoc(ref, { ...log }, { merge: false });
-                } catch (e) {
-                    const detail = e?.code ? `${e.code}: ${e?.message || ''}`.trim() : (e?.message || 'write ditolak');
-                    this.lastGateWriteError = detail;
-                    this.updateStatusUI(false, `Firebase write gagal: ${detail}`);
-                    return false;
-                }
+                // Kunci transaksi ditempatkan di koleksi gate_logs yang sama agar tidak
+                // memerlukan perubahan Rules/subkoleksi baru. Dokumen LOCK tidak ikut
+                // terbaca query logbook karena tidak memiliki timeOut/status ACTIVE.
+                const lockId = value => String(value || '').trim().replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 120);
+                const lockRefs = [];
+                if (log.vehicleId) lockRefs.push({ kind: 'kendaraan', ref: this.gateLogRef('__LOCK_VEHICLE__' + lockId(log.vehicleId)) });
+                if (log.driverId) lockRefs.push({ kind: 'driver', ref: this.gateLogRef('__LOCK_DRIVER__' + lockId(log.driverId)) });
 
-                writePromise.then(() => {
+                this.lastGateWriteError = '';
+                try {
+                    await runTransaction(this.db, async tx => {
+                        const currentSnap = await tx.get(ref);
+                        const lockSnaps = [];
+                        for (const lock of lockRefs) lockSnaps.push({ ...lock, snap: await tx.get(lock.ref) });
+
+                        if (log.status === 'ACTIVE') {
+                            // Cek juga perjalanan ACTIVE lama yang dibuat sebelum mekanisme
+                            // lock tersedia, agar migrasi tidak membuka celah penugasan ganda.
+                            if (currentSnap.exists() && currentSnap.data()?.status === 'ACTIVE') {
+                                throw new Error('Transaksi kendaraan ini sudah aktif. Muat ulang logbook.');
+                            }
+                            for (const lock of lockSnaps) {
+                                if (lock.snap.exists() && lock.snap.data()?.tripId !== log.id) {
+                                    throw new Error(lock.kind === 'kendaraan'
+                                        ? 'Kendaraan sedang digunakan pada perangkat lain. Muat ulang data.'
+                                        : 'Driver sedang bertugas pada perangkat lain. Muat ulang data.');
+                                }
+                            }
+                            tx.set(ref, { ...log }, { merge: false });
+                            lockSnaps.forEach(lock => tx.set(lock.ref, {
+                                type: 'ACTIVE_TRIP_LOCK', tripId: log.id, vehicleId: log.vehicleId || null,
+                                driverId: log.driverId || null, updatedAt: new Date().toISOString()
+                            }, { merge: false }));
+                            return;
+                        }
+
+                        if (log.status === 'COMPLETED') {
+                            if (!currentSnap.exists()) throw new Error('Logbook asal tidak ditemukan di server. Muat ulang sebelum mencatat kendaraan masuk.');
+                            if (currentSnap.data()?.status !== 'ACTIVE') throw new Error('Perjalanan sudah diselesaikan atau berubah pada perangkat lain.');
+                            tx.set(ref, { ...log }, { merge: false });
+                            lockSnaps.forEach(lock => {
+                                if (lock.snap.exists() && lock.snap.data()?.tripId === log.id) tx.delete(lock.ref);
+                            });
+                            return;
+                        }
+
+                        tx.set(ref, { ...log }, { merge: false });
+                    });
                     this.lastGateWriteError = '';
                     this.isConnected = true;
                     this.lastSyncTime = new Date();
                     this.updateStatusUI(true, `Firebase terkonfirmasi • ${log.plate || log.id}`);
                     if (typeof options.onServerConfirmed === 'function') options.onServerConfirmed();
-                }).catch((e) => {
+                    return true;
+                } catch (e) {
                     const detail = e?.code ? `${e.code}: ${e?.message || ''}`.trim() : (e?.message || 'write ditolak');
                     this.lastGateWriteError = detail;
                     this.isConnected = false;
                     this.updateStatusUI(false, `Firebase write gagal: ${detail}`);
                     if (typeof options.onServerError === 'function') options.onServerError(detail);
-                });
-
-                // Write sudah dikirim ke Firebase SDK; jangan menunggu server di event handler.
-                return true;
+                    return false;
+                }
             },
 
             async deleteGateLog(logId, options = {}) {
@@ -2623,8 +2672,16 @@
                     this.updateStatusUI(false, 'Firebase belum siap / Auth belum aktif');
                     return false;
                 }
-                // Gabungkan pemanggilan beruntun agar tidak mengirim write identik paralel.
-                if (this.stateWriteInFlight) return this.stateWriteInFlight;
+                // Jika ada perubahan ketika transaksi berjalan, tandai agar satu
+                // putaran susulan mengirim snapshot terbaru setelah transaksi aktif selesai.
+                if (this.stateWriteInFlight) {
+                    this.stateWriteRequested = true;
+                    return this.stateWriteInFlight.then(result => {
+                        if (!this.stateWriteRequested) return result;
+                        this.stateWriteRequested = false;
+                        return this.pushStateToCloud();
+                    });
+                }
                 this.stateWriteInFlight = (async () => {
                     try {
                         const syncDoc = doc(this.db, 'garasiku_fleet', 'shared_state');
@@ -2678,19 +2735,6 @@
                                 else out[key] = clone(l[key]);
                             }
                             return out;
-                        };
-                        // Merge log E-Toll berdasarkan ID: log baru/perubahan/penghapusan dari perangkat
-                        // ini diterapkan ke versi server terbaru, bukan mengganti seluruh array lama.
-                        const mergeLogs = (base, local, latest) => {
-                            const keyOf = (item, index) => String(item?.id ?? item?.logId ?? `__noid_${index}_${JSON.stringify(item)}`);
-                            const toMap = arr => new Map((Array.isArray(arr) ? arr : []).map((item, i) => [keyOf(item, i), item]));
-                            const b = toMap(base), l = toMap(local), out = toMap(latest);
-                            for (const [key, oldItem] of b) {
-                                if (!l.has(key)) out.delete(key);
-                                else if (!same(oldItem, l.get(key))) out.set(key, clone(l.get(key)));
-                            }
-                            for (const [key, item] of l) if (!b.has(key)) out.set(key, clone(item));
-                            return [...out.values()].sort((a, b) => String(b?.time || b?.timestamp || b?.date || b?.createdAt || '').localeCompare(String(a?.time || a?.timestamp || a?.date || a?.createdAt || '')));
                         };
                         const mergeField = (field, base, local, latest) => {
                             if (same(base, local)) return clone(latest);
@@ -2929,20 +2973,50 @@
         }
 
         window.Index1MasterBridge = {
-            baseUrl: 'https://uns-fleet-service-default-rtdb.asia-southeast1.firebasedatabase.app',
+            baseUrl: INDEX1_FIREBASE_CONFIG.databaseURL,
             path: 'artifacts/uns-fleet-service/public/data_v2/vehicles',
+            authApp: null,
+            auth: null,
+            authReady: null,
             timer: null,
             syncing: false,
             lastSuccess: null,
             lastOdometerSent: new Map(),
+
+            async getReadWriteToken() {
+                if (!this.authReady) {
+                    this.authReady = (async () => {
+                        const appName = 'garasiku-index1-reader-writer';
+                        this.authApp = getApps().find(app => app.name === appName)
+                            || initializeApp(INDEX1_FIREBASE_CONFIG, appName);
+                        this.auth = getAuth(this.authApp);
+                        if (!this.auth.currentUser) await signInAnonymously(this.auth);
+                        if (!this.auth.currentUser) throw new Error('Anonymous Auth Index1 belum berhasil.');
+                    })().catch(error => {
+                        this.authReady = null;
+                        throw error;
+                    });
+                }
+                await this.authReady;
+                return this.auth.currentUser.getIdToken();
+            },
+
             async sync() {
                 if (this.syncing) return;
                 this.syncing = true;
                 try {
-                    const res = await fetch(`${this.baseUrl}/${this.path}.json?ts=${Date.now()}`, {cache:'no-store'});
+                    const token = await this.getReadWriteToken();
+                    const res = await fetch(`${this.baseUrl}/${this.path}.json?auth=${encodeURIComponent(token)}`, {
+                        cache: 'no-store',
+                        headers: { 'Accept': 'application/json' }
+                    });
                     if (!res.ok) throw new Error(`HTTP ${res.status}`);
                     const data = await res.json();
+                    if (!data || typeof data !== 'object' || Array.isArray(data) && data.length === 0 || !Object.keys(data).length) {
+                        throw new Error('Master kendaraan Index 1 kosong/tidak valid; data yang sedang tampil dipertahankan.');
+                    }
                     const arr = data && typeof data === 'object' ? Object.entries(data).map(([key,val]) => ({...(val || {}), _fbKey:key})) : [];
+                    if (!arr.length) throw new Error('Master kendaraan Index 1 tidak berisi record valid; data lokal tidak ditimpa.');
                     window.vehicles = arr.map((v, i) => ({
                         ...v,
                         id: v.id || v._fbKey || `IDX1-${i+1}`,
@@ -2955,11 +3029,7 @@
                         status: v.status || 'IN_GARAGE'
                     }));
                     applyVehicleSettingsToMaster();
-                    // Daftar driver tidak diambil dari Index 1. Master driver mandiri
-                    // dimuat dari Firestore GarasiKu melalui driver_master/drivers.
-                    // Status kendaraan tetap mengikuti logbook GarasiKu.
-                    // Status operasional Keluar/Masuk wajib mengikuti Logbook GarasiKu
-                    // agar refresh master setiap 5 detik tidak membatalkan transaksi gerbang.
+                    // Driver dikelola terpisah; status keluar/masuk tetap dari logbook GarasiKu.
                     reconcileVehicleOperationalState();
                     this.lastSuccess = new Date();
                     if (typeof renderAll === 'function') renderAll();
@@ -2969,29 +3039,45 @@
                     this.syncing = false;
                 }
             },
+
             async syncOdometersToIndex1() {
                 const list = Array.isArray(window.vehicles) ? window.vehicles : [];
+                const failures = [];
+                let updated = 0;
+                let token;
+                try {
+                    token = await this.getReadWriteToken();
+                } catch (e) {
+                    console.warn('Autentikasi Index1 gagal; odometer tidak dikirim:', e.message);
+                    return { ok: false, updated, failures: [{ plate: 'Autentikasi Index1', message: e.message }] };
+                }
                 await Promise.all(list.map(async v => {
                     const key = v._fbKey || v.id || normalizePlateKey(v.plate);
                     if (!key) return;
-                    const km = Number(v.odometer ?? v.currentKm ?? 0) || 0;
+                    const km = Number(v.odometer ?? v.currentKm ?? 0);
                     const masterKm = Number(v.currentKm ?? 0) || 0;
                     const sentKm = this.lastOdometerSent.get(String(key));
-                    if (km === masterKm || km === sentKm) return;
+                    if (!Number.isFinite(km) || km < masterKm || km === masterKm || km === sentKm) return;
                     try {
-                        const response = await fetch(`${this.baseUrl}/${this.path}/${encodeURIComponent(key)}.json`, {
-                            method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({currentKm:km})
+                        const response = await fetch(`${this.baseUrl}/${this.path}/${encodeURIComponent(key)}.json?auth=${encodeURIComponent(token)}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                            body: JSON.stringify({ currentKm: km })
                         });
                         if (!response.ok) throw new Error(`HTTP ${response.status}`);
                         this.lastOdometerSent.set(String(key), km);
-                        // Perbarui cache lokal supaya pemanggilan berikutnya tidak PATCH ulang.
                         v.currentKm = km;
-                    } catch (e) { console.warn('Gagal update ODO Index 1:', v.plate, e.message); }
+                        updated += 1;
+                    } catch (e) {
+                        console.warn('Gagal update ODO Index 1:', v.plate, e.message);
+                        failures.push({ plate: v.plate || key, message: e.message });
+                    }
                 }));
+                return { ok: failures.length === 0, updated, failures };
             },
+
             start() {
-                // FIX52: satu kali baca saat aplikasi dibuka.
-                // Tidak polling 5 detik; master dibaca ulang hanya saat refresh/manual.
+                // Tidak polling; baca saat aplikasi dibuka atau refresh manual.
                 clearInterval(this.timer);
                 this.timer = null;
                 this.sync();
@@ -3000,6 +3086,21 @@
                 return this.sync();
             }
         };
+
+        async function syncIndex1OdometerAfterLogbook() {
+            if (!window.Index1MasterBridge?.syncOdometersToIndex1) return;
+            const result = await window.Index1MasterBridge.syncOdometersToIndex1();
+            if (!result?.ok) {
+                const failed = (result?.failures || []).slice(0, 3)
+                    .map(item => item.plate || 'Kendaraan').join(', ');
+                const more = (result?.failures?.length || 0) > 3 ? ' dan lainnya' : '';
+                showToast(
+                    'Logbook Tersimpan, ODO Belum Sinkron',
+                    `Data logbook sudah tersimpan di Firestore, tetapi odometer Index1 gagal diperbarui: ${failed || 'periksa koneksi/auth'}${more}. Coba refresh setelah koneksi pulih.`,
+                    'warning'
+                );
+            }
+        }
 
         // Global State & Settings
         function loadLocalJson(key, fallback) {
@@ -3029,8 +3130,12 @@
         // status operasional lokal (ON/OFF, holder, saldo) bila kartu masih ada.
         // ============================================================
         window.EtollMasterBridge = {
-            sourceProjectId: 'etoll-3366c',
+            sourceProjectId: 'rekaptoll-production',
             sourcePath: 'cards',
+            databaseUrl: REKAPTOLL_FIREBASE_CONFIG.databaseURL,
+            authApp: null,
+            auth: null,
+            authReady: null,
             intervalMs: 0, // tidak polling otomatis; baca saat startup/manual
             timer: null,
             syncing: false,
@@ -3038,15 +3143,44 @@
             monthlyTopupsByNumber: {},
             monthlyTopupMonth: '',
 
+            async getReadToken() {
+                if (!this.authReady) {
+                    this.authReady = (async () => {
+                        const appName = 'garasiku-rekaptoll-reader';
+                        this.authApp = getApps().find(app => app.name === appName)
+                            || initializeApp(REKAPTOLL_FIREBASE_CONFIG, appName);
+                        this.auth = getAuth(this.authApp);
+                        if (!this.auth.currentUser) {
+                            await signInAnonymously(this.auth);
+                        }
+                        if (!this.auth.currentUser) throw new Error('Anonymous Auth RekapToll belum berhasil.');
+                    })().catch(error => {
+                        this.authReady = null;
+                        throw error;
+                    });
+                }
+                await this.authReady;
+                return this.auth.currentUser.getIdToken();
+            },
+
             getLocalMonthKey(date = new Date()) {
                 return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
             },
+            async readSourceJson(path) {
+                // RTDB menolak akses anonim tanpa token meskipun Rules mengizinkan
+                // provider anonymous. Token diperoleh dari proyek RekapToll terpisah.
+                const token = await this.getReadToken();
+                const cleanPath = String(path || '').split('/').filter(Boolean).join('/');
+                const response = await fetch(`${this.databaseUrl}/${cleanPath}.json?auth=${encodeURIComponent(token)}`, {
+                    cache: 'no-store',
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!response.ok) throw new Error(`Gagal membaca RekapToll ${cleanPath}: HTTP ${response.status}`);
+                return response.json();
+            },
             async syncMonthlyTopups() {
                 const monthKey = this.getLocalMonthKey();
-                const baseUrl = `https://${this.sourceProjectId}-default-rtdb.asia-southeast1.firebasedatabase.app`;
-                const response = await fetch(`${baseUrl}/transactionsByMonth/${monthKey}.json`, { cache: 'no-store' });
-                if (!response.ok) throw new Error(`Gagal membaca transaksi pengisian ${monthKey}: HTTP ${response.status}`);
-                const data = await response.json();
+                const data = await this.readSourceJson(`transactionsByMonth/${monthKey}`);
                 const rows = Array.isArray(data) ? data : (data && typeof data === 'object' ? Object.values(data) : []);
                 const totals = {};
                 const seen = new Set();
@@ -3083,13 +3217,8 @@
             async sync() {
                 if (this.syncing) return;
                 this.syncing = true;
-                const baseUrl = `https://${this.sourceProjectId}-default-rtdb.asia-southeast1.firebasedatabase.app`;
                 try {
-                    const response = await fetch(`${baseUrl}/${this.sourcePath}.json?ts=${Date.now()}`, {
-                        cache: 'no-store'
-                    });
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    const data = await response.json();
+                    const data = await this.readSourceJson(this.sourcePath);
                     if (!Array.isArray(data)) {
                         throw new Error('Format master kartu RekapToll bukan array.');
                     }
@@ -3156,14 +3285,10 @@
                     try {
                         await this.syncMonthlyTopups();
                     } catch (topupError) {
-                        console.warn('Total pengisian E-Toll bulan ini belum dapat dibaca:', topupError);
-                        const cached = (() => { try { return JSON.parse(localStorage.getItem('garasiku_etoll_monthly_topups') || '{}'); } catch (_) { return {}; } })();
-                        const currentMonth = this.getLocalMonthKey();
-                        const totals = cached.month === currentMonth && cached.totals ? cached.totals : {};
-                        (window.etolls || []).forEach(card => {
-                            const number = this.normalizeNumber(card.cardNo || card.number);
-                            card.monthlyTopupTotal = number ? (Number(totals[number]) || 0) : 0;
-                        });
+                        console.warn('Total pengisian E-Toll bulan ini belum dapat dibaca dari RekapToll:', topupError);
+                        // Jangan tampilkan cache lokal sebagai angka resmi terbaru.
+                        // Nilai null membuat UI menandai total sebagai belum tersinkron.
+                        (window.etolls || []).forEach(card => { card.monthlyTopupTotal = null; });
                     }
                     try { localStorage.setItem('garasiku_etolls', JSON.stringify(window.etolls)); } catch (e) {}
                     // Perubahan operasional kartu disimpan ke Firebase melalui saveToStorage().
@@ -3658,7 +3783,6 @@
             const btnAddVeh = document.getElementById('btn-add-vehicle');
             const btnAddDrv = document.getElementById('btn-add-driver');
             const btnCloudModal = document.getElementById('btn-cloud-settings-modal');
-            const btnStatAddEtoll = document.getElementById('btn-stat-add-etoll');
 
             if (isAdminLoggedIn) {
                 if (badgeIcon) badgeIcon.className = "fa-solid fa-lock-open text-emerald-400 text-xs";
@@ -3676,7 +3800,6 @@
                     btnAddDrv.classList.add('inline-flex');
                 }
                 if (btnCloudModal) btnCloudModal.classList.remove('hidden');
-                if (btnStatAddEtoll) btnStatAddEtoll.classList.add('hidden');
                 document.querySelectorAll('.admin-col').forEach(el => el.classList.remove('hidden'));
             } else {
                 if (badgeIcon) badgeIcon.className = "fa-solid fa-user-shield text-slate-400 text-xs";
@@ -4367,7 +4490,7 @@
             vehicle.odometer = kmStart;
             window.logs = [newLog, ...window.logs.filter(l => l.id !== newLog.id)];
             try { localStorage.setItem('garasiku_vehicles', JSON.stringify(window.vehicles)); } catch (e) {}
-            if (window.Index1MasterBridge?.syncOdometersToIndex1) window.Index1MasterBridge.syncOdometersToIndex1().catch(() => {});
+            syncIndex1OdometerAfterLogbook().catch(e => console.warn('Sinkron odometer pasca-logbook gagal:', e));
 
             closeModal('modal-checkout');
             document.getElementById('form-checkout').reset();
@@ -4513,7 +4636,7 @@
                 if (kmEnd !== null) vehicle.odometer = kmEnd;
             }
             try { localStorage.setItem('garasiku_vehicles', JSON.stringify(window.vehicles)); } catch (e) {}
-            if (window.Index1MasterBridge?.syncOdometersToIndex1) window.Index1MasterBridge.syncOdometersToIndex1().catch(() => {});
+            syncIndex1OdometerAfterLogbook().catch(e => console.warn('Sinkron odometer pasca-logbook gagal:', e));
 
             closeModal('modal-checkin');
             document.getElementById('form-checkin').reset();
@@ -4751,7 +4874,7 @@
                 }
             }
             try { localStorage.setItem('garasiku_vehicles', JSON.stringify(window.vehicles)); } catch (e) {}
-            if (window.Index1MasterBridge?.syncOdometersToIndex1) window.Index1MasterBridge.syncOdometersToIndex1().catch(() => {});
+            syncIndex1OdometerAfterLogbook().catch(e => console.warn('Sinkron odometer pasca-logbook gagal:', e));
             closeModal('modal-edit-logbook');
             renderAll();
             showToast('Logbook Diperbarui', 'Perubahan logbook langsung dikirim ke Firebase Firestore.', 'success');
@@ -4808,7 +4931,7 @@
                 }
             }
             try { localStorage.setItem('garasiku_vehicles', JSON.stringify(window.vehicles)); } catch (e) {}
-            if (window.Index1MasterBridge?.syncOdometersToIndex1) window.Index1MasterBridge.syncOdometersToIndex1().catch(() => {});
+            syncIndex1OdometerAfterLogbook().catch(e => console.warn('Sinkron odometer pasca-logbook gagal:', e));
             renderAll();
             showToast('Logbook Dihapus', 'Catatan logbook langsung dihapus dari Firebase Firestore.', 'success');
         }
@@ -4983,10 +5106,6 @@
             if (event) event.preventDefault();
             closeModal('modal-add-vehicle');
             showToast('Master Armada Index 1', 'Tambah kendaraan dilakukan di Index 1. GarasiKu hanya mengelola pengaturan operasional.', 'info');
-        }
-
-        function deleteVehicle(id) {
-            showToast('Master Armada Index 1', 'Hapus kendaraan dilakukan di Index 1. GarasiKu tidak menghapus master armada.', 'info');
         }
 
         // Driver Master Cards
@@ -5204,20 +5323,6 @@
             showToast("Master E-Toll Terpusat", "Tambah kartu dilakukan di aplikasi RekapToll. GarasiKu hanya membaca database kartu tersebut.", "info");
         }
 
-        function openEditEtollModal(etollId) {
-            closeModal('modal-stat-detail');
-            const card = window.etolls.find(e => e.id === etollId);
-            if (!card) return;
-
-            document.getElementById('edit-etoll-id').value = card.id;
-            document.getElementById('edit-etoll-name').value = card.name || '';
-            document.getElementById('edit-etoll-bank').value = card.bank || 'Mandiri';
-            document.getElementById('edit-etoll-balance').value = card.balance || 0;
-            document.getElementById('edit-etoll-cardno').value = card.cardNo || '';
-
-            openModal('modal-edit-etoll');
-        }
-
         async function handleEditEtoll(event) {
             event.preventDefault();
             const id = document.getElementById('edit-etoll-id').value;
@@ -5241,12 +5346,6 @@
                 renderAll();
                 showToast("Kartu Diperbarui", `${card.name} berhasil disimpan.`, "success");
             }
-        }
-
-        function deleteEtoll(id) {
-            const card = window.etolls.find(e => e.id === id);
-            if (!card) return;
-            showToast("Master E-Toll Terpusat", "Hapus kartu dilakukan di aplikasi RekapToll. Setelah dihapus di sana, kartu otomatis hilang dari GarasiKu.", "info");
         }
 
 
@@ -6259,7 +6358,7 @@
                                   '<span class="etoll-status-available px-2 py-0.5 rounded-md text-[10px] font-bold">Di Garasi • SIAP</span>')}
                             </div>
                             <div class="flex items-center space-x-3 text-[11px] text-slate-400">
-                                <span>Total Isi Bulan Ini: <strong class="text-emerald-300 font-mono font-bold">Rp ${(Number(card.monthlyTopupTotal) || 0).toLocaleString('id-ID')}</strong></span>
+                                <span>Total Isi Bulan Ini: <strong class="text-emerald-300 font-mono font-bold">${card.monthlyTopupTotal == null ? 'Belum tersinkron' : 'Rp ' + Number(card.monthlyTopupTotal || 0).toLocaleString('id-ID')}</strong></span>
                                 <span>No: <code class="font-mono text-slate-300">${card.cardNo || '-'}</code></span>
                             </div>
                         </div>
