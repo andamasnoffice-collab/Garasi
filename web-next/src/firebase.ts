@@ -36,10 +36,27 @@ export const index1App = namedApp("garasiku-next-index1", index1Config);
 export const index1Auth = getAuth(index1App);
 export const index1Db = getDatabase(index1App);
 
+const rekapConfig: FirebaseOptions = {
+  apiKey: "AIzaSyA3Gtz2w1erDlP_FtTPTHOes1YZoQ56jJU",
+  authDomain: "rekaptoll-production.firebaseapp.com",
+  databaseURL: "https://rekaptoll-production-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "rekaptoll-production",
+  storageBucket: "rekaptoll-production.firebasestorage.app",
+  messagingSenderId: "441481183431",
+  appId: "1:441481183431:web:d6490b7f1269a6334bfee2",
+};
+export const rekapApp = namedApp("garasiku-next-rekaptoll", rekapConfig);
+export const rekapAuth = getAuth(rekapApp);
+export const rekapDb = getDatabase(rekapApp);
+
 export async function connectAnonymousSession(): Promise<void> {
   if (!auth.currentUser) await signInAnonymously(auth);
 }
 
 export async function connectIndex1Session(): Promise<void> {
   if (!index1Auth.currentUser) await signInAnonymously(index1Auth);
+}
+
+export async function connectRekapSession(): Promise<void> {
+  if (!rekapAuth.currentUser) await signInAnonymously(rekapAuth);
 }
