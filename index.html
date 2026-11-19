@@ -1874,6 +1874,19 @@
         });
         window.GARASIKU_DEFAULT_FIREBASE_CONFIG = DEFAULT_FIREBASE_CONFIG;
 
+        // Index1 adalah sumber master kendaraan dan odometer. Koneksi terpisah
+        // memakai Anonymous Auth; izin tulis dibatasi Rules pada currentKm.
+        const INDEX1_FIREBASE_CONFIG = Object.freeze({
+            apiKey: "AIzaSyAi0Ucng_tl7jSC9gZtr0JItCBUtkt-vvU",
+            authDomain: "uns-fleet-service.firebaseapp.com",
+            databaseURL: "https://uns-fleet-service-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "uns-fleet-service",
+            storageBucket: "uns-fleet-service.firebasestorage.app",
+            messagingSenderId: "881806830475",
+            appId: "1:881806830475:web:8dcf991ec95ae93b625d8e",
+            measurementId: "G-REWR64QLNH"
+        });
+
         // RekapToll adalah proyek terpisah. GarasiKu hanya memakai Anonymous Auth
         // untuk membaca RTDB sesuai Rules RekapToll; tidak ada operasi tulis.
         const REKAPTOLL_FIREBASE_CONFIG = Object.freeze({
@@ -2960,17 +2973,43 @@
         }
 
         window.Index1MasterBridge = {
-            baseUrl: 'https://uns-fleet-service-default-rtdb.asia-southeast1.firebasedatabase.app',
+            baseUrl: INDEX1_FIREBASE_CONFIG.databaseURL,
             path: 'artifacts/uns-fleet-service/public/data_v2/vehicles',
+            authApp: null,
+            auth: null,
+            authReady: null,
             timer: null,
             syncing: false,
             lastSuccess: null,
             lastOdometerSent: new Map(),
+
+            async getReadWriteToken() {
+                if (!this.authReady) {
+                    this.authReady = (async () => {
+                        const appName = 'garasiku-index1-reader-writer';
+                        this.authApp = getApps().find(app => app.name === appName)
+                            || initializeApp(INDEX1_FIREBASE_CONFIG, appName);
+                        this.auth = getAuth(this.authApp);
+                        if (!this.auth.currentUser) await signInAnonymously(this.auth);
+                        if (!this.auth.currentUser) throw new Error('Anonymous Auth Index1 belum berhasil.');
+                    })().catch(error => {
+                        this.authReady = null;
+                        throw error;
+                    });
+                }
+                await this.authReady;
+                return this.auth.currentUser.getIdToken();
+            },
+
             async sync() {
                 if (this.syncing) return;
                 this.syncing = true;
                 try {
-                    const res = await fetch(`${this.baseUrl}/${this.path}.json?ts=${Date.now()}`, {cache:'no-store'});
+                    const token = await this.getReadWriteToken();
+                    const res = await fetch(`${this.baseUrl}/${this.path}.json?auth=${encodeURIComponent(token)}`, {
+                        cache: 'no-store',
+                        headers: { 'Accept': 'application/json' }
+                    });
                     if (!res.ok) throw new Error(`HTTP ${res.status}`);
                     const data = await res.json();
                     if (!data || typeof data !== 'object' || Array.isArray(data) && data.length === 0 || !Object.keys(data).length) {
@@ -2990,11 +3029,7 @@
                         status: v.status || 'IN_GARAGE'
                     }));
                     applyVehicleSettingsToMaster();
-                    // Daftar driver tidak diambil dari Index 1. Master driver mandiri
-                    // dimuat dari Firestore GarasiKu melalui driver_master/drivers.
-                    // Status kendaraan tetap mengikuti logbook GarasiKu.
-                    // Status operasional Keluar/Masuk wajib mengikuti Logbook GarasiKu
-                    // agar refresh master setiap 5 detik tidak membatalkan transaksi gerbang.
+                    // Driver dikelola terpisah; status keluar/masuk tetap dari logbook GarasiKu.
                     reconcileVehicleOperationalState();
                     this.lastSuccess = new Date();
                     if (typeof renderAll === 'function') renderAll();
@@ -3004,29 +3039,40 @@
                     this.syncing = false;
                 }
             },
+
             async syncOdometersToIndex1() {
                 const list = Array.isArray(window.vehicles) ? window.vehicles : [];
+                let token;
+                try {
+                    token = await this.getReadWriteToken();
+                } catch (e) {
+                    console.warn('Autentikasi Index1 gagal; odometer tidak dikirim:', e.message);
+                    return;
+                }
                 await Promise.all(list.map(async v => {
                     const key = v._fbKey || v.id || normalizePlateKey(v.plate);
                     if (!key) return;
-                    const km = Number(v.odometer ?? v.currentKm ?? 0) || 0;
+                    const km = Number(v.odometer ?? v.currentKm ?? 0);
                     const masterKm = Number(v.currentKm ?? 0) || 0;
                     const sentKm = this.lastOdometerSent.get(String(key));
-                    if (km === masterKm || km === sentKm) return;
+                    if (!Number.isFinite(km) || km < masterKm || km === masterKm || km === sentKm) return;
                     try {
-                        const response = await fetch(`${this.baseUrl}/${this.path}/${encodeURIComponent(key)}.json`, {
-                            method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({currentKm:km})
+                        const response = await fetch(`${this.baseUrl}/${this.path}/${encodeURIComponent(key)}.json?auth=${encodeURIComponent(token)}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                            body: JSON.stringify({ currentKm: km })
                         });
                         if (!response.ok) throw new Error(`HTTP ${response.status}`);
                         this.lastOdometerSent.set(String(key), km);
-                        // Perbarui cache lokal supaya pemanggilan berikutnya tidak PATCH ulang.
                         v.currentKm = km;
-                    } catch (e) { console.warn('Gagal update ODO Index 1:', v.plate, e.message); }
+                    } catch (e) {
+                        console.warn('Gagal update ODO Index 1:', v.plate, e.message);
+                    }
                 }));
             },
+
             start() {
-                // FIX52: satu kali baca saat aplikasi dibuka.
-                // Tidak polling 5 detik; master dibaca ulang hanya saat refresh/manual.
+                // Tidak polling; baca saat aplikasi dibuka atau refresh manual.
                 clearInterval(this.timer);
                 this.timer = null;
                 this.sync();
