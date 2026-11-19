@@ -41,6 +41,7 @@ function renderStats(data: DashboardData): void {
     ["Di Garasi (Ready)", available.length, "Siap ditugaskan", "green"],
     ["Sedang Keluar", active.length, "Di luar garasi", "amber"],
     ["Driver Operasional Ready", readyDrivers.length, "Aktif dan tidak bertugas", "violet"],
+    ["Kartu E-Toll", `${data.etollCards.filter((card) => card.active).length} / ${data.etollCards.length}`, data.monthlyTopupTotal === null ? "Total top up belum terbaca" : `Top up bulan ini Rp ${fmt(data.monthlyTopupTotal)}`, "rose"],
   ];
   const el = $("stats");
   if (el) el.innerHTML = stats.map(([label, value, note, tone]) =>
@@ -90,8 +91,8 @@ function render(data: DashboardData): void {
   const status = $("cloud-status");
   if (status) {
     status.className = "cloud online";
-    status.textContent = data.firestoreConnected && data.index1Connected
-      ? "● Cloud Online • Firestore + Index1"
+    status.textContent = data.firestoreConnected && data.index1Connected && data.rekapConnected
+      ? "● Cloud Online • 3 sumber data"
       : "● Terhubung sebagian";
   }
 }
