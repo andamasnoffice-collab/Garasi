@@ -2458,8 +2458,20 @@
                         for (const lock of lockRefs) lockSnaps.push({ ...lock, snap: await tx.get(lock.ref) });
 
                         if (log.status === 'ACTIVE') {
+                            // Cek juga perjalanan ACTIVE lama yang dibuat sebelum mekanisme
+                            // lock tersedia, agar migrasi tidak membuka celah penugasan ganda.
+                            const activeCol = this.gateLogsCollection();
+                            const activeQueries = [];
+                            if (log.vehicleId) activeQueries.push({ kind: 'kendaraan', snapshot: await tx.get(query(activeCol, where('vehicleId', '==', log.vehicleId), where('status', '==', 'ACTIVE'))) });
+                            if (log.driverId) activeQueries.push({ kind: 'driver', snapshot: await tx.get(query(activeCol, where('driverId', '==', log.driverId), where('status', '==', 'ACTIVE'))) });
                             if (currentSnap.exists() && currentSnap.data()?.status === 'ACTIVE') {
                                 throw new Error('Transaksi kendaraan ini sudah aktif. Muat ulang logbook.');
+                            }
+                            for (const active of activeQueries) {
+                                const conflict = active.snapshot.docs.find(d => d.id !== log.id && !String(d.id).startsWith('__LOCK_'));
+                                if (conflict) throw new Error(active.kind === 'kendaraan'
+                                    ? 'Kendaraan masih memiliki perjalanan aktif. Muat ulang logbook.'
+                                    : 'Driver masih memiliki perjalanan aktif. Muat ulang logbook.');
                             }
                             for (const lock of lockSnaps) {
                                 if (lock.snap.exists() && lock.snap.data()?.tripId !== log.id) {
