@@ -79,8 +79,11 @@ export async function loadDashboard(): Promise<DashboardData> {
     )),
   ]);
 
-  const rawVehicles = asRecord(vehicleSnap.val());
-  const vehicles = Object.entries(rawVehicles).map(([key, value]) =>
+  const rawValue: unknown = vehicleSnap.val();
+  const rawEntries: Array<[string, unknown]> = rawValue && typeof rawValue === "object"
+    ? Object.entries(rawValue as Record<string, unknown>)
+    : [];
+  const vehicles = rawEntries.map(([key, value]) =>
     mapVehicle(key, asRecord(value), settings),
   );
   const driverRows = driversSnap.docs.map((item) => ({
