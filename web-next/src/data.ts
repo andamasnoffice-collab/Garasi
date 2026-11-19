@@ -3,7 +3,10 @@ import {
   type DocumentData,
 } from "firebase/firestore";
 import { get, ref } from "firebase/database";
-import { connectAnonymousSession, connectIndex1Session, db, index1Db } from "./firebase";
+import {
+  connectAnonymousSession, connectIndex1Session, connectRekapSession,
+  db, index1Db, rekapDb,
+} from "./firebase";
 
 export interface Vehicle {
   id: string; plate: string; model: string; category: string; unitNo?: number;
@@ -16,9 +19,14 @@ export interface GateTrip {
   driverName: string; destination?: string; timeOut?: string; timeIn?: string;
   kmStart?: number; status: string;
 }
+export interface EtollCard {
+  id: string; number: string; last4: string; active: boolean;
+  status: "AVAILABLE" | "BORROWED"; holderName: string; nopol: string; balance: number;
+}
 export interface DashboardData {
-  vehicles: Vehicle[]; drivers: Driver[]; trips: GateTrip[];
-  firestoreConnected: boolean; index1Connected: boolean;
+  vehicles: Vehicle[]; drivers: Driver[]; trips: GateTrip[]; etollCards: EtollCard[];
+  monthlyTopupTotal: number | null;
+  firestoreConnected: boolean; index1Connected: boolean; rekapConnected: boolean;
 }
 
 const normalizeCategory = (value: unknown): string => {
@@ -57,8 +65,7 @@ function mapTrip(id: string, raw: DocumentData): GateTrip {
 }
 
 export async function loadDashboard(): Promise<DashboardData> {
-  await connectAnonymousSession();
-  await connectIndex1Session();
+  await Promise.all([connectAnonymousSession(), connectIndex1Session(), connectRekapSession()]);
 
   const sharedRef = doc(db, "garasiku_fleet", "shared_state");
   const sharedSnap = await getDocFromServer(sharedRef);
@@ -66,7 +73,8 @@ export async function loadDashboard(): Promise<DashboardData> {
   const settings = asRecord(shared.vehicleSettings);
 
   const path = "artifacts/uns-fleet-service/public/data_v2/vehicles";
-  const [vehicleSnap, driversSnap, recentSnap, activeSnap] = await Promise.all([
+  const monthKey = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }).slice(0, 7);
+  const [vehicleSnap, driversSnap, recentSnap, activeSnap, cardsSnap, topupsSnap] = await Promise.all([
     get(ref(index1Db, path)),
     getDocsFromServer(collection(db, "garasiku_drivers")),
     getDocsFromServer(query(
@@ -77,6 +85,8 @@ export async function loadDashboard(): Promise<DashboardData> {
       collection(db, "garasiku_fleet", "shared_state", "gate_logs"),
       where("status", "==", "ACTIVE"),
     )),
+    get(ref(rekapDb, "cards")),
+    get(ref(rekapDb, `transactionsByMonth/${monthKey}`)),
   ]);
 
   const rawValue: unknown = vehicleSnap.val();
@@ -105,10 +115,46 @@ export async function loadDashboard(): Promise<DashboardData> {
     Date.parse(b.timeOut || b.timeIn || "") - Date.parse(a.timeOut || a.timeIn || ""),
   );
 
+  const cloudEtollState = asRecord(shared.etollState);
+  const rawCards: unknown = cardsSnap.val();
+  const cardRows = Array.isArray(rawCards) ? rawCards : rawCards && typeof rawCards === "object" ? Object.values(rawCards as Record<string, unknown>) : [];
+  const seenCards = new Set<string>();
+  const etollCards: EtollCard[] = cardRows.map((value, index) => {
+    const card = asRecord(value);
+    const number = String(card.number || card.cardNo || "").replace(/\\D/g, "");
+    const sourceId = String(card.id || `source-${index + 1}`);
+    const key = number ? `number:${number}` : `id:${sourceId}`;
+    if (seenCards.has(key)) return null;
+    seenCards.add(key);
+    const state = asRecord(cloudEtollState[sourceId] || (number ? cloudEtollState[number] : undefined));
+    const status = state.status === "BORROWED" ? "BORROWED" : "AVAILABLE";
+    return {
+      id: sourceId, number, last4: number.slice(-4), active: state.active === true,
+      status, holderName: status === "BORROWED" ? String(state.holderName || "") : "",
+      nopol: String(card.nopol || state.nopol || ""), balance: Number(state.balance) || 0,
+    } as EtollCard;
+  }).filter((card): card is EtollCard => card !== null);
+  const rawTopups: unknown = topupsSnap.val();
+  const topupRows = Array.isArray(rawTopups) ? rawTopups : rawTopups && typeof rawTopups === "object" ? Object.values(rawTopups as Record<string, unknown>) : [];
+  const seenInvoices = new Set<string>();
+  let monthlyTopupTotal = 0;
+  topupRows.forEach((value) => {
+    const tx = asRecord(value);
+    const date = String(tx.date || tx.createdAt || tx.timestamp || "").slice(0, 10);
+    const amount = Number(tx.amount ?? tx.nominal ?? tx.topupAmount);
+    if (!date.startsWith(monthKey) || !Number.isFinite(amount) || amount <= 0) return;
+    const id = String(tx.id || tx.invoiceNumber || tx.invoice || "");
+    const dedupe = id ? `id:${id}` : `${date}|${amount}|${String(tx.etollNumber || tx.cardNumber || tx.number || "")}`;
+    if (seenInvoices.has(dedupe)) return;
+    seenInvoices.add(dedupe);
+    monthlyTopupTotal += amount;
+  });
+
   // Preserve the exact distinction between successful server reads and partial failures.
   return {
-    vehicles, drivers, trips,
+    vehicles, drivers, trips, etollCards, monthlyTopupTotal,
     firestoreConnected: true,
     index1Connected: vehicleSnap.exists(),
+    rekapConnected: cardsSnap.exists(),
   };
 }
