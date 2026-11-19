@@ -6,22 +6,59 @@ if (!root) throw new Error("Elemen aplikasi #app tidak ditemukan.");
 
 root.innerHTML = `
   <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand"><div class="brand-mark">G</div><div><b>GarasiKu</b><small>GATE PRO • NEXT</small></div></div>
-      <nav><a class="selected" href="#dashboard" data-view="dashboard">▦ <span>Monitoring Garasi</span></a><a href="#logbook" data-view="logbook">▤ <span>Logbook Gerbang</span></a><a href="#vehicles" data-view="vehicles">🚘 <span>Daftar Armada</span></a><a href="#drivers" data-view="drivers">♟ <span>Daftar Driver</span></a><a href="#etoll" data-view="etoll">▣ <span>Rekap E-Toll</span></a></nav>
-      <div class="sidebar-foot">Versi baru • Preview paralel</div>
-    </aside>
-    <main class="main">
-      <header class="topbar"><div><h1>Monitoring Garasi</h1><p>Ringkasan operasional armada secara langsung</p></div><div class="top-actions"><span id="cloud-status" class="cloud">● Menghubungkan</span><button id="refresh" class="secondary">↻ Refresh</button></div></header>
-      <div id="dashboard-view" class="view">
-        <section id="stats" class="stats"><div class="stat">Memuat data…</div></section>
-        <section class="section"><div class="section-head"><div><h2>Armada Sedang Bertugas di Luar</h2><p id="active-caption">Memuat perjalanan aktif</p></div><span id="active-count" class="pill">—</span></div><div id="active-trips" class="trip-grid"></div></section>
+    <header class="top-header">
+      <div class="header-inner">
+        <div class="brand">
+          <div class="brand-mark">▤</div>
+          <div class="brand-copy"><div class="brand-line"><b>GarasiKu</b><span class="brand-badge">GATE PRO</span><span class="next-badge">NEXT</span></div><small>Sistem Gerbang Armada &amp; Kendali Pengemudi</small></div>
+        </div>
+        <div class="header-actions">
+          <span id="cloud-status" class="cloud"><i></i> Menghubungkan</span>
+          <button id="refresh" class="refresh-button" type="button"><span>↻</span> Refresh</button>
+        </div>
       </div>
-      <section id="vehicles-view" class="section view hidden"><div class="section-head"><div><h2>Status Seluruh Armada</h2><p>Kendaraan nonaktif tidak ditampilkan</p></div><input id="search" placeholder="Cari plat, unit, model…"/></div><div id="vehicle-grid" class="vehicle-grid"></div></section>
-      <section id="logbook-view" class="section view hidden"><div class="section-head"><div><h2>Logbook Gerbang</h2><p>Riwayat satu bulan terakhir dan semua perjalanan ACTIVE</p></div></div><div class="table-wrap"><table><thead><tr><th>Waktu Keluar</th><th>Kendaraan</th><th>Driver</th><th>Tujuan</th><th>KM Awal</th><th>Status</th></tr></thead><tbody id="logbook-rows"></tbody></table></div></section>
-      <section id="drivers-view" class="section view hidden"><div class="section-head"><div><h2>Daftar Driver</h2><p>Master driver dari Firestore GarasiKu</p></div></div><div class="table-wrap"><table><thead><tr><th>Nama</th><th>Kategori</th><th>Kontak</th><th>Status</th></tr></thead><tbody id="driver-rows"></tbody></table></div></section>
-      <section id="etoll-view" class="section view hidden"><div class="section-head"><div><h2>Rekap Kartu E-Toll</h2><p>Master kartu dari RekapToll • status operasional dari Firestore GarasiKu</p></div></div><div class="table-wrap"><table><thead><tr><th>Kartu</th><th>Nomor Akhir</th><th>Nopol</th><th>Status</th><th>Pemegang</th><th>Saldo</th></tr></thead><tbody id="etoll-rows"></tbody></table></div><p id="topup-total" class="table-note"></p></section>
-      <footer>GarasiKu Next • Data dibaca langsung dari Firebase Server • Mode read-only</footer>
+    </header>
+    <main class="main">
+      <section id="stats" class="stats"><div class="loading-card">Memuat data Firebase…</div></section>
+      <nav class="mobile-tabs" aria-label="Navigasi utama">
+        <a class="tab-btn active" href="#dashboard" data-view="dashboard"><span class="nav-icon">▦</span><span>Monitoring Garasi</span></a>
+        <a class="tab-btn" href="#logbook" data-view="logbook"><span class="nav-icon">▤</span><span>Logbook Gerbang</span></a>
+        <a class="tab-btn" href="#vehicles" data-view="vehicles"><span class="nav-icon">🚘</span><span>Daftar Armada</span></a>
+        <a class="tab-btn" href="#drivers" data-view="drivers"><span class="nav-icon">♟</span><span>Daftar Driver</span></a>
+        <a class="tab-btn etoll-tab" href="#etoll" data-view="etoll"><span class="nav-icon">▣</span><span>Rekap E-Toll</span></a>
+      </nav>
+      <section id="dashboard-view" class="view">
+        <section id="active-section" class="active-section">
+          <div class="section-head active-head"><div><h2><span class="section-icon amber">◉</span> Armada Sedang Bertugas di Luar</h2><p id="active-caption">Memuat perjalanan aktif</p></div><span id="active-count" class="pill">— Unit</span></div>
+          <div id="active-trips" class="trip-grid"></div>
+        </section>
+        <section class="fleet-section">
+          <div class="fleet-heading"><div><h2><span class="section-icon cyan">▦</span> Status Seluruh Armada</h2><p>Sentuh unit untuk memeriksa status operasional</p></div></div>
+          <div class="fleet-toolbar">
+            <input id="monitor-search" type="search" placeholder="⌕  Cari plat, unit, model, driver…" autocomplete="off"/>
+            <div id="category-filters" class="category-filters"></div>
+            <select id="vehicle-sort" aria-label="Urutkan kendaraan"><option value="frequent">Sort: Sering Dipakai</option><option value="unit">Sort: No. Unit</option><option value="category">Sort: Jenis Kendaraan</option><option value="ops">Sort: Mobil Operasional</option><option value="pimpinan">Sort: Mobil Pimpinan</option><option value="plate">Sort: Plat (A-Z)</option><option value="garage">Sort: Siap di Garasi</option><option value="km-asc">Sort: KM Terendah</option><option value="km-desc">Sort: KM Tertinggi</option></select>
+          </div>
+          <div id="monitoring-vehicles-grid" class="vehicle-grid"></div>
+        </section>
+      </section>
+      <section id="vehicles-view" class="section view hidden">
+        <div class="section-head"><div><h2><span class="section-icon cyan">🚘</span> Daftar Armada</h2><p>Master kendaraan dari Index1 • sumber data server</p></div><input id="search" type="search" placeholder="Cari plat, model, kategori…"/></div>
+        <div id="vehicle-grid" class="vehicle-grid"></div>
+      </section>
+      <section id="logbook-view" class="section view hidden">
+        <div class="section-head"><div><h2><span class="section-icon cyan">▤</span> Riwayat Catatan Gerbang Keluar &amp; Masuk</h2><p>Riwayat satu bulan terakhir dan semua perjalanan ACTIVE</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Waktu Keluar</th><th>Kendaraan</th><th>Driver</th><th>Tujuan</th><th>KM Awal</th><th>Status</th></tr></thead><tbody id="logbook-rows"></tbody></table></div>
+      </section>
+      <section id="drivers-view" class="section view hidden">
+        <div class="section-head"><div><h2><span class="section-icon cyan">♟</span> Daftar Driver</h2><p>Master driver dari Firestore GarasiKu</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Nama</th><th>Kategori</th><th>Kontak</th><th>Status</th></tr></thead><tbody id="driver-rows"></tbody></table></div>
+      </section>
+      <section id="etoll-view" class="section view hidden">
+        <div class="section-head"><div><h2><span class="section-icon rose">▣</span> Rekap Mutasi E-Toll</h2><p>Master kartu dari RekapToll • status operasional dari Firestore GarasiKu</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Kartu</th><th>Nomor Akhir</th><th>Nopol</th><th>Status</th><th>Pemegang</th><th>Saldo</th></tr></thead><tbody id="etoll-rows"></tbody></table></div><p id="topup-total" class="table-note"></p>
+      </section>
+      <footer>GarasiKu • GATE PRO • Versi Web Next (Preview Paralel)</footer>
     </main>
   </div>`;
 
