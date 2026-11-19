@@ -35,7 +35,7 @@ const normalizeCategory = (value: unknown): string => {
   if (["MPV", "SEDAN", "BUS", "HIACE"].includes(text)) return text;
   return text || "Armada";
 };
-const normalizePlate = (value: unknown) => String(value ?? "").trim().toUpperCase();
+const normalizePlate = (value: unknown) => String(value ?? "").trim().toUpperCase().replace(/\s+/g, "");
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 
@@ -50,7 +50,7 @@ function mapVehicle(id: string, raw: Record<string, unknown>, settings: Record<s
     category: normalizeCategory(raw.category), unitNo: Number(raw.unitNo) || undefined,
     currentKm: km, odometer: km,
     active: setting.active !== false, operational: setting.operational !== false,
-    usageCategory: (setting.usageCategory || raw.usageCategory) === "PIMPINAN" ? "PIMPINAN" : "OPERATIONAL",
+    usageCategory: ["PIMPINAN", "EXECUTIVE"].includes(String(setting.usageCategory || raw.usageCategory || raw.vehicleCategory || "").trim().toUpperCase()) ? "PIMPINAN" : "OPERATIONAL",
     status: String(raw.status || "IN_GARAGE"),
   };
 }
@@ -145,24 +145,34 @@ export async function loadDashboard(): Promise<DashboardData> {
 
   const cloudEtollState = asRecord(shared.etollState);
   const rawCards: unknown = cardsSnap?.val();
-  const cardRows = Array.isArray(rawCards) ? rawCards : rawCards && typeof rawCards === "object" ? Object.values(rawCards as Record<string, unknown>) : [];
+  const cardEntries: Array<[string, unknown]> = Array.isArray(rawCards)
+    ? Object.entries(rawCards)
+    : rawCards && typeof rawCards === "object"
+      ? Object.entries(rawCards as Record<string, unknown>)
+      : [];
   const seenCards = new Set<string>();
-  const etollCards: EtollCard[] = cardRows.map((value, index) => {
+  const etollCards: EtollCard[] = cardEntries.map(([sourceKey, value], index) => {
     const card = asRecord(value);
-    const number = String(card.number || card.cardNo || "").replace(/\\D/g, "");
-    const sourceId = String(card.id || `source-${index + 1}`);
-    const key = number ? `number:${number}` : `id:${sourceId}`;
-    if (seenCards.has(key)) return null;
-    seenCards.add(key);
-    const state = asRecord(cloudEtollState[sourceId] || (number ? cloudEtollState[number] : undefined) || cloudEtollState[String(card.id || "")]);
+    const number = String(card.number || card.cardNo || "").replace(/\D/g, "");
+    const sourceId = String(card.id || sourceKey || `source-${index + 1}`);
+    const dedupeKey = number ? `number:${number}` : `id:${sourceId}`;
+    if (seenCards.has(dedupeKey)) return null;
+    seenCards.add(dedupeKey);
+
+    // Sama dengan EtollMasterBridge produksi: cloud state canonical sourceId
+    // lebih diutamakan; key nomor kartu hanya fallback untuk data lama.
+    const canonicalCloud = asRecord(cloudEtollState[sourceId]);
+    const legacyCloud = number ? asRecord(cloudEtollState[number]) : {};
+    const state = Object.keys(canonicalCloud).length ? canonicalCloud
+      : Object.keys(legacyCloud).length ? legacyCloud : {};
     const status = state.status === "BORROWED" ? "BORROWED" : "AVAILABLE";
-    const active = typeof state.active === "boolean"
-      ? state.active
+    const active = typeof state.active === "boolean" ? state.active
       : typeof card.active === "boolean" ? card.active : false;
     return {
       id: sourceId, number, last4: number.slice(-4), active,
       status, holderName: status === "BORROWED" ? String(state.holderName || "") : "",
-      nopol: String(card.nopol || state.nopol || ""), balance: Number(state.balance) || 0,
+      nopol: String(card.nopol || state.nopol || ""),
+      balance: Number.isFinite(Number(state.balance)) ? Number(state.balance) : 0,
     } as EtollCard;
   }).filter((card): card is EtollCard => card !== null);
   const rawTopups: unknown = topupsSnap?.val();
