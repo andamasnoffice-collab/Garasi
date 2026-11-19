@@ -1861,6 +1861,12 @@
         window.__garasikuGetDocFromServer = getDocFromServer;
         window.__garasikuDoc = doc;
 
+        // Bridge aman antara ES module Firebase dan skrip UI klasik di bawahnya.
+        // Import module tidak otomatis menjadi variabel global.
+        window.__garasikuFirebaseSDK = Object.freeze({
+            initializeApp, getApps, getAuth, signInAnonymously
+        });
+
         // Konfigurasi default resmi GarasiKu: proyek yang sudah dikonfirmasi online.
         // Semua instalasi baru diarahkan ke proyek ini; config lama pada localStorage
         // tidak boleh menimpa projectId default yang sudah benar.
@@ -1873,6 +1879,7 @@
             appId: "1:854283207354:web:f836e125e125e8aaaeb883"
         });
         window.GARASIKU_DEFAULT_FIREBASE_CONFIG = DEFAULT_FIREBASE_CONFIG;
+        window.INDEX1_FIREBASE_CONFIG = INDEX1_FIREBASE_CONFIG;
 
         // Index1 adalah sumber master kendaraan dan odometer. Koneksi terpisah
         // memakai Anonymous Auth; izin tulis dibatasi Rules pada currentKm.
@@ -1898,6 +1905,7 @@
             messagingSenderId: "441481183431",
             appId: "1:441481183431:web:d6490b7f1269a6334bfee2"
         });
+        window.REKAPTOLL_FIREBASE_CONFIG = REKAPTOLL_FIREBASE_CONFIG;
 
         // State operasional E-Toll milik GarasiKu disimpan di Firestore.
         // Master identitas kartu tetap berasal dari RekapToll (RTDB).
@@ -2973,7 +2981,7 @@
         }
 
         window.Index1MasterBridge = {
-            baseUrl: INDEX1_FIREBASE_CONFIG.databaseURL,
+            baseUrl: window.INDEX1_FIREBASE_CONFIG.databaseURL,
             path: 'artifacts/uns-fleet-service/public/data_v2/vehicles',
             authApp: null,
             auth: null,
@@ -2987,10 +2995,12 @@
                 if (!this.authReady) {
                     this.authReady = (async () => {
                         const appName = 'garasiku-index1-reader-writer';
-                        this.authApp = getApps().find(app => app.name === appName)
-                            || initializeApp(INDEX1_FIREBASE_CONFIG, appName);
-                        this.auth = getAuth(this.authApp);
-                        if (!this.auth.currentUser) await signInAnonymously(this.auth);
+                        const sdk = window.__garasikuFirebaseSDK;
+                        if (!sdk) throw new Error('Firebase SDK bridge belum siap.');
+                        this.authApp = sdk.getApps().find(app => app.name === appName)
+                            || sdk.initializeApp(window.INDEX1_FIREBASE_CONFIG, appName);
+                        this.auth = sdk.getAuth(this.authApp);
+                        if (!this.auth.currentUser) await sdk.signInAnonymously(this.auth);
                         if (!this.auth.currentUser) throw new Error('Anonymous Auth Index1 belum berhasil.');
                     })().catch(error => {
                         this.authReady = null;
@@ -3132,7 +3142,7 @@
         window.EtollMasterBridge = {
             sourceProjectId: 'rekaptoll-production',
             sourcePath: 'cards',
-            databaseUrl: REKAPTOLL_FIREBASE_CONFIG.databaseURL,
+            databaseUrl: window.REKAPTOLL_FIREBASE_CONFIG.databaseURL,
             authApp: null,
             auth: null,
             authReady: null,
@@ -3147,11 +3157,13 @@
                 if (!this.authReady) {
                     this.authReady = (async () => {
                         const appName = 'garasiku-rekaptoll-reader';
-                        this.authApp = getApps().find(app => app.name === appName)
-                            || initializeApp(REKAPTOLL_FIREBASE_CONFIG, appName);
-                        this.auth = getAuth(this.authApp);
+                        const sdk = window.__garasikuFirebaseSDK;
+                        if (!sdk) throw new Error('Firebase SDK bridge belum siap.');
+                        this.authApp = sdk.getApps().find(app => app.name === appName)
+                            || sdk.initializeApp(window.REKAPTOLL_FIREBASE_CONFIG, appName);
+                        this.auth = sdk.getAuth(this.authApp);
                         if (!this.auth.currentUser) {
-                            await signInAnonymously(this.auth);
+                            await sdk.signInAnonymously(this.auth);
                         }
                         if (!this.auth.currentUser) throw new Error('Anonymous Auth RekapToll belum berhasil.');
                     })().catch(error => {
@@ -6643,6 +6655,13 @@
         }
 
         function renderAll() {
+            // Pastikan seluruh koleksi tersedia sebelum renderer berjalan, termasuk
+            // ketika listener Firebase selesai lebih cepat dari pemuatan cache lokal.
+            if (!Array.isArray(window.logs)) window.logs = [];
+            if (!Array.isArray(window.vehicles)) window.vehicles = [];
+            if (!Array.isArray(window.drivers)) window.drivers = [];
+            if (!Array.isArray(window.etolls)) window.etolls = [];
+            if (!Array.isArray(window.etollLogs)) window.etollLogs = [];
             updateDashboardStats();
             renderMonitoringBay();
             renderLogsTable();
