@@ -1,14 +1,24 @@
 # GarasiKu Web Next
 
-TypeScript + Vite + Firebase modular SDK.
+Modern web client using TypeScript, Vite, and the modular Firebase SDK.
+
+## Current scope
+- Responsive fleet monitoring dashboard.
+- Server reads from the existing GarasiKu Firestore project and Index1 RTDB master vehicle path.
+- Active trips from Firestore `gate_logs`.
+- Driver master from Firestore `garasiku_drivers`.
+- No production writes. This branch is intentionally read-only while data parity is verified.
 
 ## Local setup
-1. Install Node.js LTS.
-2. Copy `.env.example` to `.env.local`.
-3. Fill the existing GarasiKu Web Firebase app values from Firebase Console. Keep `VITE_FIREBASE_PROJECT_ID=garasiku-9580a`.
-4. Run `npm install`, then `npm run dev`.
-5. Run `npm run build` before publishing a preview.
+1. Install Node.js 22 LTS.
+2. Run `npm install`.
+3. Run `npm run dev`.
+4. Run `npm run build` before publishing a preview.
 
-The first screen only performs Anonymous Auth and a server-confirmed read of `garasiku_fleet/shared_state`. It does not write production data.
+Firebase client configuration is copied from the currently running production client. It is public client configuration, not an admin credential. Firestore/RTDB Security Rules and Anonymous Auth remain the actual access controls.
 
-Never commit `.env.local`, service-account credentials, or private signing keys. Firebase web config is not a substitute for Firestore Security Rules.
+## Safety
+- Main production app remains untouched.
+- No Firebase Rules edits, no writes, no data migration, and no Telegram changes.
+- The dashboard reads only the existing source paths; it does not create or modify records.
+- Do not add service-account credentials or private signing keys to this project.
