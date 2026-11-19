@@ -1851,6 +1851,34 @@
     <!-- TOAST NOTIFICATION CONTAINER -->
     <div id="toast-container" class="fixed bottom-16 sm:bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
+    <!-- Read-only authentication for the latest RekapToll RTDB source -->
+    <script type="module">
+        import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        const REKAPTOLL_SOURCE_CONFIG = {
+            apiKey: "AIzaSyA3Gtz2w1erDlP_FtTPTHOes1YZoQ56jJU",
+            authDomain: "rekaptoll-production.firebaseapp.com",
+            databaseURL: "https://rekaptoll-production-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "rekaptoll-production",
+            storageBucket: "rekaptoll-production.firebasestorage.app",
+            messagingSenderId: "441481183431",
+            appId: "1:441481183431:web:d6490b7f1269a6334bfee2"
+        };
+        window.__rekaptollSourceAuthReady = (async () => {
+            const appName = "garasiku-rekaptoll-readonly";
+            const app = getApps().find(item => item.name === appName) || initializeApp(REKAPTOLL_SOURCE_CONFIG, appName);
+            const auth = getAuth(app);
+            if (!auth.currentUser) await signInAnonymously(auth);
+            if (!auth.currentUser) throw new Error("Anonymous Auth RekapToll tidak tersedia.");
+            return auth;
+        })();
+        window.__rekaptollSourceGetToken = async () => {
+            const auth = await window.__rekaptollSourceAuthReady;
+            if (!auth.currentUser) throw new Error("Sesi baca RekapToll belum aktif.");
+            return auth.currentUser.getIdToken();
+        };
+    </script>
+
     <!-- Firebase SDK Modules -->
     <script type="module">
         import { initializeApp, getApps, getApp, deleteApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -3092,7 +3120,7 @@
         // status operasional lokal (ON/OFF, holder, saldo) bila kartu masih ada.
         // ============================================================
         window.EtollMasterBridge = {
-            sourceProjectId: 'etoll-3366c',
+            sourceProjectId: 'rekaptoll-production',
             sourcePath: 'cards',
             intervalMs: 0, // tidak polling otomatis; baca saat startup/manual
             timer: null,
@@ -3104,12 +3132,16 @@
             getLocalMonthKey(date = new Date()) {
                 return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
             },
+            async readSourceJson(path) {
+                const token = await window.__rekaptollSourceGetToken();
+                const baseUrl = `https://${this.sourceProjectId}-default-rtdb.asia-southeast1.firebasedatabase.app`;
+                const response = await fetch(`${baseUrl}/${path}.json?auth=${encodeURIComponent(token)}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+                if (!response.ok) throw new Error(`Gagal membaca RekapToll ${path}: HTTP ${response.status}`);
+                return response.json();
+            },
             async syncMonthlyTopups() {
                 const monthKey = this.getLocalMonthKey();
-                const baseUrl = `https://${this.sourceProjectId}-default-rtdb.asia-southeast1.firebasedatabase.app`;
-                const response = await fetch(`${baseUrl}/transactionsByMonth/${monthKey}.json`, { cache: 'no-store' });
-                if (!response.ok) throw new Error(`Gagal membaca transaksi pengisian ${monthKey}: HTTP ${response.status}`);
-                const data = await response.json();
+                const data = await this.readSourceJson(`transactionsByMonth/${monthKey}`);
                 const rows = Array.isArray(data) ? data : (data && typeof data === 'object' ? Object.values(data) : []);
                 const totals = {};
                 const seen = new Set();
@@ -3146,13 +3178,8 @@
             async sync() {
                 if (this.syncing) return;
                 this.syncing = true;
-                const baseUrl = `https://${this.sourceProjectId}-default-rtdb.asia-southeast1.firebasedatabase.app`;
                 try {
-                    const response = await fetch(`${baseUrl}/${this.sourcePath}.json?ts=${Date.now()}`, {
-                        cache: 'no-store'
-                    });
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    const data = await response.json();
+                    const data = await this.readSourceJson(this.sourcePath);
                     if (!Array.isArray(data)) {
                         throw new Error('Format master kartu RekapToll bukan array.');
                     }
