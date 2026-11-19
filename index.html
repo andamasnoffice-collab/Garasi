@@ -2462,8 +2462,8 @@
                             // lock tersedia, agar migrasi tidak membuka celah penugasan ganda.
                             const activeCol = this.gateLogsCollection();
                             const activeQueries = [];
-                            if (log.vehicleId) activeQueries.push({ kind: 'kendaraan', snapshot: await tx.get(query(activeCol, where('vehicleId', '==', log.vehicleId), where('status', '==', 'ACTIVE'))) });
-                            if (log.driverId) activeQueries.push({ kind: 'driver', snapshot: await tx.get(query(activeCol, where('driverId', '==', log.driverId), where('status', '==', 'ACTIVE'))) });
+                            if (log.vehicleId) activeQueries.push({ kind: 'kendaraan', snapshot: await tx.get(query(activeCol, where('vehicleId', '==', log.vehicleId))) });
+                            if (log.driverId) activeQueries.push({ kind: 'driver', snapshot: await tx.get(query(activeCol, where('driverId', '==', log.driverId))) });
                             if (currentSnap.exists() && currentSnap.data()?.status === 'ACTIVE') {
                                 throw new Error('Transaksi kendaraan ini sudah aktif. Muat ulang logbook.');
                             }
