@@ -93,6 +93,9 @@ export async function loadDashboard(): Promise<DashboardData> {
   const rawEntries: Array<[string, unknown]> = rawValue && typeof rawValue === "object"
     ? Object.entries(rawValue as Record<string, unknown>)
     : [];
+  if (!vehicleSnap.exists() || rawEntries.length === 0) {
+    throw new Error("Master kendaraan Index1 kosong/tidak dapat dibaca dari server. Dashboard tidak akan mengganti data dengan cache lokal.");
+  }
   const vehicles = rawEntries.map(([key, value]) =>
     mapVehicle(key, asRecord(value), settings),
   );
