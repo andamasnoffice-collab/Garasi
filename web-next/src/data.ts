@@ -41,7 +41,8 @@ const asRecord = (value: unknown): Record<string, unknown> =>
 
 function mapVehicle(id: string, raw: Record<string, unknown>, settings: Record<string, unknown>): Vehicle {
   const plate = normalizePlate(raw.plate || raw.id || id);
-  const key = plate.replace(/[^A-Z0-9]/g, "");
+  // Samakan persis dengan normalizePlateKey pada aplikasi produksi: hapus spasi, pertahankan tanda hubung.
+  const key = plate.trim().toUpperCase().replace(/\\s+/g, "");
   const setting = asRecord(settings[key]);
   const km = Number(raw.currentKm ?? raw.odometer ?? 0) || 0;
   return {
@@ -49,7 +50,7 @@ function mapVehicle(id: string, raw: Record<string, unknown>, settings: Record<s
     category: normalizeCategory(raw.category), unitNo: Number(raw.unitNo) || undefined,
     currentKm: km, odometer: km,
     active: setting.active !== false, operational: setting.operational !== false,
-    usageCategory: setting.usageCategory === "PIMPINAN" ? "PIMPINAN" : "OPERATIONAL",
+    usageCategory: (setting.usageCategory || raw.usageCategory) === "PIMPINAN" ? "PIMPINAN" : "OPERATIONAL",
     status: String(raw.status || "IN_GARAGE"),
   };
 }
@@ -118,6 +119,30 @@ export async function loadDashboard(): Promise<DashboardData> {
     Date.parse(b.timeOut || b.timeIn || "") - Date.parse(a.timeOut || a.timeIn || ""),
   );
 
+  // Match production reconciliation: ACTIVE gate log is authoritative for trip status;
+  // completed logs restore the last kmEnd; with no log data, retain master status.
+  if (trips.length) {
+    vehicles.forEach((vehicle) => {
+      const activeTrip = trips.find((trip) => trip.vehicleId === vehicle.id && trip.status === "ACTIVE");
+      if (activeTrip) {
+        vehicle.status = "ON_TRIP";
+        if (Number.isFinite(Number(activeTrip.kmStart))) {
+          vehicle.currentKm = Number(activeTrip.kmStart);
+          vehicle.odometer = Number(activeTrip.kmStart);
+        }
+        return;
+      }
+      const completed = trips
+        .filter((trip) => trip.vehicleId === vehicle.id && trip.status === "COMPLETED")
+        .sort((a, b) => Date.parse(b.timeIn || b.timeOut || "") - Date.parse(a.timeIn || a.timeOut || ""))[0];
+      vehicle.status = "IN_GARAGE";
+      if (completed && Number.isFinite(Number(completed.kmEnd))) {
+        vehicle.currentKm = Number(completed.kmEnd);
+        vehicle.odometer = Number(completed.kmEnd);
+      }
+    });
+  }
+
   const cloudEtollState = asRecord(shared.etollState);
   const rawCards: unknown = cardsSnap?.val();
   const cardRows = Array.isArray(rawCards) ? rawCards : rawCards && typeof rawCards === "object" ? Object.values(rawCards as Record<string, unknown>) : [];
@@ -129,10 +154,13 @@ export async function loadDashboard(): Promise<DashboardData> {
     const key = number ? `number:${number}` : `id:${sourceId}`;
     if (seenCards.has(key)) return null;
     seenCards.add(key);
-    const state = asRecord(cloudEtollState[sourceId] || (number ? cloudEtollState[number] : undefined));
+    const state = asRecord(cloudEtollState[sourceId] || (number ? cloudEtollState[number] : undefined) || cloudEtollState[String(card.id || "")]);
     const status = state.status === "BORROWED" ? "BORROWED" : "AVAILABLE";
+    const active = typeof state.active === "boolean"
+      ? state.active
+      : typeof card.active === "boolean" ? card.active : false;
     return {
-      id: sourceId, number, last4: number.slice(-4), active: state.active === true,
+      id: sourceId, number, last4: number.slice(-4), active,
       status, holderName: status === "BORROWED" ? String(state.holderName || "") : "",
       nopol: String(card.nopol || state.nopol || ""), balance: Number(state.balance) || 0,
     } as EtollCard;
