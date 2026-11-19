@@ -1879,33 +1879,6 @@
         window.cloudEtollState = {};
         window.cloudAppSettings = {};
 
-        function firestoreRestValue(value) {
-            if (value === null || value === undefined) return { nullValue: null };
-            if (typeof value === 'boolean') return { booleanValue: value };
-            if (typeof value === 'number') {
-                return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
-            }
-            if (typeof value === 'string') return { stringValue: value };
-            if (Array.isArray(value)) return { arrayValue: { values: value.map(firestoreRestValue) } };
-            if (value instanceof Date) return { timestampValue: value.toISOString() };
-            if (typeof value === 'object') {
-                const fields = {};
-                Object.entries(value).forEach(([k, v]) => { fields[k] = firestoreRestValue(v); });
-                return { mapValue: { fields } };
-            }
-            return { stringValue: String(value) };
-        }
-
-        function firestoreRestDocumentFields(data) {
-            const fields = {};
-            Object.entries(data || {}).forEach(([k, v]) => { fields[k] = firestoreRestValue(v); });
-            return fields;
-        }
-
-        function firestoreRestErrorMessage(payload, status) {
-            return payload?.error?.message || payload?.error?.status || `HTTP ${status}`;
-        }
-
         window.FirebaseBridge = {
             stateBaseline: null,
             stateWriteInFlight: null,
@@ -2737,19 +2710,6 @@
                                 else out[key] = clone(l[key]);
                             }
                             return out;
-                        };
-                        // Merge log E-Toll berdasarkan ID: log baru/perubahan/penghapusan dari perangkat
-                        // ini diterapkan ke versi server terbaru, bukan mengganti seluruh array lama.
-                        const mergeLogs = (base, local, latest) => {
-                            const keyOf = (item, index) => String(item?.id ?? item?.logId ?? `__noid_${index}_${JSON.stringify(item)}`);
-                            const toMap = arr => new Map((Array.isArray(arr) ? arr : []).map((item, i) => [keyOf(item, i), item]));
-                            const b = toMap(base), l = toMap(local), out = toMap(latest);
-                            for (const [key, oldItem] of b) {
-                                if (!l.has(key)) out.delete(key);
-                                else if (!same(oldItem, l.get(key))) out.set(key, clone(l.get(key)));
-                            }
-                            for (const [key, item] of l) if (!b.has(key)) out.set(key, clone(item));
-                            return [...out.values()].sort((a, b) => String(b?.time || b?.timestamp || b?.date || b?.createdAt || '').localeCompare(String(a?.time || a?.timestamp || a?.date || a?.createdAt || '')));
                         };
                         const mergeField = (field, base, local, latest) => {
                             if (same(base, local)) return clone(latest);
@@ -3717,7 +3677,6 @@
             const btnAddVeh = document.getElementById('btn-add-vehicle');
             const btnAddDrv = document.getElementById('btn-add-driver');
             const btnCloudModal = document.getElementById('btn-cloud-settings-modal');
-            const btnStatAddEtoll = document.getElementById('btn-stat-add-etoll');
 
             if (isAdminLoggedIn) {
                 if (badgeIcon) badgeIcon.className = "fa-solid fa-lock-open text-emerald-400 text-xs";
@@ -3735,7 +3694,6 @@
                     btnAddDrv.classList.add('inline-flex');
                 }
                 if (btnCloudModal) btnCloudModal.classList.remove('hidden');
-                if (btnStatAddEtoll) btnStatAddEtoll.classList.add('hidden');
                 document.querySelectorAll('.admin-col').forEach(el => el.classList.remove('hidden'));
             } else {
                 if (badgeIcon) badgeIcon.className = "fa-solid fa-user-shield text-slate-400 text-xs";
@@ -5044,10 +5002,6 @@
             showToast('Master Armada Index 1', 'Tambah kendaraan dilakukan di Index 1. GarasiKu hanya mengelola pengaturan operasional.', 'info');
         }
 
-        function deleteVehicle(id) {
-            showToast('Master Armada Index 1', 'Hapus kendaraan dilakukan di Index 1. GarasiKu tidak menghapus master armada.', 'info');
-        }
-
         // Driver Master Cards
         function renderDriversGrid() {
             const grid = document.getElementById('drivers-cards-grid');
@@ -5263,20 +5217,6 @@
             showToast("Master E-Toll Terpusat", "Tambah kartu dilakukan di aplikasi RekapToll. GarasiKu hanya membaca database kartu tersebut.", "info");
         }
 
-        function openEditEtollModal(etollId) {
-            closeModal('modal-stat-detail');
-            const card = window.etolls.find(e => e.id === etollId);
-            if (!card) return;
-
-            document.getElementById('edit-etoll-id').value = card.id;
-            document.getElementById('edit-etoll-name').value = card.name || '';
-            document.getElementById('edit-etoll-bank').value = card.bank || 'Mandiri';
-            document.getElementById('edit-etoll-balance').value = card.balance || 0;
-            document.getElementById('edit-etoll-cardno').value = card.cardNo || '';
-
-            openModal('modal-edit-etoll');
-        }
-
         async function handleEditEtoll(event) {
             event.preventDefault();
             const id = document.getElementById('edit-etoll-id').value;
@@ -5300,12 +5240,6 @@
                 renderAll();
                 showToast("Kartu Diperbarui", `${card.name} berhasil disimpan.`, "success");
             }
-        }
-
-        function deleteEtoll(id) {
-            const card = window.etolls.find(e => e.id === id);
-            if (!card) return;
-            showToast("Master E-Toll Terpusat", "Hapus kartu dilakukan di aplikasi RekapToll. Setelah dihapus di sana, kartu otomatis hilang dari GarasiKu.", "info");
         }
 
 
