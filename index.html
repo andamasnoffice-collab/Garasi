@@ -2391,6 +2391,24 @@
                     window.logs = [...byId.values()].sort((a, b) =>
                         new Date(b.timeOut || b.timeIn || 0) - new Date(a.timeOut || a.timeIn || 0)
                     );
+                    // Seed lock dokumen untuk perjalanan ACTIVE yang sudah ada sebelum
+                    // mekanisme lock lintas perangkat diterapkan. Hanya membaca/menulis
+                    // dokumen lock per perjalanan aktif; tidak memindai histori lama.
+                    for (const trip of window.logs.filter(item => item.status === 'ACTIVE')) {
+                        const safe = value => String(value || '').trim().replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 120);
+                        const refs = [];
+                        if (trip.vehicleId) refs.push({ ref: this.gateLogRef('__LOCK_VEHICLE__' + safe(trip.vehicleId)), kind: 'vehicle' });
+                        if (trip.driverId) refs.push({ ref: this.gateLogRef('__LOCK_DRIVER__' + safe(trip.driverId)), kind: 'driver' });
+                        for (const item of refs) {
+                            await runTransaction(this.db, async tx => {
+                                const lockSnap = await tx.get(item.ref);
+                                if (!lockSnap.exists()) tx.set(item.ref, {
+                                    type: 'ACTIVE_TRIP_LOCK', tripId: trip.id, vehicleId: trip.vehicleId || null,
+                                    driverId: trip.driverId || null, updatedAt: new Date().toISOString()
+                                }, { merge: false });
+                            });
+                        }
+                    }
                     this.gateLogsReady = true;
                     this.isConnected = true;
                     this.lastSyncTime = new Date();
@@ -2460,19 +2478,8 @@
                         if (log.status === 'ACTIVE') {
                             // Cek juga perjalanan ACTIVE lama yang dibuat sebelum mekanisme
                             // lock tersedia, agar migrasi tidak membuka celah penugasan ganda.
-                            const activeCol = this.gateLogsCollection();
-                            // Satu query status ACTIVE untuk seluruh armada (umumnya hanya
-                            // beberapa dokumen), bukan membaca histori per kendaraan/driver.
-                            const activeSnap = await tx.get(query(activeCol, where('status', '==', 'ACTIVE')));
                             if (currentSnap.exists() && currentSnap.data()?.status === 'ACTIVE') {
                                 throw new Error('Transaksi kendaraan ini sudah aktif. Muat ulang logbook.');
-                            }
-                            const activeTrips = activeSnap.docs.filter(d => d.id !== log.id && !String(d.id).startsWith('__LOCK_'));
-                            if (log.vehicleId && activeTrips.some(d => d.data()?.vehicleId === log.vehicleId)) {
-                                throw new Error('Kendaraan masih memiliki perjalanan aktif. Muat ulang logbook.');
-                            }
-                            if (log.driverId && activeTrips.some(d => d.data()?.driverId === log.driverId)) {
-                                throw new Error('Driver masih memiliki perjalanan aktif. Muat ulang logbook.');
                             }
                             for (const lock of lockSnaps) {
                                 if (lock.snap.exists() && lock.snap.data()?.tripId !== log.id) {
