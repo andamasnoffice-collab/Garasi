@@ -1893,6 +1893,8 @@
             measurementId: "G-REWR64QLNH"
         });
 
+        window.INDEX1_FIREBASE_CONFIG = INDEX1_FIREBASE_CONFIG;
+
         // RekapToll adalah proyek terpisah. GarasiKu hanya memakai Anonymous Auth
         // untuk membaca RTDB sesuai Rules RekapToll; tidak ada operasi tulis.
         const REKAPTOLL_FIREBASE_CONFIG = Object.freeze({
@@ -1902,10 +1904,8 @@
             projectId: "rekaptoll-production",
             storageBucket: "rekaptoll-production.firebasestorage.app",
             messagingSenderId: "441481183431",
+            appId: "1:441481183431:web:d6490b7f1269a6334bfee2"
         });
-        window.INDEX1_FIREBASE_CONFIG = INDEX1_FIREBASE_CONFIG;
-
-        const REKAPTOLL_FIREBASE_CONFIG = Object.freeze({
         window.REKAPTOLL_FIREBASE_CONFIG = REKAPTOLL_FIREBASE_CONFIG;
 
         // State operasional E-Toll milik GarasiKu disimpan di Firestore.
