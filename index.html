@@ -1851,34 +1851,6 @@
     <!-- TOAST NOTIFICATION CONTAINER -->
     <div id="toast-container" class="fixed bottom-16 sm:bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-    <!-- Read-only authentication for the latest RekapToll RTDB source -->
-    <script type="module">
-        import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        const REKAPTOLL_SOURCE_CONFIG = {
-            apiKey: "AIzaSyA3Gtz2w1erDlP_FtTPTHOes1YZoQ56jJU",
-            authDomain: "rekaptoll-production.firebaseapp.com",
-            databaseURL: "https://rekaptoll-production-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "rekaptoll-production",
-            storageBucket: "rekaptoll-production.firebasestorage.app",
-            messagingSenderId: "441481183431",
-            appId: "1:441481183431:web:d6490b7f1269a6334bfee2"
-        };
-        window.__rekaptollSourceAuthReady = (async () => {
-            const appName = "garasiku-rekaptoll-readonly";
-            const app = getApps().find(item => item.name === appName) || initializeApp(REKAPTOLL_SOURCE_CONFIG, appName);
-            const auth = getAuth(app);
-            if (!auth.currentUser) await signInAnonymously(auth);
-            if (!auth.currentUser) throw new Error("Anonymous Auth RekapToll tidak tersedia.");
-            return auth;
-        })();
-        window.__rekaptollSourceGetToken = async () => {
-            const auth = await window.__rekaptollSourceAuthReady;
-            if (!auth.currentUser) throw new Error("Sesi baca RekapToll belum aktif.");
-            return auth.currentUser.getIdToken();
-        };
-    </script>
-
     <!-- Firebase SDK Modules -->
     <script type="module">
         import { initializeApp, getApps, getApp, deleteApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -3133,9 +3105,10 @@
                 return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
             },
             async readSourceJson(path) {
-                const token = await window.__rekaptollSourceGetToken();
+                // Pola baca mengikuti dashboard RekapToll: REST RTDB read-only tanpa
+                // menanam API key proyek sumber ke repository GarasiKu.
                 const baseUrl = `https://${this.sourceProjectId}-default-rtdb.asia-southeast1.firebasedatabase.app`;
-                const response = await fetch(`${baseUrl}/${path}.json?auth=${encodeURIComponent(token)}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+                const response = await fetch(`${baseUrl}/${path}.json`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
                 if (!response.ok) throw new Error(`Gagal membaca RekapToll ${path}: HTTP ${response.status}`);
                 return response.json();
             },
