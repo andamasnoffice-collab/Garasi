@@ -85,8 +85,8 @@ export async function loadDashboard(): Promise<DashboardData> {
       collection(db, "garasiku_fleet", "shared_state", "gate_logs"),
       where("status", "==", "ACTIVE"),
     )),
-    get(ref(rekapDb, "cards")),
-    get(ref(rekapDb, `transactionsByMonth/${monthKey}`)),
+    get(ref(rekapDb, "cards")).catch(() => null),
+    get(ref(rekapDb, `transactionsByMonth/${monthKey}`)).catch(() => null),
   ]);
 
   const rawValue: unknown = vehicleSnap.val();
@@ -116,7 +116,7 @@ export async function loadDashboard(): Promise<DashboardData> {
   );
 
   const cloudEtollState = asRecord(shared.etollState);
-  const rawCards: unknown = cardsSnap.val();
+  const rawCards: unknown = cardsSnap?.val();
   const cardRows = Array.isArray(rawCards) ? rawCards : rawCards && typeof rawCards === "object" ? Object.values(rawCards as Record<string, unknown>) : [];
   const seenCards = new Set<string>();
   const etollCards: EtollCard[] = cardRows.map((value, index) => {
@@ -134,10 +134,10 @@ export async function loadDashboard(): Promise<DashboardData> {
       nopol: String(card.nopol || state.nopol || ""), balance: Number(state.balance) || 0,
     } as EtollCard;
   }).filter((card): card is EtollCard => card !== null);
-  const rawTopups: unknown = topupsSnap.val();
+  const rawTopups: unknown = topupsSnap?.val();
   const topupRows = Array.isArray(rawTopups) ? rawTopups : rawTopups && typeof rawTopups === "object" ? Object.values(rawTopups as Record<string, unknown>) : [];
   const seenInvoices = new Set<string>();
-  let monthlyTopupTotal = 0;
+  let monthlyTopupTotal: number | null = topupsSnap ? 0 : null;
   topupRows.forEach((value) => {
     const tx = asRecord(value);
     const date = String(tx.date || tx.createdAt || tx.timestamp || "").slice(0, 10);
@@ -147,7 +147,7 @@ export async function loadDashboard(): Promise<DashboardData> {
     const dedupe = id ? `id:${id}` : `${date}|${amount}|${String(tx.etollNumber || tx.cardNumber || tx.number || "")}`;
     if (seenInvoices.has(dedupe)) return;
     seenInvoices.add(dedupe);
-    monthlyTopupTotal += amount;
+    if (monthlyTopupTotal !== null) monthlyTopupTotal += amount;
   });
 
   // Preserve the exact distinction between successful server reads and partial failures.
@@ -155,6 +155,6 @@ export async function loadDashboard(): Promise<DashboardData> {
     vehicles, drivers, trips, etollCards, monthlyTopupTotal,
     firestoreConnected: true,
     index1Connected: vehicleSnap.exists(),
-    rekapConnected: cardsSnap.exists(),
+    rekapConnected: cardsSnap?.exists() ?? false,
   };
 }
