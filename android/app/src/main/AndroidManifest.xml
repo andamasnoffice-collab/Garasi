@@ -2,7 +2,7 @@
  <uses-permission android:name="android.permission.INTERNET"/>
  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
  <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
- <application android:allowBackup="true" android:label="GarasiKu" android:usesCleartextTraffic="false" android:theme="@style/AppTheme" android:supportsRtl="true">
+ <application android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:allowBackup="true" android:label="Garasi UNS" android:usesCleartextTraffic="false" android:theme="@style/AppTheme" android:supportsRtl="true">
   <service android:name=".GarasiKuMessagingService" android:exported="false">
    <intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT"/></intent-filter>
   </service>
