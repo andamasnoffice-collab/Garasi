@@ -17,7 +17,7 @@ public class GarasiKuMessagingService extends FirebaseMessagingService {
  }
  @Override public void onMessageReceived(RemoteMessage message) {
   super.onMessageReceived(message);
-  String title="GarasiKu", body="Ada informasi baru dari GarasiKu.";
+  String title="Garasi UNS", body="Ada informasi baru dari Garasi UNS.";
   if(message.getNotification()!=null) {
    if(message.getNotification().getTitle()!=null) title=message.getNotification().getTitle();
    if(message.getNotification().getBody()!=null) body=message.getNotification().getBody();
