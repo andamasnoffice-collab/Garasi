@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "854283207354",
+    "firebase_url": "https://garasiku-9580a-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "garasiku-9580a",
+    "storage_bucket": "garasiku-9580a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:854283207354:android:1c76159f2e81ff7baeb883",
+        "android_client_info": {
+          "package_name": "id.uns.garasiku"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAVe0vwMCrQO-6exVWKFhxkjYemVD_x0sI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
